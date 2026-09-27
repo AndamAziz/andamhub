@@ -238,20 +238,25 @@ function transcodeEndpoint(relay: RelayConfig | null): string | null {
   return base.replace(/\/proxy\/?$/i, '') + '/transcode.php';
 }
 
+/** The audio fixer runs on the relay host (pm2 `andam-tc`, port 9311), reached through the relay. */
+const LOCAL_TRANSCODER = 'http://127.0.0.1:9311/transcode.php';
+
 async function fetchTranscoded(
   upstream: string,
-  relay: RelayConfig | null,
+  _relay: RelayConfig | null,
 ): Promise<Response | null> {
-  const endpoint = transcodeEndpoint(relay);
-  if (!endpoint) return null;
-  const target = `${endpoint}${endpoint.includes('?') ? '&' : '?'}stream=${encodeURIComponent(upstream)}`;
+  const endpoint = process.env['TRANSCODE_URL'] || LOCAL_TRANSCODER;
+  const direct = `${endpoint}${endpoint.includes('?') ? '&' : '?'}stream=${encodeURIComponent(upstream)}`;
+  // Loopback addresses only exist on the relay host, so ask the shared relay to fetch them.
+  const viaRelay = /^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(endpoint);
+  const target = viaRelay ? relayUrl(direct, null) : direct;
   const ac = new AbortController();
   // ffmpeg needs a moment to open the source; once it answers the stream must
   // keep running, so the guard only covers the handshake.
   const guard = setTimeout(() => ac.abort(), 25_000);
   try {
     const res = await fetch(target, {
-      headers: { ...relayHeaders(relay), 'User-Agent': 'AndamTV/1.0' },
+      headers: { ...relayHeaders(null), 'User-Agent': 'AndamTV/1.0' },
       redirect: 'follow',
       signal: ac.signal,
     });
