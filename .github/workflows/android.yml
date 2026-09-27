@@ -8,6 +8,9 @@ on:
       - "android-app/**"
       - ".github/workflows/android.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -63,6 +66,7 @@ jobs:
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           KS_PASS="${KS_PASS:-andam-store-pass}"
           KEY_ALIAS="${KEY_ALIAS:-andam}"
@@ -80,6 +84,23 @@ jobs:
               rm -f "$RUNNER_TEMP/release.jks"
               echo "::warning title=Keystore secret invalid::ANDROID_KEYSTORE_BASE64 could not be used; generating a fresh keystore instead."
             fi
+          fi
+
+          if [ "$VALID" -eq 0 ]; then
+            mkdir -p "$RUNNER_TEMP/previous-key"
+            for RELEASE_TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName' 2>/dev/null); do
+              rm -f "$RUNNER_TEMP/previous-key/Andam-signing-key.jks"
+              if gh release download "$RELEASE_TAG" --pattern 'Andam-signing-key.jks' \
+                   --dir "$RUNNER_TEMP/previous-key" --clobber 2>/dev/null \
+                 && keytool -list \
+                   -keystore "$RUNNER_TEMP/previous-key/Andam-signing-key.jks" \
+                   -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+                cp "$RUNNER_TEMP/previous-key/Andam-signing-key.jks" "$RUNNER_TEMP/release.jks"
+                VALID=1
+                echo "Reusing the existing Andam signing key"
+                break
+              fi
+            done
           fi
 
           if [ "$VALID" -eq 0 ]; then
@@ -108,22 +129,23 @@ jobs:
             -Pandroid.injected.signing.key.alias="${{ steps.sign.outputs.key_alias }}" \
             -Pandroid.injected.signing.key.password="${{ steps.sign.outputs.key_pass }}"
 
-      - name: Upload generated keystore
-        if: steps.sign.outputs.generated == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          retention-days: 1
-          name: andam-keystore
-          path: ${{ runner.temp }}/release.jks
+      - name: Prepare release downloads
+        run: |
+          mkdir -p release-files
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            release-files/Andam-${{ github.run_number }}.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab \
+            release-files/Andam-${{ github.run_number }}.aab
+          if [ "${{ steps.sign.outputs.generated }}" = "true" ]; then
+            cp "$RUNNER_TEMP/release.jks" release-files/Andam-signing-key.jks
+          fi
 
-      - uses: actions/upload-artifact@v4
-        with:
-          retention-days: 1
-          name: andam-apk
-          path: android-app/android/app/build/outputs/apk/**/*.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          retention-days: 1
-          name: andam-aab
-          path: android-app/android/app/build/outputs/bundle/**/*.aab
+      - name: Publish APK and AAB in Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-build-${{ github.run_number }}
+        run: |
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" release-files/* \
+            --title "Andam Android build ${{ github.run_number }}" \
+            --notes "Signed Android APK and AAB generated from commit ${{ github.sha }}."
