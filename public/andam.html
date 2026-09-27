@@ -2253,7 +2253,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
         /* Movies/episodes through the audio fixer arrive faster than real time.
            Latency chasing would keep speeding up / skipping ahead (choppy
            picture), so for files play at normal speed with a deep buffer. */
-        var file=tc&&kind!=='live';
+        var file=tc&&!isHls;
         p=mpegts.createPlayer({type:'mpegts',isLive:!file,url:src},
           file?{enableStashBuffer:true,stashInitialSize:1024*1024,
                 liveBufferLatencyChasing:false,lazyLoad:false,
