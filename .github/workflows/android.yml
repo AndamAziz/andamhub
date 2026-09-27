@@ -27,19 +27,27 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Check Android SDK
+      - name: Accept Android SDK licenses
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          SDKMANAGER=""
+          for c in "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+                   "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" \
+                   "$ANDROID_HOME/tools/bin/sdkmanager"; do
+            [ -x "$c" ] && SDKMANAGER="$c" && break
+          done
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          else
+            echo "sdkmanager not found, skipping license accept"
+          fi
 
       - name: Install Capacitor
         run: npm install --no-audit --no-fund
 
       - name: Create Android project
         run: |
-          npx cap add android
-          npx cap sync android
+          npx --yes cap add android
+          npx --yes cap sync android
 
       - name: Set version
         working-directory: android-app/android
