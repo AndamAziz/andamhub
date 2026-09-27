@@ -100,23 +100,20 @@ jobs:
           echo "key_pass=$KEY_PASS" >> "$GITHUB_OUTPUT"
 
       - name: Build signed APK + AAB
-        if: steps.sign.outputs.signed == 'true'
         working-directory: android-app/android
-        env:
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ./gradlew assembleRelease bundleRelease \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
-            -Pandroid.injected.signing.store.password="$KS_PASS" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASS"
+            -Pandroid.injected.signing.store.password="${{ steps.sign.outputs.store_pass }}" \
+            -Pandroid.injected.signing.key.alias="${{ steps.sign.outputs.key_alias }}" \
+            -Pandroid.injected.signing.key.password="${{ steps.sign.outputs.key_pass }}"
 
-      - name: Build debug APK + unsigned AAB (no key set)
-        if: steps.sign.outputs.signed != 'true'
-        working-directory: android-app/android
-        run: ./gradlew assembleDebug bundleRelease
+      - name: Upload generated keystore
+        if: steps.sign.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: andam-keystore
+          path: ${{ runner.temp }}/release.jks
 
       - uses: actions/upload-artifact@v4
         with:
