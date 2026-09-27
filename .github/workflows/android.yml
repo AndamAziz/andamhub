@@ -60,9 +60,33 @@ jobs:
         id: sign
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            CLEAN_KEY="$(printf '%s' "$KEYSTORE_BASE64" | sed 's#^data:[^,]*;base64,##' | tr -d '[:space:]')"
+
+            if ! printf '%s' "$CLEAN_KEY" | base64 --decode > "$RUNNER_TEMP/release.jks" 2>/dev/null; then
+              rm -f "$RUNNER_TEMP/release.jks"
+              echo "::error title=Invalid Android keystore Base64::ANDROID_KEYSTORE_BASE64 is not valid Base64. Replace it with the complete Base64 output of your real andam.jks file; do not paste a path or command."
+              exit 1
+            fi
+
+            if [ ! -s "$RUNNER_TEMP/release.jks" ]; then
+              echo "::error title=Empty Android keystore::ANDROID_KEYSTORE_BASE64 decoded to an empty file."
+              exit 1
+            fi
+
+            if [ -z "$KS_PASS" ] || [ -z "$KEY_ALIAS" ]; then
+              echo "::error title=Missing Android signing secret::ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS must both be set."
+              exit 1
+            fi
+
+            if ! keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+              echo "::error title=Android keystore could not be opened::Check that the Base64 came from the correct andam.jks file and that ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS match it."
+              exit 1
+            fi
+
             echo "signed=true" >> "$GITHUB_OUTPUT"
           else
             echo "signed=false" >> "$GITHUB_OUTPUT"
