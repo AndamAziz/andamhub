@@ -100,6 +100,7 @@ function AuthPage() {
         return;
       }
 
+      let token = '';
       if (mode === 'signup') {
         const { data, error: err } = await supabase.auth.signUp({
           email,
