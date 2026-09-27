@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/auth-headers';
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -69,7 +70,7 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      const account = await syncMyAccount({ data: { recordLogin: true } });
+      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
       if (account.suspended) {
         await supabase.auth.signOut();
         setError('This account has been suspended. Contact the administrator.');
@@ -115,7 +116,7 @@ function AuthPage() {
         if (err) throw err;
       }
 
-      const account = await syncMyAccount({ data: { recordLogin: true } });
+      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
       if (account.suspended) {
         await supabase.auth.signOut();
         setError('This account has been suspended. Contact the administrator.');

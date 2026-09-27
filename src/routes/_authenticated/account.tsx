@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/auth-headers';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -35,7 +36,7 @@ function AccountPage() {
 
   const account = useQuery({
     queryKey: ['my-account'],
-    queryFn: () => syncMyAccount({ data: { recordLogin: false } }),
+    queryFn: async () => syncMyAccount({ data: { recordLogin: false }, headers: await authHeaders() }),
   });
 
   const access = useQuery({ queryKey: ['my-access'], queryFn: () => getMyAccess() });
