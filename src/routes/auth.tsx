@@ -43,8 +43,16 @@ function AuthPage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
-      const account = await syncMyAccount({ data: { recordLogin: false } });
-      navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      try {
+        const account = await syncMyAccount({
+          data: { recordLogin: false },
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+        });
+        navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      } catch (err) {
+        // Stale session: stay on the sign-in form instead of crashing.
+        console.warn('[auth] account sync failed', err);
+      }
     });
   }, [navigate]);
 
