@@ -112,15 +112,18 @@ jobs:
         if: steps.sign.outputs.generated == 'true'
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: andam-keystore
           path: ${{ runner.temp }}/release.jks
 
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: andam-apk
           path: android-app/android/app/build/outputs/apk/**/*.apk
 
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: andam-aab
           path: android-app/android/app/build/outputs/bundle/**/*.aab
