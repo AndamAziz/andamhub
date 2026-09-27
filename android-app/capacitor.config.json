@@ -7,6 +7,7 @@
     "androidScheme": "https",
     "allowNavigation": ["ip.andam.uk", "*.andam.uk", "andam-stream-show.lovable.app", "*.supabase.co"]
   },
+  "appendUserAgent": " AndamApp/1.0",
   "android": {
     "allowMixedContent": true
   }

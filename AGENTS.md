@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Android CI publishes APK/AAB downloads through GitHub Releases, not Actions Artifacts, because artifact-storage quotas can block otherwise successful builds.
+- Android OAuth uses the `andam://auth/callback` deep link and the Capacitor Browser/App plugins so social sign-in returns from the system browser to the installed app.
