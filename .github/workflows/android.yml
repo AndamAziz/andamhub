@@ -51,6 +51,7 @@ jobs:
         run: |
           npx --yes cap add android
           npx --yes cap sync android
+          node configure-android.mjs
 
       - name: Set version
         working-directory: android-app/android

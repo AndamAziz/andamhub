@@ -1,6 +1,7 @@
 import { authHeaders } from '@/lib/auth-headers';
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { Apple, Chrome, Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
@@ -9,6 +10,8 @@ import { syncMyAccount } from '@/lib/account.functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import authCinemaBackdrop from '@/assets/auth-cinema-backdrop.jpg';
+import { isAndamNativeApp, startNativeOAuth } from '@/lib/native-auth';
 
 export const Route = createFileRoute('/auth')({
   head: () => ({
@@ -40,28 +43,56 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const finishSignIn = useCallback(async (recordLogin: boolean, token?: string) => {
+    const headers = token ? { Authorization: `Bearer ${token}` } : await authHeaders();
+    const account = await syncMyAccount({ data: { recordLogin }, headers });
+    if (account.suspended) {
+      await supabase.auth.signOut();
+      throw new Error('This account has been suspended. Contact the administrator.');
+    }
+    navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+  }, [navigate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
       try {
-        const account = await syncMyAccount({
-          data: { recordLogin: false },
-          headers: { Authorization: `Bearer ${data.session.access_token}` },
-        });
-        navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+        await finishSignIn(false, data.session.access_token);
       } catch (err) {
         // Stale session: stay on the sign-in form instead of crashing.
         console.warn('[auth] account sync failed', err);
       }
     });
-  }, [navigate]);
+    const onComplete = () => {
+      setBusy(true);
+      void finishSignIn(true)
+        .catch((err) => setError(err instanceof Error ? err.message : 'Sign-in failed'))
+        .finally(() => setBusy(false));
+    };
+    const onNativeError = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      setBusy(false);
+      setError(detail || 'Sign-in failed');
+    };
+    window.addEventListener('andam:native-auth-complete', onComplete);
+    window.addEventListener('andam:native-auth-error', onNativeError);
+    return () => {
+      window.removeEventListener('andam:native-auth-complete', onComplete);
+      window.removeEventListener('andam:native-auth-error', onNativeError);
+    };
+  }, [finishSignIn]);
 
   async function signInWith(provider: 'google' | 'apple') {
     setError('');
     setNotice('');
     setBusy(true);
     try {
+      if (isAndamNativeApp()) {
+        await startNativeOAuth(provider);
+        return;
+      }
       const result = await lovable.auth.signInWithOAuth(provider, {
         redirect_uri: window.location.origin,
       });
@@ -70,13 +101,7 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
-      if (account.suspended) {
-        await supabase.auth.signOut();
-        setError('This account has been suspended. Contact the administrator.');
-        return;
-      }
-      navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      await finishSignIn(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : `${provider} sign-in failed`);
     } finally {
@@ -121,13 +146,7 @@ function AuthPage() {
 
       // Use the token sign-in just returned: session storage may not be readable yet.
       const headers = token ? { Authorization: `Bearer ${token}` } : await authHeaders();
-      const account = await syncMyAccount({ data: { recordLogin: true }, headers });
-      if (account.suspended) {
-        await supabase.auth.signOut();
-        setError('This account has been suspended. Contact the administrator.');
-        return;
-      }
-      navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      await finishSignIn(true, headers['Authorization']?.replace('Bearer ', ''));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -136,23 +155,42 @@ function AuthPage() {
   }
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12">
-        <Link to="/" className="mb-8 text-2xl font-bold tracking-tight text-primary">
+    <main className="dark min-h-[100dvh] bg-background text-foreground lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
+      <section className="relative h-44 overflow-hidden sm:h-56 lg:h-[100dvh]" aria-label="Andam cinema">
+        <img
+          src={authCinemaBackdrop}
+          alt="Dark cinema illuminated by ember and teal lights"
+          width={1024}
+          height={1536}
+          className="absolute inset-0 h-full w-full object-cover object-center opacity-80 lg:opacity-90"
+        />
+        <div className="absolute inset-0 bg-background/35" />
+        <Link
+          to="/"
+          className="absolute left-5 top-[max(1.25rem,env(safe-area-inset-top))] font-heading text-2xl font-bold text-primary sm:left-8 sm:text-3xl lg:left-12 lg:top-10"
+        >
           ANDAM
         </Link>
-        <h1 className="text-3xl font-semibold">
-          {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Reset password'}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {mode === 'forgot'
-            ? 'We will email you a link to choose a new password.'
-            : 'Live TV, movies and shows in one place.'}
+        <p className="absolute bottom-5 left-5 max-w-xs font-heading text-lg font-semibold text-foreground sm:left-8 lg:bottom-12 lg:left-12 lg:text-3xl">
+          Your screen. Your stories.
         </p>
+      </section>
 
-        <form onSubmit={submit} className="mt-8 space-y-4">
+      <section className="mx-auto flex w-full max-w-md flex-col justify-center px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 lg:min-h-[100dvh] lg:py-10">
+        <div>
+          <h1 className="font-heading text-3xl font-bold sm:text-4xl">
+            {mode === 'signin' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mode === 'forgot'
+              ? 'We will email you a secure reset link.'
+              : 'Live TV, movies and shows in one place.'}
+          </p>
+        </div>
+
+        <form onSubmit={submit} className="mt-5 space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-xs font-semibold uppercase text-muted-foreground">Email address</Label>
             <Input
               id="email"
               type="email"
@@ -160,30 +198,44 @@ function AuthPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-11"
+              placeholder="name@example.com"
+              className="h-12 border-input bg-secondary/60 px-4 shadow-none focus-visible:border-primary focus-visible:ring-primary/40"
             />
           </div>
 
           {mode !== 'forgot' && (
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="min-h-11"
-              />
+              <Label htmlFor="password" className="text-xs font-semibold uppercase text-muted-foreground">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 border-input bg-secondary/60 px-4 pr-12 shadow-none focus-visible:border-primary focus-visible:ring-primary/40"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-1.5 top-1.5 h-9 w-9 text-muted-foreground"
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </Button>
+              </div>
             </div>
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {notice && <p className="text-sm text-accent">{notice}</p>}
 
-          <Button type="submit" disabled={busy} className="min-h-11 w-full">
+          <Button type="submit" disabled={busy} className="h-12 w-full text-base font-bold active:scale-[0.98]">
+            {busy && <LoaderCircle className="animate-spin" />}
             {busy
               ? 'Please wait…'
               : mode === 'signin'
@@ -194,73 +246,35 @@ function AuthPage() {
           </Button>
         </form>
 
-        <div className="mt-6 flex items-center gap-3">
+        <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-border" />
-          <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
+          <span className="text-xs font-semibold uppercase text-muted-foreground">or continue with</span>
           <span className="h-px flex-1 bg-border" />
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() => signInWith('google')}
-          className="mt-6 min-h-11 w-full gap-2"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              fill="#4285F4"
-              d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3a7.2 7.2 0 0 1-10.7-3.8H1.3v3.1A12 12 0 0 0 12 24z"
-            />
-            <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1z" />
-            <path
-              fill="#EA4335"
-              d="M12 4.8c1.8 0 3.4.6 4.6 1.8l3.5-3.5A12 12 0 0 0 1.3 6.6l4 3.1A7.2 7.2 0 0 1 12 4.8z"
-            />
-          </svg>
-          Continue with Google
-        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => signInWith('google')} className="h-12 gap-2 font-semibold">
+            <Chrome /> Google
+          </Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => signInWith('apple')} className="h-12 gap-2 bg-background font-semibold">
+            <Apple /> Apple
+          </Button>
+        </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() => signInWith('apple')}
-          className="mt-3 min-h-11 w-full gap-2"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
-            <path d="M17.6 9.05c-.04-1.57.64-2.76 2.03-3.64-.77-1.1-1.93-1.7-3.45-1.8-1.44-.1-3.02.85-3.6.85-.6 0-2.04-.8-3.17-.8C6.12 3.78 4 5.74 4 8.74c0 1.23.45 2.5 1.02 3.4.9 1.38 1.92 2.92 3.3 2.86.6-.02 1.03-.42 1.83-.42.78 0 1.18.42 1.88.4 1.55-.04 2.57-1.4 3.45-2.78.6-.9.85-1.78.86-1.82-.05-.02-1.66-.63-1.68-2.5-.02-1.56 1.26-2.3 1.32-2.34-.74-1.07-1.9-1.2-2.3-1.22-1.04-.08-2.04.58-2.58.58-.55 0-1.42-.55-2.34-.55C7.13 4.65 5 6.67 5 9.88c0 1.9.7 3.9 2.1 5.3 1.1 1.1 2.44 1.65 3.9 1.65 1.57 0 2.96-.64 3.9-1.65-.76-.48-1.4-1.15-1.9-1.94z" />
-          </svg>
-          Continue with Apple
-        </Button>
-
-
-        <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
           {mode !== 'signin' && (
-            <button type="button" className="underline" onClick={() => setMode('signin')}>
+            <Button type="button" variant="link" className="h-11 px-1 text-muted-foreground" onClick={() => setMode('signin')}>
               Back to sign in
-            </button>
+            </Button>
           )}
           {mode === 'signin' && (
             <>
-              <div>
-                <button type="button" className="underline" onClick={() => setMode('signup')}>
-                  Create an account
-                </button>
-              </div>
-              <div>
-                <button type="button" className="underline" onClick={() => setMode('forgot')}>
-                  Forgot your password?
-                </button>
-              </div>
+              <Button type="button" variant="link" className="h-11 px-1 text-muted-foreground" onClick={() => setMode('signup')}>Create account</Button>
+              <Button type="button" variant="link" className="h-11 px-1 text-muted-foreground" onClick={() => setMode('forgot')}>Forgot password?</Button>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

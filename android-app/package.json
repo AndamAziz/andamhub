@@ -5,6 +5,8 @@
   "description": "Android wrapper (APK + AAB) for the Andam platform",
   "dependencies": {
     "@capacitor/android": "6.2.0",
+    "@capacitor/app": "6.0.2",
+    "@capacitor/browser": "6.0.2",
     "@capacitor/cli": "6.2.0",
     "@capacitor/core": "6.2.0"
   }
