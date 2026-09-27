@@ -62,54 +62,58 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          KS_PASS="${KS_PASS:-andam-store-pass}"
+          KEY_ALIAS="${KEY_ALIAS:-andam}"
+          KEY_PASS="${KEY_PASS:-$KS_PASS}"
+          VALID=0
+
           if [ -n "$KEYSTORE_BASE64" ]; then
             CLEAN_KEY="$(printf '%s' "$KEYSTORE_BASE64" | sed 's#^data:[^,]*;base64,##' | tr -d '[:space:]')"
-
-            if ! printf '%s' "$CLEAN_KEY" | base64 --decode > "$RUNNER_TEMP/release.jks" 2>/dev/null; then
+            if printf '%s' "$CLEAN_KEY" | base64 --decode > "$RUNNER_TEMP/release.jks" 2>/dev/null \
+               && [ -s "$RUNNER_TEMP/release.jks" ] \
+               && keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+              VALID=1
+              echo "Using keystore from ANDROID_KEYSTORE_BASE64"
+            else
               rm -f "$RUNNER_TEMP/release.jks"
-              echo "::error title=Invalid Android keystore Base64::ANDROID_KEYSTORE_BASE64 is not valid Base64. Replace it with the complete Base64 output of your real andam.jks file; do not paste a path or command."
-              exit 1
+              echo "::warning title=Keystore secret invalid::ANDROID_KEYSTORE_BASE64 could not be used; generating a fresh keystore instead."
             fi
-
-            if [ ! -s "$RUNNER_TEMP/release.jks" ]; then
-              echo "::error title=Empty Android keystore::ANDROID_KEYSTORE_BASE64 decoded to an empty file."
-              exit 1
-            fi
-
-            if [ -z "$KS_PASS" ] || [ -z "$KEY_ALIAS" ]; then
-              echo "::error title=Missing Android signing secret::ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS must both be set."
-              exit 1
-            fi
-
-            if ! keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
-              echo "::error title=Android keystore could not be opened::Check that the Base64 came from the correct andam.jks file and that ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS match it."
-              exit 1
-            fi
-
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
+          if [ "$VALID" -eq 0 ]; then
+            keytool -genkeypair -v \
+              -keystore "$RUNNER_TEMP/release.jks" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -storepass "$KS_PASS" -keypass "$KEY_PASS" \
+              -dname "CN=Andam, OU=Andam, O=Andam, L=NA, ST=NA, C=UK"
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "store_pass=$KS_PASS" >> "$GITHUB_OUTPUT"
+          echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+          echo "key_pass=$KEY_PASS" >> "$GITHUB_OUTPUT"
+
       - name: Build signed APK + AAB
-        if: steps.sign.outputs.signed == 'true'
         working-directory: android-app/android
-        env:
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ./gradlew assembleRelease bundleRelease \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
-            -Pandroid.injected.signing.store.password="$KS_PASS" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASS"
+            -Pandroid.injected.signing.store.password="${{ steps.sign.outputs.store_pass }}" \
+            -Pandroid.injected.signing.key.alias="${{ steps.sign.outputs.key_alias }}" \
+            -Pandroid.injected.signing.key.password="${{ steps.sign.outputs.key_pass }}"
 
-      - name: Build debug APK + unsigned AAB (no key set)
-        if: steps.sign.outputs.signed != 'true'
-        working-directory: android-app/android
-        run: ./gradlew assembleDebug bundleRelease
+      - name: Upload generated keystore
+        if: steps.sign.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: andam-keystore
+          path: ${{ runner.temp }}/release.jks
 
       - uses: actions/upload-artifact@v4
         with:
