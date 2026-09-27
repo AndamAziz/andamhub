@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Android CI publishes APK/AAB downloads through GitHub Releases, not Actions Artifacts, because artifact-storage quotas can block otherwise successful builds.
