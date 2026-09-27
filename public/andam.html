@@ -2067,6 +2067,23 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     s.video.addEventListener('loadeddata',settled,{once:true});
     s.video.addEventListener('canplay',settled,{once:true});
 
+    /* Silent-audio repair: some movies/episodes carry AC3/E-AC3 sound that
+       Chrome/Firefox cannot decode, so the picture plays with no sound. After a
+       few seconds of real playback, if the browser has decoded zero audio,
+       restart once through the server audio fixer (video copied, sound → AAC).
+       Only runs when the sound is actually missing. */
+    if(!tc){
+      var audioCheck=function(){
+        if(!alive()) return;
+        var v=s.video; if(v.currentTime<3) return;
+        v.removeEventListener('timeupdate',audioCheck);
+        var silent=(typeof v.webkitAudioDecodedByteCount==='number'&&v.webkitAudioDecodedByteCount===0)||
+                   (typeof v.mozHasAudio==='boolean'&&v.mozHasAudio===false);
+        if(silent){ console.warn('[player] no decodable audio — switching to audio fix'); lvPlay(kind,token,title,sub,isHls,alt,true) }
+      };
+      s.video.addEventListener('timeupdate',audioCheck);
+    }
+
     /* ---- self-healing -------------------------------------------------
        A channel must never sit frozen. A heartbeat watches the clock and,
        ONLY when playback actually stops moving (or an engine reports a
