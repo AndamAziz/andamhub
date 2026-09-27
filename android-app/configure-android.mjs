@@ -3,13 +3,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 const manifestPath = new URL('./android/app/src/main/AndroidManifest.xml', import.meta.url);
 let manifest = await readFile(manifestPath, 'utf8');
 
-if (!manifest.includes('android:scheme="andam"')) {
+if (!manifest.includes('android:scheme="lovable"')) {
   const deepLinkFilter = `
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="andam" android:host="auth" android:path="/callback" />
+                <data android:scheme="lovable" android:host="oauth-callback" />
             </intent-filter>`;
 
   const activityEnd = manifest.indexOf('</activity>');

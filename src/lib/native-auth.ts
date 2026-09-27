@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 const OAUTH_STATE_KEY = 'andam-native-oauth-state';
-const NATIVE_CALLBACK = 'andam://auth/callback';
+const NATIVE_CALLBACK = 'lovable://oauth-callback';
 
 type NativeOAuthProvider = 'google' | 'apple';
 
