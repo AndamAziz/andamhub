@@ -1,0 +1,13 @@
+{
+  "appId": "uk.andam.app",
+  "appName": "Andam",
+  "webDir": "www",
+  "server": {
+    "url": "https://ip.andam.uk",
+    "androidScheme": "https",
+    "allowNavigation": ["ip.andam.uk", "*.andam.uk", "andam-stream-show.lovable.app", "*.supabase.co"]
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
