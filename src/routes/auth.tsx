@@ -146,7 +146,7 @@ function AuthPage() {
 
       // Use the token sign-in just returned: session storage may not be readable yet.
       const headers = token ? { Authorization: `Bearer ${token}` } : await authHeaders();
-      await finishSignIn(true, headers.Authorization?.replace('Bearer ', ''));
+      await finishSignIn(true, headers['Authorization']?.replace('Bearer ', ''));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
