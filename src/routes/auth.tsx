@@ -111,12 +111,16 @@ function AuthPage() {
           setNotice('Account created. Check your email to confirm before signing in.');
           return;
         }
+        token = data.session.access_token;
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
+        token = data.session?.access_token ?? '';
       }
 
-      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
+      // Use the token sign-in just returned: session storage may not be readable yet.
+      const headers = token ? { Authorization: `Bearer ${token}` } : await authHeaders();
+      const account = await syncMyAccount({ data: { recordLogin: true }, headers });
       if (account.suspended) {
         await supabase.auth.signOut();
         setError('This account has been suspended. Contact the administrator.');
