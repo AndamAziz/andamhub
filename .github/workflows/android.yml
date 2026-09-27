@@ -66,6 +66,7 @@ jobs:
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           KS_PASS="${KS_PASS:-andam-store-pass}"
           KEY_ALIAS="${KEY_ALIAS:-andam}"
@@ -82,6 +83,19 @@ jobs:
             else
               rm -f "$RUNNER_TEMP/release.jks"
               echo "::warning title=Keystore secret invalid::ANDROID_KEYSTORE_BASE64 could not be used; generating a fresh keystore instead."
+            fi
+          fi
+
+          if [ "$VALID" -eq 0 ]; then
+            mkdir -p "$RUNNER_TEMP/previous-key"
+            if gh release download --pattern 'Andam-signing-key.jks' \
+                 --dir "$RUNNER_TEMP/previous-key" --clobber 2>/dev/null \
+               && keytool -list \
+                 -keystore "$RUNNER_TEMP/previous-key/Andam-signing-key.jks" \
+                 -storepass "$KS_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+              cp "$RUNNER_TEMP/previous-key/Andam-signing-key.jks" "$RUNNER_TEMP/release.jks"
+              VALID=1
+              echo "Reusing signing key from the latest Android release"
             fi
           fi
 
