@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/auth-headers';
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -43,8 +44,16 @@ function AuthPage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
-      const account = await syncMyAccount({ data: { recordLogin: false } });
-      navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      try {
+        const account = await syncMyAccount({
+          data: { recordLogin: false },
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+        });
+        navigate({ to: account.role === 'admin' ? '/admin' : '/', replace: true });
+      } catch (err) {
+        // Stale session: stay on the sign-in form instead of crashing.
+        console.warn('[auth] account sync failed', err);
+      }
     });
   }, [navigate]);
 
@@ -61,7 +70,7 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      const account = await syncMyAccount({ data: { recordLogin: true } });
+      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
       if (account.suspended) {
         await supabase.auth.signOut();
         setError('This account has been suspended. Contact the administrator.');
@@ -107,7 +116,7 @@ function AuthPage() {
         if (err) throw err;
       }
 
-      const account = await syncMyAccount({ data: { recordLogin: true } });
+      const account = await syncMyAccount({ data: { recordLogin: true }, headers: await authHeaders() });
       if (account.suspended) {
         await supabase.auth.signOut();
         setError('This account has been suspended. Contact the administrator.');

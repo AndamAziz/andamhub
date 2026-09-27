@@ -34,7 +34,15 @@ function useSessionBridge(frame: React.RefObject<HTMLIFrameElement | null>) {
       const { data: sessionData } = await supabase.auth.getSession();
       const session = sessionData.session;
       if (!session?.user) return { signedIn: false, role: "guest" as string, token: null };
-      const account = await syncMyAccount({ data: { recordLogin: false } });
+      // Send the token we already hold, so a race in the global attacher can't drop it;
+      // a failed sync (stale session) must never blank the homepage.
+      const account = await syncMyAccount({
+        data: { recordLogin: false },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }).catch((err) => {
+        console.warn("[home] account sync failed", err);
+        return null;
+      });
       // Same-origin iframe only: the token lets the homepage read this user's
       // own watch history and any privately granted providers.
       return { signedIn: true, role: account?.role ?? "user", token: session.access_token };

@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/auth-headers';
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -26,7 +27,7 @@ function AdminLayout() {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['my-account'],
-    queryFn: () => syncMyAccount({ data: { recordLogin: false } }),
+    queryFn: async () => syncMyAccount({ data: { recordLogin: false }, headers: await authHeaders() }),
     staleTime: 60_000,
   });
 
