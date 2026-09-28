@@ -17,4 +17,4 @@
 - [x] Verify controls, navigation, and uninterrupted playback on mobile and desktop.
 - [x] Force landscape orientation before fullscreen playback in the Android app.
 - [x] Remove excess space between the fixed header and Live TV/IPTV player.
-- [ ] Verify compact spacing and fullscreen fallback on mobile and laptop.
+- [x] Verify compact spacing and fullscreen fallback on mobile and laptop.
