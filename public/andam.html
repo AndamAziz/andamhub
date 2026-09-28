@@ -1987,6 +1987,74 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
      Each section (Live TV / IPTV) owns a small inline player. Starting or
      repairing a stream never blocks or visually covers the video. */
   var SURF={};
+  function timeText(n){
+    if(!isFinite(n)||n<0) return 'LIVE';
+    n=Math.floor(n); var h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;
+    return (h?h+':':'')+(h&&m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+  function controlsMarkup(){
+    return '<div class="ctrlseek"><span class="ctrltime" data-current>0:00</span><input class="ctrlrange" data-seek type="range" min="0" max="1000" value="0" aria-label="Playback position"><span class="ctrltime" data-duration>LIVE</span></div>'+
+      '<div class="ctrlrow"><button class="ctrlbtn primary" data-control="play" type="button" aria-label="Play or pause">▶</button>'+
+      '<button class="ctrlbtn" data-control="back" type="button" aria-label="Rewind 10 seconds">↶<span class="small">10</span></button>'+
+      '<button class="ctrlbtn" data-control="forward" type="button" aria-label="Forward 10 seconds">↷<span class="small">10</span></button>'+
+      '<span class="ctrllabel" data-title>Andam</span><span class="ctrlspacer"></span>'+
+      '<button class="ctrlbtn" data-control="menu" type="button" aria-label="Categories and channels">☰</button>'+
+      '<button class="ctrlbtn" data-control="mute" type="button" aria-label="Mute or unmute">🔊</button>'+
+      '<button class="ctrlbtn" data-control="fit" type="button" aria-label="Change video fit">Fit</button>'+
+      '<button class="ctrlbtn" data-control="settings" type="button" aria-label="Playback settings">⚙</button>'+
+      '<button class="ctrlbtn" data-control="fullscreen" type="button" aria-label="Enter fullscreen">⛶</button></div>'+
+      '<div class="ctrlsettings" data-settings hidden><div class="ctitle">Playback speed</div>'+
+      '<button class="ctrlsetting" data-speed="0.75" type="button"><span>Slower</span><span>0.75×</span></button>'+
+      '<button class="ctrlsetting on" data-speed="1" type="button"><span>Normal</span><span>1×</span></button>'+
+      '<button class="ctrlsetting" data-speed="1.25" type="button"><span>Faster</span><span>1.25×</span></button></div>';
+  }
+  function showControls(s,hold){
+    if(!s||!s.stage) return;
+    clearTimeout(s.ctrlTimer); s.stage.classList.add('controls-on');
+    if(!hold&&!s.video.paused) s.ctrlTimer=setTimeout(function(){ s.stage.classList.remove('controls-on'); if(s.settings) s.settings.hidden=true },3500);
+  }
+  function updateControls(s){
+    if(!s||!s.controls) return;
+    var v=s.video,d=v.duration,finite=isFinite(d)&&d>0;
+    s.current.textContent=timeText(v.currentTime);
+    s.duration.textContent=finite?timeText(d):'LIVE';
+    s.seek.disabled=!finite; s.seek.value=finite?String(Math.round((v.currentTime/d)*1000)):'1000';
+    s.playBtn.textContent=v.paused?'▶':'Ⅱ';
+    s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
+  }
+  function toggleStageFullscreen(s){
+    if(isStageFullscreen(s)){
+      var exit=document.exitFullscreen||document.webkitExitFullscreen; if(exit) try{ exit.call(document) }catch(_){};
+      return;
+    }
+    var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
+    if(req) try{ var p=req.call(s.stage); if(p&&p.then) p.then(function(){ showControls(s,true) }).catch(function(){}) }catch(_){}
+  }
+  function installControls(s){
+    s.controls.innerHTML=controlsMarkup();
+    s.seek=s.controls.querySelector('[data-seek]'); s.current=s.controls.querySelector('[data-current]');
+    s.duration=s.controls.querySelector('[data-duration]'); s.playBtn=s.controls.querySelector('[data-control="play"]');
+    s.muteBtn=s.controls.querySelector('[data-control="mute"]'); s.fitBtn=s.controls.querySelector('[data-control="fit"]');
+    s.titleCtl=s.controls.querySelector('[data-title]'); s.settings=s.controls.querySelector('[data-settings]');
+    s.controls.addEventListener('click',function(e){
+      var b=e.target.closest('[data-control]'); if(!b) return; e.stopPropagation(); var a=b.getAttribute('data-control'),v=s.video;
+      if(a==='play'){ if(v.paused) v.play().catch(function(){}); else v.pause() }
+      else if(a==='back') try{ v.currentTime=Math.max(0,v.currentTime-10) }catch(_){}
+      else if(a==='forward') try{ v.currentTime=Math.min(isFinite(v.duration)?v.duration:v.currentTime+10,v.currentTime+10) }catch(_){}
+      else if(a==='mute') v.muted=!v.muted;
+      else if(a==='fit'){ s.fit=(s.fit+1)%3; v.style.objectFit=['contain','cover','fill'][s.fit]; b.textContent=['Fit','Fill','Wide'][s.fit] }
+      else if(a==='settings') s.settings.hidden=!s.settings.hidden;
+      else if(a==='menu'){ renderFsNav(s.kind); showFsNav(s,!s.stage.classList.contains('fsactive')); }
+      else if(a==='fullscreen') toggleStageFullscreen(s);
+      updateControls(s); showControls(s,true);
+    });
+    s.controls.addEventListener('click',function(e){ var b=e.target.closest('[data-speed]'); if(!b) return; e.stopPropagation();
+      s.video.playbackRate=parseFloat(b.getAttribute('data-speed'))||1;
+      [].forEach.call(s.settings.querySelectorAll('[data-speed]'),function(x){x.classList.toggle('on',x===b)}); s.settings.hidden=true; showControls(s);
+    });
+    s.seek.addEventListener('input',function(e){ e.stopPropagation(); if(isFinite(s.video.duration)) s.video.currentTime=(Number(s.seek.value)/1000)*s.video.duration; updateControls(s) });
+    ['timeupdate','durationchange','play','pause','volumechange','loadedmetadata'].forEach(function(ev){ s.video.addEventListener(ev,function(){ updateControls(s) }) });
+  }
   function surf(kind){
     if(SURF[kind]) return SURF[kind];
     var p=kind==='iptv'?'ip':'ltv';
@@ -2001,22 +2069,22 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       tag:document.getElementById(p+'NowTag'),
       live:document.getElementById(p+'Live'),
       stage:document.getElementById(p+'Stage'),
-      fsnav:document.getElementById(p+'FsNav'),fsTimer:null,
+      fsnav:document.getElementById(p+'FsNav'),controls:document.getElementById(p+'Controls'),fsTimer:null,ctrlTimer:null,fit:0,
       hls:null,session:0,last:null};
+    installControls(s);
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });
     s.err.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' ') s.err.click() });
     s.stage.addEventListener('dblclick',function(e){
       if(e.target.closest('.fsnav')) return;
-      var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
-      try{ if(req) req.call(s.stage).then(function(){ showFsNav(s,true) }).catch(function(){}) }catch(_){}
+      toggleStageFullscreen(s);
     });
     s.stage.addEventListener('keydown',function(e){
       if((e.key==='f'||e.key==='F')&&!isStageFullscreen(s)){
-        var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
-        if(req){ e.preventDefault(); try{ req.call(s.stage).then(function(){ showFsNav(s,true) }).catch(function(){}) }catch(_){} }
+        e.preventDefault(); toggleStageFullscreen(s);
       }
     });
-    ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(){ if(isStageFullscreen(s)) showFsNav(s,true) },{passive:true}) });
+    s.stage.addEventListener('click',function(e){ if(e.target.closest('.fsnav,.lvcontrols')) return; showControls(s) });
+    ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(e){ if(e.target.closest&&e.target.closest('.fsnav')) return; showControls(s) },{passive:true}) });
     SURF[kind]=s; return s;
   }
   function isStageFullscreen(s){
@@ -2027,7 +2095,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     if(!s||!s.fsnav) return;
     clearTimeout(s.fsTimer); s.stage.classList.toggle('fsactive',!!on);
     s.fsnav.setAttribute('aria-hidden',on?'false':'true');
-    if(on) s.fsTimer=setTimeout(function(){ showFsNav(s,false) },6500);
+    if(on){ showControls(s,true); s.fsTimer=setTimeout(function(){ showFsNav(s,false); showControls(s) },6500) }
   }
   function fsCategories(kind){
     if(kind==='iptv') return [{id:'',name:'All groups',count:ip.channels.length}].concat(ip.groups||[]);
@@ -2045,10 +2113,10 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       '</div></section><section class="fsnavcol"><div class="fsnavhead"><h3>Channels</h3><span>'+chans.length+'</span></div><div class="fsnavlist">'+
       chans.map(function(c,i){return '<button class="fsch'+(playing===c.name?' on':'')+'" type="button" data-fsch="'+esc(c.id)+'" data-name="'+esc(c.name)+'"><span class="no">'+esc(c.num||i+1)+'</span>'+
         (c.logo?'<img src="'+esc(c.logo)+'" alt="" />':'<span class="flogo"></span>')+'<span class="fn">'+esc(c.name)+'</span></button>'}).join('')+
-      '</div></section><span class="fsnavhint">Double tap or move to show navigation</span>';
+      '</div></section><span class="fsnavhint">Choose a category, then switch channels without leaving the player</span>';
   }
   function syncFullscreenNav(){
-    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showFsNav(s,true) } else showFsNav(s,false) });
+    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showControls(s,true) } else { showFsNav(s,false); showControls(s) } });
   }
   document.addEventListener('fullscreenchange',syncFullscreenNav);
   document.addEventListener('webkitfullscreenchange',syncFullscreenNav);
@@ -2059,6 +2127,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   /* slim now-playing bar: logo + name + category tag + LIVE badge */
   function setNow(s,title,sub,logo){
     s.now.textContent=title||'Andam';
+    if(s.titleCtl) s.titleCtl.textContent=title||'Andam';
     var txt=(sub||'').replace(/^●\s*/,'');
     s.sub.textContent=txt||'Andam relay';
     var isLive=/live/i.test(txt);
@@ -2162,6 +2231,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 
     clearFail(s); busy(s,true);
     s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:tc};
+    showControls(s,true); updateControls(s);
     var ok=false,timer=null;
 
 
