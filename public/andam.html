@@ -2140,7 +2140,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       if((e.key==='f'||e.key==='F')&&!isStageFullscreen(s)){
         e.preventDefault(); toggleStageFullscreen(s);
       }
-      if(e.key==='Escape'&&s.stage.classList.contains('fsactive')){ e.preventDefault(); showFsNav(s,false); showControls(s) }
+      if(e.key==='Escape'&&s.stage.classList.contains('fsactive')){ e.preventDefault(); showFsNav(s,false); showControls(s); return }
+      if(e.key==='Escape'&&s.stage.classList.contains('fspseudo')){ e.preventDefault(); pseudoFs(s,false) }
       if((e.key==='Enter'||e.key===' ')&&e.target===s.stage){ e.preventDefault(); if(s.video.paused) s.video.play().catch(function(){}); else s.video.pause() }
       if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key)>=0&&s.stage.classList.contains('fsactive')){
         var item=e.target.closest&&e.target.closest('.fscat,.fsch'); if(!item) return;
