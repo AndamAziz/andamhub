@@ -540,7 +540,10 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
-.lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
+.lvstage:fullscreen,.lvstage:-webkit-full-screen{position:fixed;inset:0;margin:0;width:100vw;height:100vh;aspect-ratio:auto}
+/* Pseudo-fullscreen fallback: some engines collapse the native fullscreen box
+   to 0x0; this class pins the stage over the viewport instead. */
+.lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
 /* An ancestor transform/contain traps the fullscreen element and collapses it
    to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
    any stage inside it is fullscreen. */
