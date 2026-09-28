@@ -539,6 +539,36 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage{position:relative;aspect-ratio:16/9;background:#000}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
+.lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
+.fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
+  justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw);background:linear-gradient(90deg,rgba(5,5,5,.9),rgba(5,5,5,.2) 45%,rgba(5,5,5,.86));
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
+.lvstage:fullscreen .fsnav,.lvstage:-webkit-full-screen .fsnav,.lvstage.fsactive .fsnav{visibility:visible}
+.lvstage.fsactive .fsnav{opacity:1;pointer-events:auto}
+.fsnavcol{min-width:0;align-self:stretch;display:flex;flex-direction:column;overflow:hidden}
+.fsnavhead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px}
+.fsnavhead h3{font-size:clamp(16px,2vw,24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fsnavhead span{font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.fsnavlist{display:flex;flex-direction:column;gap:5px;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.fsnavlist::-webkit-scrollbar{display:none}
+.fscat,.fsch{display:grid;align-items:center;width:100%;min-height:48px;border:1px solid transparent;border-radius:8px;
+  color:rgba(246,246,248,.78);background:rgba(15,15,18,.5);backdrop-filter:blur(12px);text-align:left}
+.fscat{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:0 14px;font-size:13px;font-weight:600}
+.fscat b{font:500 10px/1 'IBM Plex Mono',monospace;color:var(--muted)}
+.fsch{grid-template-columns:32px 42px minmax(0,1fr);gap:10px;padding:5px 10px}
+.fsch .no{font:500 10px/1 'IBM Plex Mono',monospace;color:var(--faint);text-align:center}
+.fsch img,.fsch .flogo{width:38px;height:38px;border-radius:7px;object-fit:contain;background:rgba(255,255,255,.06)}
+.fsch .fn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fscat:hover,.fscat:focus-visible,.fsch:hover,.fsch:focus-visible{background:rgba(255,255,255,.12);color:var(--text);border-color:rgba(255,255,255,.16)}
+.fscat.on,.fsch.on{background:rgba(255,69,0,.2);border-color:rgba(255,69,0,.55);color:var(--text)}
+.fsnavhint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font:500 10px/1 'IBM Plex Mono',monospace;
+  letter-spacing:.08em;color:rgba(246,246,248,.65);white-space:nowrap}
+@media (max-width:700px){
+  .fsnav{grid-template-columns:minmax(112px,34vw) minmax(0,1fr);gap:8px;padding:16px 10px}
+  .fsnavhead{margin-bottom:8px}.fsnavhead h3{font-size:14px}.fsnavhead span,.fsnavhint{display:none}
+  .fscat,.fsch{min-height:44px;border-radius:7px}.fscat{padding:0 9px;font-size:11px}.fscat b{display:none}
+  .fsch{grid-template-columns:24px 34px minmax(0,1fr);gap:7px;padding:4px 7px}.fsch img,.fsch .flogo{width:32px;height:32px}.fsch .fn{font-size:11px}
+}
 .lvidle{position:absolute;inset:0;display:grid;place-items:center;gap:6px;text-align:center;
   background:radial-gradient(circle at 50% 40%,#191A20,#08090C);color:var(--muted);
   font:500 13px Inter,sans-serif;padding:16px}
@@ -550,7 +580,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lverr{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:88%;
   background:rgba(8,9,12,.9);border:1px solid rgba(255,69,0,.4);border-radius:10px;color:#fff;
   font:500 12.5px/1.35 Inter,sans-serif;padding:10px 14px;cursor:pointer;text-align:center}
-/* slim now-playing bar: logo + name + category tag + LIVE badge + small icon actions */
+/* slim now-playing bar: logo + name + category tag + LIVE badge */
 .lvbar{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surface);
   border-top:1px solid var(--hair)}
 .lvbar .lgo{width:26px;height:26px;flex:none;border-radius:7px;object-fit:contain;padding:2px;
@@ -566,10 +596,6 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   border:1px solid rgba(255,69,0,.4);background:rgba(255,69,0,.12);border-radius:999px;padding:3px 8px}
 .lvbar .live[hidden]{display:none}
 .lvbar .live .ld{width:5px;height:5px;border-radius:50%;background:var(--ember);animation:pulse 1.4s ease-in-out infinite}
-.lvbar .ib{margin-left:auto;width:28px;height:28px;flex:none;border-radius:8px;border:1px solid var(--hair);
-  background:rgba(255,255,255,.05);color:var(--muted);font-size:12px;display:grid;place-items:center;cursor:pointer}
-.lvbar .live:not([hidden])+.ib{margin-left:6px}
-.lvbar .ib:hover{color:#fff;background:rgba(255,255,255,.1)}
 .lvbar .sb{display:none}
 
 /* channel browsing column — scrolls inside itself so the page (and therefore
@@ -751,17 +777,17 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   </div>
   <div class="lvmain">
     <div class="lvplayer" id="ltvPlayer">
-      <div class="lvstage">
+      <div class="lvstage" id="ltvStage" aria-label="Live TV player. Double tap for fullscreen navigation">
         <video id="ltvVideo" controls playsinline preload="auto"></video>
         <div class="lvidle" id="ltvIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ltvErr" role="button" tabindex="0"></div>
+        <div class="fsnav" id="ltvFsNav" aria-hidden="true"></div>
       </div>
       <div class="lvbar">
         <img class="lgo" id="ltvNowLogo" alt="" />
         <span class="nm" id="ltvNow">Nothing playing</span>
         <span class="tg" id="ltvNowTag"></span>
         <span class="live" id="ltvLive" hidden><span class="ld"></span>LIVE</span>
-        <button class="ib" id="ltvFs" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
         <span class="sb" id="ltvNowSub">Andam relay</span>
       </div>
     </div>
@@ -793,17 +819,17 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   </div>
   <div class="lvmain">
     <div class="lvplayer" id="ipPlayer">
-      <div class="lvstage">
+      <div class="lvstage" id="ipStage" aria-label="IPTV player. Double tap for fullscreen navigation">
         <video id="ipVideo" controls playsinline preload="auto"></video>
         <div class="lvidle" id="ipIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ipErr" role="button" tabindex="0"></div>
+        <div class="fsnav" id="ipFsNav" aria-hidden="true"></div>
       </div>
       <div class="lvbar">
         <img class="lgo" id="ipNowLogo" alt="" />
         <span class="nm" id="ipNow">Nothing playing</span>
         <span class="tg" id="ipNowTag"></span>
         <span class="live" id="ipLive" hidden><span class="ld"></span>LIVE</span>
-        <button class="ib" id="ipFs" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
         <span class="sb" id="ipNowSub">Andam relay</span>
       </div>
     </div>
