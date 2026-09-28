@@ -799,7 +799,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   </div>
   <div class="lvmain">
     <div class="lvplayer" id="ltvPlayer">
-      <div class="lvstage" id="ltvStage" aria-label="Live TV player. Double tap for fullscreen navigation">
+      <div class="lvstage" id="ltvStage" tabindex="0" aria-label="Live TV player. Double tap for fullscreen navigation">
         <video id="ltvVideo" playsinline preload="auto"></video>
         <div class="lvidle" id="ltvIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ltvErr" role="button" tabindex="0"></div>
@@ -842,7 +842,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   </div>
   <div class="lvmain">
     <div class="lvplayer" id="ipPlayer">
-      <div class="lvstage" id="ipStage" aria-label="IPTV player. Double tap for fullscreen navigation">
+      <div class="lvstage" id="ipStage" tabindex="0" aria-label="IPTV player. Double tap for fullscreen navigation">
         <video id="ipVideo" playsinline preload="auto"></video>
         <div class="lvidle" id="ipIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ipErr" role="button" tabindex="0"></div>
@@ -2082,6 +2082,17 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       if((e.key==='f'||e.key==='F')&&!isStageFullscreen(s)){
         e.preventDefault(); toggleStageFullscreen(s);
       }
+      if(e.key==='Escape'&&s.stage.classList.contains('fsactive')){ e.preventDefault(); showFsNav(s,false); showControls(s) }
+      if((e.key==='Enter'||e.key===' ')&&e.target===s.stage){ e.preventDefault(); if(s.video.paused) s.video.play().catch(function(){}); else s.video.pause() }
+      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key)>=0&&s.stage.classList.contains('fsactive')){
+        var item=e.target.closest&&e.target.closest('.fscat,.fsch'); if(!item) return;
+        var col=item.closest('.fsnavcol'), list=[].slice.call(col.querySelectorAll('.fscat,.fsch')), i=list.indexOf(item), next=null;
+        if(e.key==='ArrowDown') next=list[Math.min(list.length-1,i+1)];
+        if(e.key==='ArrowUp') next=list[Math.max(0,i-1)];
+        if(e.key==='ArrowRight'&&item.classList.contains('fscat')) next=s.fsnav.querySelector('.fsch');
+        if(e.key==='ArrowLeft'&&item.classList.contains('fsch')) next=s.fsnav.querySelector('.fscat.on')||s.fsnav.querySelector('.fscat');
+        if(next){ e.preventDefault(); next.focus(); next.scrollIntoView({block:'nearest'}) }
+      }
     });
     s.stage.addEventListener('click',function(e){ if(e.target.closest('.fsnav,.lvcontrols')) return; showControls(s) });
     ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(e){ if(e.target.closest&&e.target.closest('.fsnav')) return; showControls(s) },{passive:true}) });
@@ -2532,6 +2543,9 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 
 
   window.lvStopKind=function(kind){ if(SURF[kind]||document.getElementById(kind==='iptv'?'ipPlayer':'ltvPlayer')) lvStop(kind) };
+  /* Controls are ready before providers load, including on an intentionally
+     empty APK installation. No media request is made by this initialization. */
+  surf('live'); surf('iptv');
 
   /* The player is always pinned in place at the top of the section; the channel
      list scrolls inside its own container. No mini / floating player, so any

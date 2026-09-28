@@ -14,4 +14,4 @@
 - [x] Verify fullscreen navigation and playback on mobile and desktop.
 - [x] Add reference-style custom bottom controls for Live TV and IPTV.
 - [x] Connect the controls menu to the fullscreen category/channel overlay.
-- [ ] Verify controls, navigation, and uninterrupted playback on mobile and desktop.
+- [x] Verify controls, navigation, and uninterrupted playback on mobile and desktop.
