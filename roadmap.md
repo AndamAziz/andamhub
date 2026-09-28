@@ -15,3 +15,6 @@
 - [x] Add reference-style custom bottom controls for Live TV and IPTV.
 - [x] Connect the controls menu to the fullscreen category/channel overlay.
 - [x] Verify controls, navigation, and uninterrupted playback on mobile and desktop.
+- [x] Force landscape orientation before fullscreen playback in the Android app.
+- [x] Remove excess space between the fixed header and Live TV/IPTV player.
+- [ ] Verify compact spacing and fullscreen fallback on mobile and laptop.
