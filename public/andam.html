@@ -2153,7 +2153,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       '</div></section><span class="fsnavhint">Choose a category, then switch channels without leaving the player</span>';
   }
   function syncFullscreenNav(){
-    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showControls(s,true) } else { showFsNav(s,false); showControls(s) } });
+    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showControls(s,true) } else { showFsNav(s,false); showControls(s); unlockOrientation() } });
   }
   document.addEventListener('fullscreenchange',syncFullscreenNav);
   document.addEventListener('webkitfullscreenchange',syncFullscreenNav);
