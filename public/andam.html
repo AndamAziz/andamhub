@@ -544,8 +544,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
   justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw);background:linear-gradient(90deg,rgba(5,5,5,.9),rgba(5,5,5,.2) 45%,rgba(5,5,5,.86));
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
-.lvstage:fullscreen .fsnav,.lvstage:-webkit-full-screen .fsnav,.lvstage.fsactive .fsnav{visibility:visible}
-.lvstage.fsactive .fsnav{opacity:1;pointer-events:auto}
+.lvstage.fsactive .fsnav{opacity:1;visibility:visible;pointer-events:auto}
 .fsnavcol{min-width:0;align-self:stretch;display:flex;flex-direction:column;overflow:hidden}
 .fsnavhead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px}
 .fsnavhead h3{font-size:clamp(16px,2vw,24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
