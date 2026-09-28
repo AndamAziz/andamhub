@@ -540,15 +540,15 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
-.lvstage:fullscreen,.lvstage:-webkit-full-screen{position:fixed;inset:0;margin:0;width:100vw;height:100vh;aspect-ratio:auto}
+.lvstage:fullscreen,.lvstage:-webkit-full-screen{position:fixed;inset:0;margin:0;width:100vw;height:100vh;height:100dvh;aspect-ratio:auto;border-radius:0}
 /* Pseudo-fullscreen fallback: some engines collapse the native fullscreen box
    to 0x0; this class pins the stage over the viewport instead. */
-.lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
+.lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;height:100dvh;aspect-ratio:auto;border-radius:0}
 html.fslock,html.fslock body{overflow:hidden;height:100%}
 /* An ancestor transform/contain traps the fullscreen element and collapses it
    to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
    any stage inside it is fullscreen. */
-.lvplayer:has(.lvstage:fullscreen),.lvplayer:has(.lvstage:-webkit-full-screen){
+.lvplayer.fs-shell-active,.lvplayer:has(.lvstage:fullscreen),.lvplayer:has(.lvstage:-webkit-full-screen){
   position:static;transform:none;contain:none;overflow:visible;border:0;border-radius:0}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
   justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw) max(88px,13vh);background:linear-gradient(90deg,rgba(5,5,5,.92),rgba(5,5,5,.18) 46%,rgba(5,5,5,.88));
@@ -2032,8 +2032,8 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     s.playBtn.textContent=v.paused?'▶':'Ⅱ';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
   }
-  /* Rotate before native fullscreen begins. Rotating only after the fullscreen
-     promise resolves can make Android leave fullscreen during its resize. */
+  /* Orientation is independent from the media element. The Android app uses a
+     stable viewport-sized player while the native plugin rotates the screen. */
   function nativeOrientation(){
     try{
       var cap=window.Capacitor;
@@ -2063,42 +2063,88 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
   }
   function pseudoFs(s,on){
+    if(!s||!s.stage) return;
+    clearTimeout(s.fsProbeTimer); s.fsProbeTimer=null;
     s.stage.classList.toggle('fspseudo',!!on);
+    s.player.classList.toggle('fs-shell-active',!!on);
     document.documentElement.classList.toggle('fslock',!!on);
-    if(on){ lockLandscape(); renderFsNav(s.kind); showControls(s,true) } else unlockOrientation();
+    if(on){ lockLandscape(); renderFsNav(s.kind); showControls(s,true); if(s.fsWasPlaying) s.video.play().catch(function(){}) }
+    else { showFsNav(s,false); unlockOrientation(); if(s.fsWasPlaying) s.video.play().catch(function(){}) }
   }
   function toggleStageFullscreen(s){
+    if(!s||s.fsTransitioning) return;
+    clearTimeout(s.fsProbeTimer); s.fsProbeTimer=null;
     if(s.stage.classList.contains('fspseudo')){ pseudoFs(s,false); return }
     if(isStageFullscreen(s)){
-      var exit=document.exitFullscreen||document.webkitExitFullscreen; if(exit) try{ exit.call(document) }catch(_){};
-      unlockOrientation();
+      s.fsTransitioning=true;
+      var exit=document.exitFullscreen||document.webkitExitFullscreen;
+      if(exit) try{
+        var leaving=exit.call(document);
+        if(leaving&&leaving.finally) leaving.finally(function(){ s.fsTransitioning=false });
+        else setTimeout(function(){ s.fsTransitioning=false },300);
+      }catch(_){ s.fsTransitioning=false }
+      else { s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); unlockOrientation() }
+      return;
+    }
+    s.fsWasPlaying=!s.video.paused&&!s.video.ended;
+    /* Capacitor's WebView fullscreen API is unreliable when orientation also
+       changes. A fixed, viewport-sized stage keeps the same media element and
+       decoder alive while Android rotates, so playback never restarts. */
+    if(isNativeApp()){
+      pseudoFs(s,true);
+      if(s.fsWasPlaying) s.video.play().catch(function(){});
       return;
     }
     var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
     var fallback=function(){ pseudoFs(s,true) };
     if(!req){ fallback(); return }
     var enter=function(){
+      s.fsTransitioning=true;
+      s.player.classList.add('fs-shell-active');
       try{
         var p=req.call(s.stage,{navigationUI:'hide'});
+        /* A few desktop engines leave requestFullscreen pending until another
+           gesture. Fall back without replacing or reloading the video. */
+        var enterGuard=setTimeout(function(){
+          if(isStageFullscreen(s)) return;
+          s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback();
+        },1200);
         if(p&&p.then) p.then(function(){
-          if(!isNativeApp()) lockLandscape();
+          clearTimeout(enterGuard);
+          /* If native fullscreen resolved late, keep the already-visible
+             fallback instead of stacking two fullscreen layers. */
+          if(s.stage.classList.contains('fspseudo')){
+            var lateExit=document.exitFullscreen||document.webkitExitFullscreen;
+            if(lateExit) try{ lateExit.call(document) }catch(_){}
+            return;
+          }
+          s.fsTransitioning=false;
           showControls(s,true);
+          if(s.fsWasPlaying) s.video.play().catch(function(){});
         /* Some engines size the native fullscreen box to 0x0 (broken screen).
            Verify the box a beat after entering; if collapsed, switch to the
            pseudo-fullscreen overlay instead. */
-          setTimeout(function(){
+          s.fsProbeTimer=setTimeout(function(){
+            s.fsProbeTimer=null;
             if(!isStageFullscreen(s)) return;
             var r=s.stage.getBoundingClientRect();
             if(r.width<window.innerWidth*0.5||r.height<window.innerHeight*0.5){
-              var ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex) try{ ex.call(document) }catch(_){}
-              pseudoFs(s,true);
+              s.pseudoPending=true;
+              var ex=document.exitFullscreen||document.webkitExitFullscreen;
+              var finish=function(){ s.pseudoPending=false; pseudoFs(s,true) };
+              if(ex) try{
+                var out=ex.call(document);
+                if(out&&out.then) out.then(finish).catch(finish); else setTimeout(finish,100);
+              }catch(_){ finish() } else finish();
             }
-          },500);
-        }).catch(fallback);
-      }catch(_){ fallback() }
+          },700);
+        }).catch(function(){ clearTimeout(enterGuard); s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback() });
+        else { clearTimeout(enterGuard); s.fsTransitioning=false; showControls(s,true) }
+      }catch(_){ s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback() }
     };
-    if(isNativeApp()) lockLandscape().then(function(){ requestAnimationFrame(enter) });
-    else enter();
+    /* Keep this synchronous with the click so laptop browsers retain the user
+       activation required by requestFullscreen(). */
+    enter();
   }
   function installControls(s){
     s.controls.innerHTML=controlsMarkup();
@@ -2139,7 +2185,7 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
       tag:document.getElementById(p+'NowTag'),
       live:document.getElementById(p+'Live'),
       stage:document.getElementById(p+'Stage'),
-      fsnav:document.getElementById(p+'FsNav'),controls:document.getElementById(p+'Controls'),fsTimer:null,ctrlTimer:null,fit:0,
+      fsnav:document.getElementById(p+'FsNav'),controls:document.getElementById(p+'Controls'),fsTimer:null,ctrlTimer:null,fsProbeTimer:null,fsTransitioning:false,pseudoPending:false,fsWasPlaying:false,fit:0,
       hls:null,session:0,last:null};
     installControls(s);
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });
@@ -2198,7 +2244,20 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
       '</div></section><span class="fsnavhint">Choose a category, then switch channels without leaving the player</span>';
   }
   function syncFullscreenNav(){
-    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showControls(s,true) } else { showFsNav(s,false); showControls(s); unlockOrientation() } });
+    ['live','iptv'].forEach(function(kind){
+      if(!SURF[kind]) return;
+      var s=SURF[kind];
+      if(s.pseudoPending) return;
+      s.fsTransitioning=false;
+      if(isStageFullscreen(s)){
+        s.player.classList.add('fs-shell-active'); renderFsNav(kind); showControls(s,true);
+        if(s.fsWasPlaying) s.video.play().catch(function(){});
+      }else{
+        clearTimeout(s.fsProbeTimer); s.fsProbeTimer=null;
+        s.player.classList.remove('fs-shell-active'); showFsNav(s,false); showControls(s); unlockOrientation();
+        if(s.fsWasPlaying) s.video.play().catch(function(){});
+      }
+    });
   }
   document.addEventListener('fullscreenchange',syncFullscreenNav);
   document.addEventListener('webkitfullscreenchange',syncFullscreenNav);
@@ -2362,7 +2421,7 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
          4. restart it through the relay's transcoder (fixes streams whose
             audio or video codec this device cannot decode)
        While everything plays, none of this runs. */
-    var healN=0,lastT=-1,lastMove=Date.now(),healing=false,restartPending=false;
+    var healN=0,lastT=-1,lastMove=Date.now(),healing=false,restartPending=false,nextHealAt=0;
     if(s.hb){ clearInterval(s.hb); s.hb=null }
     function restart(useTc){
       if(!alive()||restartPending) return;
@@ -2394,6 +2453,7 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     function selfHeal(reason){
       if(!alive()||healing) return;
       healing=true; healN++;
+      nextHealAt=Date.now()+4000;
       console.warn('[player] self-heal step',healN,reason||'');
       busy(s,true);
       setTimeout(function(){ healing=false },1500);
@@ -2407,16 +2467,19 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     s.hb=setInterval(function beat(){
       if(!alive()){ clearInterval(s.hb); s.hb=null; return }
       var v=s.video;
+      /* Android suspends media timers while the app is backgrounded. Never
+         mistake that normal suspension for a broken stream. */
+      if(document.hidden){ lastT=v.currentTime; lastMove=Date.now(); nextHealAt=0; return }
       /* Paused by the user, or seeking: nothing to repair. */
       if(v.paused||v.ended||v.seeking){ lastT=v.currentTime; lastMove=Date.now(); return }
       if(v.currentTime>lastT+0.05){
         lastT=v.currentTime; lastMove=Date.now();
-        if(healN){ healN=0; clearFail(s) }
+        if(healN){ healN=0; nextHealAt=0; clearFail(s) }
         busy(s,false);
         return;
       }
       if(Date.now()-lastMove<7000) return;
-      lastMove=Date.now();
+      if(Date.now()<nextHealAt) return;
       selfHeal('no progress');
     },2000);
 
