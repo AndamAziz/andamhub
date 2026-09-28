@@ -2158,7 +2158,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   }
   function isStageFullscreen(s){
     var f=document.fullscreenElement||document.webkitFullscreenElement;
-    return f===s.stage||s.stage.classList.contains('fsnative');
+    return f===s.stage||s.stage.classList.contains('fsnative')||s.stage.classList.contains('fspseudo');
   }
   function showFsNav(s,on){
     if(!s||!s.fsnav) return;
