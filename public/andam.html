@@ -539,6 +539,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   transform:translateZ(0);backface-visibility:hidden;contain:paint}
 .lvstage{position:relative;aspect-ratio:16/9;background:#000}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
+.lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvidle{position:absolute;inset:0;display:grid;place-items:center;gap:6px;text-align:center;
   background:radial-gradient(circle at 50% 40%,#191A20,#08090C);color:var(--muted);
   font:500 13px Inter,sans-serif;padding:16px}
@@ -1945,10 +1946,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   }
 
   /* ---- inline playback through the opaque proxy ----
-     Each section (Live TV / IPTV) owns a small inline player. Nothing about
-     starting a stream blocks the page: no body scroll lock, no full-screen
-     overlay, no channel-list re-render. The only loading affordance is a
-     spinner drawn over the video itself. */
+     Each section (Live TV / IPTV) owns a small inline player. Starting or
+     repairing a stream never blocks or visually covers the video. */
   var SURF={};
   function surf(kind){
     if(SURF[kind]) return SURF[kind];
