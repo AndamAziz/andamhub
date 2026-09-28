@@ -2032,8 +2032,8 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     s.playBtn.textContent=v.paused?'▶':'Ⅱ';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
   }
-  /* Rotate before native fullscreen begins. Rotating only after the fullscreen
-     promise resolves can make Android leave fullscreen during its resize. */
+  /* Orientation is independent from the media element. The Android app uses a
+     stable viewport-sized player while the native plugin rotates the screen. */
   function nativeOrientation(){
     try{
       var cap=window.Capacitor;
@@ -2083,6 +2083,7 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
         if(leaving&&leaving.finally) leaving.finally(function(){ s.fsTransitioning=false });
         else setTimeout(function(){ s.fsTransitioning=false },300);
       }catch(_){ s.fsTransitioning=false }
+      else { s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); unlockOrientation() }
       return;
     }
     s.fsWasPlaying=!s.video.paused&&!s.video.ended;
@@ -2102,7 +2103,21 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
       s.player.classList.add('fs-shell-active');
       try{
         var p=req.call(s.stage,{navigationUI:'hide'});
+        /* A few desktop engines leave requestFullscreen pending until another
+           gesture. Fall back without replacing or reloading the video. */
+        var enterGuard=setTimeout(function(){
+          if(isStageFullscreen(s)) return;
+          s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback();
+        },1200);
         if(p&&p.then) p.then(function(){
+          clearTimeout(enterGuard);
+          /* If native fullscreen resolved late, keep the already-visible
+             fallback instead of stacking two fullscreen layers. */
+          if(s.stage.classList.contains('fspseudo')){
+            var lateExit=document.exitFullscreen||document.webkitExitFullscreen;
+            if(lateExit) try{ lateExit.call(document) }catch(_){}
+            return;
+          }
           s.fsTransitioning=false;
           showControls(s,true);
           if(s.fsWasPlaying) s.video.play().catch(function(){});
@@ -2123,8 +2138,8 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
               }catch(_){ finish() } else finish();
             }
           },700);
-        }).catch(function(){ s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback() });
-        else { s.fsTransitioning=false; showControls(s,true) }
+        }).catch(function(){ clearTimeout(enterGuard); s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback() });
+        else { clearTimeout(enterGuard); s.fsTransitioning=false; showControls(s,true) }
       }catch(_){ s.fsTransitioning=false; s.player.classList.remove('fs-shell-active'); fallback() }
     };
     /* Keep this synchronous with the click so laptop browsers retain the user
