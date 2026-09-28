@@ -42,9 +42,11 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
 .navright{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
 .navsource{display:none;min-width:0;order:1}
 .navsource.on{display:block}
-.navsource .lvsel select{width:clamp(104px,13vw,164px);height:36px;min-height:36px;padding-left:36px}
-.navsource .lvsel::before{content:"";position:absolute;left:13px;width:12px;height:12px;border-radius:3px;
-  border:1px solid var(--ember);box-shadow:0 0 0 2px rgba(255,59,78,.1);pointer-events:none}
+.navsource .lvsel select{width:auto;max-width:150px;height:32px;min-height:32px;padding:0 28px 0 14px;
+  border:1px solid var(--hair);border-radius:999px;background:rgba(255,255,255,.03);box-shadow:none;
+  color:var(--muted);font:500 12.5px/1 Inter,sans-serif;text-overflow:ellipsis}
+.navsource .lvsel select:hover{color:var(--text);background:rgba(255,255,255,.07);border-color:var(--hair)}
+.navsource .lvsel select:focus{outline:none;border-color:var(--hair);box-shadow:none}
 .chip{border:1px solid var(--hair);background:rgba(255,255,255,.03);border-radius:999px;padding:6px 12px;font-size:11.5px;color:var(--muted)}
 .iconbtn{width:32px;height:32px;border-radius:9px;border:1px solid var(--hair);display:grid;place-items:center;color:var(--muted);background:rgba(255,255,255,.03)}
 .iconbtn:hover{color:var(--text)}
@@ -336,9 +338,8 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
   .nav{padding:12px 10px;gap:10px}
   .word{display:none}
   .navsource.on{display:block}
-  .navsource .lvsel select{width:88px;height:40px;min-height:40px;padding:0 25px 0 29px;font-size:11px}
-  .navsource .lvsel::before{left:11px;width:10px;height:10px}
-  .navsource .lvsel::after{right:11px;width:6px;height:6px}
+  .navsource .lvsel select{max-width:118px;height:40px;min-height:40px;padding:0 24px 0 12px;font-size:11px}
+  .navsource .lvsel::after{right:12px;width:6px;height:6px}
   .links{display:none}
   .burger{display:grid;width:40px;height:40px}
   .navright{gap:5px}
@@ -672,8 +673,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   </div>
   <div class="navright">
     <div class="navsource" id="navSource" aria-label="Active provider">
-      <div class="lvsel accent" id="liveSourceWrap"><select id="provSel" aria-label="Provider"></select></div>
-      <div class="lvsel accent" id="iptvSourceWrap" hidden><select id="ipSrcSel" aria-label="Playlist source"></select></div>
+      <div class="lvsel" id="liveSourceWrap"><select id="provSel" aria-label="Provider"></select></div>
+      <div class="lvsel" id="iptvSourceWrap" hidden><select id="ipSrcSel" aria-label="Playlist source"></select></div>
     </div>
     <div class="autharea" id="authArea">
       <a class="authbtn" id="authAccount" href="/auth" target="_top">Sign in</a>
