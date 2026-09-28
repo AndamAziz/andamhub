@@ -8,7 +8,7 @@
 - [x] Place the compact provider selector beside Account on mobile Live TV/IPTV views.
 - [x] Replace inline category selectors with a smooth category drawer.
 - [x] Verify continuous playback controls and the revised mobile layout.
-- [ ] Remove fullscreen and category icons from the player status bars.
-- [ ] Add fullscreen category and channel navigation overlays for Live TV and IPTV.
-- [ ] Keep channel switching seamless and strengthen recovery without buffering loops.
+- [x] Remove fullscreen and category icons from the player status bars.
+- [x] Add fullscreen category and channel navigation overlays for Live TV and IPTV.
+- [x] Keep channel switching seamless and strengthen recovery without buffering loops.
 - [ ] Verify fullscreen navigation and playback on mobile and desktop.
