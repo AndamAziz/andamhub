@@ -2055,14 +2055,38 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     }catch(_){}
     try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
   }
+  function pseudoFs(s,on){
+    s.stage.classList.toggle('fspseudo',!!on);
+    document.documentElement.classList.toggle('fslock',!!on);
+    if(on){ lockLandscape(); renderFsNav(s.kind); showControls(s,true) } else unlockOrientation();
+  }
   function toggleStageFullscreen(s){
+    if(s.stage.classList.contains('fspseudo')){ pseudoFs(s,false); return }
     if(isStageFullscreen(s)){
       var exit=document.exitFullscreen||document.webkitExitFullscreen; if(exit) try{ exit.call(document) }catch(_){};
       unlockOrientation();
       return;
     }
     var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
-    if(req) try{ var p=req.call(s.stage); if(p&&p.then) p.then(function(){ lockLandscape(); showControls(s,true) }).catch(function(){}) }catch(_){}
+    var fallback=function(){ pseudoFs(s,true) };
+    if(!req){ fallback(); return }
+    try{
+      var p=req.call(s.stage);
+      if(p&&p.then) p.then(function(){
+        lockLandscape(); showControls(s,true);
+        /* Some engines size the native fullscreen box to 0x0 (broken screen).
+           Verify the box a beat after entering; if collapsed, switch to the
+           pseudo-fullscreen overlay instead. */
+        setTimeout(function(){
+          if(!isStageFullscreen(s)) return;
+          var r=s.stage.getBoundingClientRect();
+          if(r.width<window.innerWidth*0.5||r.height<window.innerHeight*0.5){
+            var ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex) try{ ex.call(document) }catch(_){}
+            pseudoFs(s,true);
+          }
+        },350);
+      }).catch(fallback);
+    }catch(_){ fallback() }
   }
   function installControls(s){
     s.controls.innerHTML=controlsMarkup();
