@@ -543,8 +543,12 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage:fullscreen,.lvstage:-webkit-full-screen{position:fixed;inset:0;margin:0;width:100vw;height:100vh;height:100dvh;aspect-ratio:auto;border-radius:0}
 /* Pseudo-fullscreen fallback: some engines collapse the native fullscreen box
    to 0x0; this class pins the stage over the viewport instead. */
-.lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;height:100dvh;aspect-ratio:auto;border-radius:0}
-html.fslock,html.fslock body{overflow:hidden;height:100%}
+.lvstage.fspseudo{position:fixed!important;inset:0!important;z-index:2147483647!important;
+  width:var(--fs-width,100vw)!important;height:var(--fs-height,100dvh)!important;max-width:none!important;max-height:none!important;
+  margin:0!important;aspect-ratio:auto!important;border:0!important;border-radius:0!important;transform:none!important;contain:none!important;background:#000}
+html.fslock,html.fslock body{overflow:hidden!important;width:100%!important;height:100%!important;background:#000!important}
+body.player-fullscreen>*:not(.lvstage.fspseudo){visibility:hidden!important;pointer-events:none!important}
+body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-events:auto!important}
 /* An ancestor transform/contain traps the fullscreen element and collapses it
    to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
    any stage inside it is fullscreen. */
@@ -599,6 +603,11 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
   .fsch{grid-template-columns:24px 34px minmax(0,1fr);gap:7px;padding:4px 7px}.fsch img,.fsch .flogo{width:32px;height:32px}.fsch .fn{font-size:11px}
   .lvcontrols{padding:28px 8px 6px}.ctrlseek{gap:7px;margin-bottom:2px}.ctrlrow{gap:1px}.ctrlbtn{width:38px;height:38px;min-width:38px;font-size:16px}
   .ctrllabel{display:none}.ctrlsettings{right:8px;bottom:50px}.ctrlrange::-webkit-slider-thumb{width:14px;height:14px}
+}
+@media (orientation:landscape) and (max-height:700px){
+  .lvstage.fspseudo .fsnav{grid-template-columns:minmax(150px,25vw) minmax(260px,38vw);padding:10px 12px 64px;gap:10px}
+  .lvstage.fspseudo .fscat,.lvstage.fspseudo .fsch{min-height:40px}
+  .lvstage.fspseudo .lvcontrols{padding:22px max(10px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
 }
 .lvidle{position:absolute;inset:0;display:grid;place-items:center;gap:6px;text-align:center;
   background:radial-gradient(circle at 50% 40%,#191A20,#08090C);color:var(--muted);
@@ -2062,14 +2071,72 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     if(isNativeApp()&&plugin&&plugin.unlock){ try{ plugin.unlock().catch(function(){}) }catch(_){}; return }
     try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
   }
+  function nativeStatusBar(hidden){
+    if(!isNativeApp()) return;
+    try{
+      var cap=window.Capacitor, plugin=cap&&cap.Plugins&&cap.Plugins.StatusBar;
+      if(!plugin&&cap&&cap.registerPlugin) plugin=cap.registerPlugin('StatusBar');
+      if(plugin){
+        var action=hidden&&plugin.hide?plugin.hide():(!hidden&&plugin.show?plugin.show():null);
+        if(action&&action.catch) action.catch(function(){});
+      }
+    }catch(_){}
+  }
+  function sizePseudoFullscreen(s){
+    if(!s||!s.stage||!s.stage.classList.contains('fspseudo')) return;
+    var viewport=window.visualViewport;
+    var width=Math.round(viewport&&viewport.width?viewport.width:window.innerWidth);
+    var height=Math.round(viewport&&viewport.height?viewport.height:window.innerHeight);
+    /* A few Android WebViews report the pre-rotation portrait viewport for one
+       frame. Physical screen dimensions keep the player landscape until the
+       visual viewport catches up. */
+    if(isNativeApp()&&screen.width&&screen.height&&screen.width>screen.height){
+      width=Math.max(width,screen.width); height=Math.min(height,screen.height);
+    }
+    s.stage.style.setProperty('--fs-width',width+'px');
+    s.stage.style.setProperty('--fs-height',height+'px');
+  }
+  function bindPseudoViewport(s,on){
+    if(!s) return;
+    if(s.fsViewportHandler){
+      window.removeEventListener('resize',s.fsViewportHandler);
+      window.removeEventListener('orientationchange',s.fsViewportHandler);
+      if(window.visualViewport) window.visualViewport.removeEventListener('resize',s.fsViewportHandler);
+      s.fsViewportHandler=null;
+    }
+    if(!on) return;
+    s.fsViewportHandler=function(){
+      sizePseudoFullscreen(s);
+      clearTimeout(s.fsSizeTimer);
+      s.fsSizeTimer=setTimeout(function(){ sizePseudoFullscreen(s) },180);
+    };
+    window.addEventListener('resize',s.fsViewportHandler,{passive:true});
+    window.addEventListener('orientationchange',s.fsViewportHandler,{passive:true});
+    if(window.visualViewport) window.visualViewport.addEventListener('resize',s.fsViewportHandler,{passive:true});
+  }
   function pseudoFs(s,on){
     if(!s||!s.stage) return;
     clearTimeout(s.fsProbeTimer); s.fsProbeTimer=null;
+    if(on&&!s.fsPlaceholder){
+      s.fsPlaceholder=document.createComment(s.kind+'-player-stage');
+      s.stage.parentNode.insertBefore(s.fsPlaceholder,s.stage);
+      document.body.appendChild(s.stage);
+    }
     s.stage.classList.toggle('fspseudo',!!on);
     s.player.classList.toggle('fs-shell-active',!!on);
     document.documentElement.classList.toggle('fslock',!!on);
-    if(on){ lockLandscape(); renderFsNav(s.kind); showControls(s,true); if(s.fsWasPlaying) s.video.play().catch(function(){}) }
-    else { showFsNav(s,false); unlockOrientation(); if(s.fsWasPlaying) s.video.play().catch(function(){}) }
+    document.body.classList.toggle('player-fullscreen',!!on);
+    if(on){
+      nativeStatusBar(true); bindPseudoViewport(s,true); sizePseudoFullscreen(s);
+      lockLandscape().then(function(){ requestAnimationFrame(function(){ sizePseudoFullscreen(s) }); setTimeout(function(){ sizePseudoFullscreen(s) },450) });
+      renderFsNav(s.kind); showControls(s,true); if(s.fsWasPlaying) s.video.play().catch(function(){})
+    }else{
+      bindPseudoViewport(s,false); clearTimeout(s.fsSizeTimer); s.fsSizeTimer=null;
+      s.stage.style.removeProperty('--fs-width'); s.stage.style.removeProperty('--fs-height');
+      if(s.fsPlaceholder&&s.fsPlaceholder.parentNode){ s.fsPlaceholder.parentNode.insertBefore(s.stage,s.fsPlaceholder); s.fsPlaceholder.remove() }
+      s.fsPlaceholder=null; nativeStatusBar(false); showFsNav(s,false); unlockOrientation();
+      if(s.fsWasPlaying) s.video.play().catch(function(){})
+    }
   }
   function toggleStageFullscreen(s){
     if(!s||s.fsTransitioning) return;
@@ -2185,7 +2252,7 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
       tag:document.getElementById(p+'NowTag'),
       live:document.getElementById(p+'Live'),
       stage:document.getElementById(p+'Stage'),
-      fsnav:document.getElementById(p+'FsNav'),controls:document.getElementById(p+'Controls'),fsTimer:null,ctrlTimer:null,fsProbeTimer:null,fsTransitioning:false,pseudoPending:false,fsWasPlaying:false,fit:0,
+      fsnav:document.getElementById(p+'FsNav'),controls:document.getElementById(p+'Controls'),fsTimer:null,ctrlTimer:null,fsProbeTimer:null,fsSizeTimer:null,fsViewportHandler:null,fsPlaceholder:null,fsTransitioning:false,pseudoPending:false,fsWasPlaying:false,fit:0,
       hls:null,session:0,last:null};
     installControls(s);
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });

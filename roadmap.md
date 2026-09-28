@@ -21,3 +21,5 @@
 - [x] Make fullscreen reliable on Android and laptop without replacing the active player.
 - [x] Prevent fullscreen transitions and app backgrounding from triggering playback restart loops.
 - [x] Verify repeated fullscreen entry/exit, preserved playback state, and project health.
+- [x] Make APK fullscreen show only the player after Android rotates to landscape.
+- [x] Keep fullscreen controls correctly sized and restore the page after exit.

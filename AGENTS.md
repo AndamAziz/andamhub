@@ -11,3 +11,4 @@
 
 - Android CI publishes APK/AAB downloads through GitHub Releases, not Actions Artifacts, because artifact-storage quotas can block otherwise successful builds.
 - Android OAuth uses Lovable's allowed `lovable://oauth-callback` deep link with state validation and Capacitor Browser/App plugins so social sign-in returns to the installed app.
+- Android player fullscreen portals the existing video stage to the document body so WebView rotation cannot trap it inside the page layout.
