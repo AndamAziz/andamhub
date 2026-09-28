@@ -2022,13 +2022,39 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     s.playBtn.textContent=v.paused?'▶':'Ⅱ';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
   }
+  /* Rotate to landscape when entering fullscreen; restore on exit.
+     Uses the Capacitor ScreenOrientation plugin inside the APK and the
+     Screen Orientation API in browsers; both fail silently if unavailable. */
+  function lockLandscape(){
+    try{
+      var cap=window.Capacitor;
+      if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.ScreenOrientation){
+        cap.Plugins.ScreenOrientation.lock({orientation:'landscape'}).catch(function(){});
+        return;
+      }
+    }catch(_){}
+    try{
+      if(screen.orientation&&screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){});
+    }catch(_){}
+  }
+  function unlockOrientation(){
+    try{
+      var cap=window.Capacitor;
+      if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.ScreenOrientation){
+        cap.Plugins.ScreenOrientation.unlock().catch(function(){});
+        return;
+      }
+    }catch(_){}
+    try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
+  }
   function toggleStageFullscreen(s){
     if(isStageFullscreen(s)){
       var exit=document.exitFullscreen||document.webkitExitFullscreen; if(exit) try{ exit.call(document) }catch(_){};
+      unlockOrientation();
       return;
     }
     var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
-    if(req) try{ var p=req.call(s.stage); if(p&&p.then) p.then(function(){ showControls(s,true) }).catch(function(){}) }catch(_){}
+    if(req) try{ var p=req.call(s.stage); if(p&&p.then) p.then(function(){ lockLandscape(); showControls(s,true) }).catch(function(){}) }catch(_){}
   }
   function installControls(s){
     s.controls.innerHTML=controlsMarkup();
