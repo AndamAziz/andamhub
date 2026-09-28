@@ -537,12 +537,12 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   border:1px solid var(--hair);background:#000;
   transform:translateZ(0);backface-visibility:hidden;contain:paint}
 .lvstage{position:relative;aspect-ratio:16/9;background:#000}
-.lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
+.lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
 .lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
-  justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw);background:linear-gradient(90deg,rgba(5,5,5,.9),rgba(5,5,5,.2) 45%,rgba(5,5,5,.86));
+  justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw) max(88px,13vh);background:linear-gradient(90deg,rgba(5,5,5,.92),rgba(5,5,5,.18) 46%,rgba(5,5,5,.88));
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
 .lvstage.fsactive .fsnav{opacity:1;visibility:visible;pointer-events:auto}
 .fsnavcol{min-width:0;align-self:stretch;display:flex;flex-direction:column;overflow:hidden}
@@ -561,13 +561,35 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .fsch .fn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fscat:hover,.fscat:focus-visible,.fsch:hover,.fsch:focus-visible{background:rgba(255,255,255,.12);color:var(--text);border-color:rgba(255,255,255,.16)}
 .fscat.on,.fsch.on{background:rgba(255,69,0,.2);border-color:rgba(255,69,0,.55);color:var(--text)}
-.fsnavhint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font:500 10px/1 'IBM Plex Mono',monospace;
+.fsnavhint{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);font:500 10px/1 'IBM Plex Mono',monospace;
   letter-spacing:.08em;color:rgba(246,246,248,.65);white-space:nowrap}
+.lvcontrols{position:absolute;left:0;right:0;bottom:0;z-index:12;padding:42px 16px 12px;
+  background:linear-gradient(transparent,rgba(0,0,0,.94));opacity:0;visibility:hidden;transform:translateY(5px);
+  transition:opacity .18s ease,visibility .18s ease,transform .18s ease;pointer-events:none}
+.lvstage.controls-on .lvcontrols,.lvstage.fsactive .lvcontrols{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.ctrlseek{display:grid;grid-template-columns:auto minmax(70px,1fr) auto;align-items:center;gap:10px;margin-bottom:8px}
+.ctrltime{font:600 10px/1 'IBM Plex Mono',monospace;color:rgba(245,245,245,.85);white-space:nowrap}
+.ctrlrange{appearance:none;width:100%;height:3px;border:0;border-radius:99px;background:rgba(255,255,255,.34);accent-color:var(--ember);cursor:pointer}
+.ctrlrange::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 3px rgba(255,69,0,.2)}
+.ctrlrow{display:flex;align-items:center;gap:6px;min-height:44px}
+.ctrlbtn{display:grid;place-items:center;width:42px;height:42px;min-width:42px;border:1px solid transparent;border-radius:50%;
+  background:transparent;color:#f5f5f5;font:600 18px/1 Inter,sans-serif;cursor:pointer}
+.ctrlbtn:hover,.ctrlbtn:focus-visible{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.16);outline:none}
+.ctrlbtn.primary{background:#f5f5f5;color:#050505;font-size:20px}
+.ctrlbtn .small{font:600 10px/1 'IBM Plex Mono',monospace}
+.ctrlspacer{flex:1}.ctrllabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px/1 Inter,sans-serif;color:rgba(245,245,245,.82)}
+.ctrlsettings{position:absolute;right:16px;bottom:66px;width:190px;padding:8px;border:1px solid rgba(255,255,255,.15);border-radius:8px;
+  background:rgba(8,8,10,.94);backdrop-filter:blur(16px);box-shadow:0 18px 45px rgba(0,0,0,.45)}
+.ctrlsettings[hidden]{display:none}.ctrlsettings .ctitle{padding:7px 9px;color:var(--muted);font:600 9px/1 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.12em}
+.ctrlsetting{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f5f5f5;font:600 12px/1 Inter,sans-serif;text-align:left}
+.ctrlsetting:hover,.ctrlsetting:focus-visible{background:rgba(255,255,255,.1);outline:none}.ctrlsetting.on{color:var(--ember)}
 @media (max-width:700px){
-  .fsnav{grid-template-columns:minmax(112px,34vw) minmax(0,1fr);gap:8px;padding:16px 10px}
+  .fsnav{grid-template-columns:minmax(112px,34vw) minmax(0,1fr);gap:8px;padding:14px 8px 72px}
   .fsnavhead{margin-bottom:8px}.fsnavhead h3{font-size:14px}.fsnavhead span,.fsnavhint{display:none}
   .fscat,.fsch{min-height:44px;border-radius:7px}.fscat{padding:0 9px;font-size:11px}.fscat b{display:none}
   .fsch{grid-template-columns:24px 34px minmax(0,1fr);gap:7px;padding:4px 7px}.fsch img,.fsch .flogo{width:32px;height:32px}.fsch .fn{font-size:11px}
+  .lvcontrols{padding:28px 8px 6px}.ctrlseek{gap:7px;margin-bottom:2px}.ctrlrow{gap:1px}.ctrlbtn{width:38px;height:38px;min-width:38px;font-size:16px}
+  .ctrllabel{display:none}.ctrlsettings{right:8px;bottom:50px}.ctrlrange::-webkit-slider-thumb{width:14px;height:14px}
 }
 .lvidle{position:absolute;inset:0;display:grid;place-items:center;gap:6px;text-align:center;
   background:radial-gradient(circle at 50% 40%,#191A20,#08090C);color:var(--muted);
@@ -778,10 +800,11 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   <div class="lvmain">
     <div class="lvplayer" id="ltvPlayer">
       <div class="lvstage" id="ltvStage" aria-label="Live TV player. Double tap for fullscreen navigation">
-        <video id="ltvVideo" controls controlslist="nofullscreen nodownload" playsinline preload="auto"></video>
+        <video id="ltvVideo" playsinline preload="auto"></video>
         <div class="lvidle" id="ltvIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ltvErr" role="button" tabindex="0"></div>
         <div class="fsnav" id="ltvFsNav" aria-hidden="true"></div>
+        <div class="lvcontrols" id="ltvControls" aria-label="Playback controls"></div>
       </div>
       <div class="lvbar">
         <img class="lgo" id="ltvNowLogo" alt="" />
@@ -820,10 +843,11 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   <div class="lvmain">
     <div class="lvplayer" id="ipPlayer">
       <div class="lvstage" id="ipStage" aria-label="IPTV player. Double tap for fullscreen navigation">
-        <video id="ipVideo" controls controlslist="nofullscreen nodownload" playsinline preload="auto"></video>
+        <video id="ipVideo" playsinline preload="auto"></video>
         <div class="lvidle" id="ipIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ipErr" role="button" tabindex="0"></div>
         <div class="fsnav" id="ipFsNav" aria-hidden="true"></div>
+        <div class="lvcontrols" id="ipControls" aria-label="Playback controls"></div>
       </div>
       <div class="lvbar">
         <img class="lgo" id="ipNowLogo" alt="" />
