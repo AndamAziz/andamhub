@@ -11,4 +11,4 @@
 - [x] Remove fullscreen and category icons from the player status bars.
 - [x] Add fullscreen category and channel navigation overlays for Live TV and IPTV.
 - [x] Keep channel switching seamless and strengthen recovery without buffering loops.
-- [ ] Verify fullscreen navigation and playback on mobile and desktop.
+- [x] Verify fullscreen navigation and playback on mobile and desktop.
