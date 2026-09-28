@@ -23,3 +23,8 @@
 - [x] Verify repeated fullscreen entry/exit, preserved playback state, and project health.
 - [x] Make APK fullscreen show only the player after Android rotates to landscape.
 - [x] Keep fullscreen controls correctly sized and restore the page after exit.
+- [x] Redesign Live TV as a compact mobile-first player and channel browser.
+- [x] Replace player controls with live-aware overlay controls and unified settings.
+- [x] Move channel browsing to page chips/search and a reusable bottom sheet.
+- [x] Make fullscreen orientation-neutral and add non-fullscreen landscape columns.
+- [x] Apply the same compact visual language to Movies and Series.
