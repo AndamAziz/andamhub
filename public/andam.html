@@ -1348,7 +1348,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     ' .dots button, .rowhead a, .rowhead button, .card, .tile, .pcard, .cwrm,'+
     ' #catSearch, #catMore, .drawer button, .drawer a, .drawer select, .vp button,'+
     ' .modal button, .modal a, .pchan, #pSearch,'+
-    ' .chips .pill, .seg .pill, .lvsel select, .catpick, .catoption, .lvbar .ib, .chanrow, .epirow,'+
+    ' .chips .pill, .seg .pill, .lvsel select, .catpick, .catoption, .fscat, .fsch, .chanrow, .epirow,'+
     ' .lvsearch input, .repbox select, .repbox input, .repbox button';
   var GROUPSEL='.nav, .hero .cta, .dots, .rowhead, .strip, .grid, .catbar, .drawer, .vp, .modal, .menu,'+
     ' .chips, .seg, .lvtools, .lvlist, .epilist, .repbox, .vodgrid';
@@ -1937,7 +1937,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       repGo=document.getElementById('repGo'), iptvEl=document.getElementById('iptv');
 
   var PROV_KEY='andam:provider';
-  var ltv={providers:[],prov:null,tab:'direct',cat:'',q:'',hasArchive:false,req:0,started:false,
+  var ltv={providers:[],prov:null,tab:'direct',cat:'',q:'',hasArchive:false,req:0,started:false,channels:[],
            archive:[],series:null};
   var lcache={}, TTL=5*60*1000;   // client cache so tab switches don't refetch
 
@@ -1976,16 +1976,52 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       logo:document.getElementById(p+'NowLogo'),
       tag:document.getElementById(p+'NowTag'),
       live:document.getElementById(p+'Live'),
-      fs:document.getElementById(p+'Fs'),
+      stage:document.getElementById(p+'Stage'),
+      fsnav:document.getElementById(p+'FsNav'),fsTimer:null,
       hls:null,session:0,last:null};
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });
     s.err.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' ') s.err.click() });
-    s.fs.addEventListener('click',function(){
-      var v=s.video;
-      try{ (v.requestFullscreen||v.webkitRequestFullscreen||v.webkitEnterFullscreen||function(){}).call(v) }catch(_){}
+    s.stage.addEventListener('dblclick',function(e){
+      if(e.target.closest('.fsnav')) return;
+      var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
+      try{ if(req) req.call(s.stage).then(function(){ showFsNav(s,true) }).catch(function(){}) }catch(_){}
     });
+    ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(){ if(isStageFullscreen(s)) showFsNav(s,true) },{passive:true}) });
     SURF[kind]=s; return s;
   }
+  function isStageFullscreen(s){
+    var f=document.fullscreenElement||document.webkitFullscreenElement;
+    return f===s.stage||s.stage.classList.contains('fsnative');
+  }
+  function showFsNav(s,on){
+    if(!s||!s.fsnav) return;
+    clearTimeout(s.fsTimer); s.stage.classList.toggle('fsactive',!!on);
+    s.fsnav.setAttribute('aria-hidden',on?'false':'true');
+    if(on) s.fsTimer=setTimeout(function(){ showFsNav(s,false) },6500);
+  }
+  function fsCategories(kind){
+    if(kind==='iptv') return [{id:'',name:'All groups',count:ip.channels.length}].concat(ip.groups||[]);
+    return [{id:'',name:'All categories',count:''}].concat((ltv.cats||[]).map(function(c){return {id:c.id,name:c.name,count:c.count||''}}));
+  }
+  function fsChannels(kind){
+    if(kind==='iptv') return ip.channels.filter(function(c){ return !ip.group||c.group===ip.group });
+    return ltv.channels||[];
+  }
+  function renderFsNav(kind){
+    var s=surf(kind), active=kind==='iptv'?ip.group:ltv.cat, playing=s.last&&s.last.title;
+    var cats=fsCategories(kind), chans=fsChannels(kind);
+    s.fsnav.innerHTML='<section class="fsnavcol"><div class="fsnavhead"><h3>'+(kind==='iptv'?'Groups':'Categories')+'</h3><span>'+cats.length+'</span></div><div class="fsnavlist">'+
+      cats.map(function(c){return '<button class="fscat'+(String(active)===String(c.id)?' on':'')+'" type="button" data-fscat="'+esc(c.id)+'"><span>'+esc(c.name)+'</span><b>'+esc(c.count||'')+'</b></button>'}).join('')+
+      '</div></section><section class="fsnavcol"><div class="fsnavhead"><h3>Channels</h3><span>'+chans.length+'</span></div><div class="fsnavlist">'+
+      chans.map(function(c,i){return '<button class="fsch'+(playing===c.name?' on':'')+'" type="button" data-fsch="'+esc(c.id)+'" data-name="'+esc(c.name)+'"><span class="no">'+esc(c.num||i+1)+'</span>'+
+        (c.logo?'<img src="'+esc(c.logo)+'" alt="" />':'<span class="flogo"></span>')+'<span class="fn">'+esc(c.name)+'</span></button>'}).join('')+
+      '</div></section><span class="fsnavhint">Double tap or move to show navigation</span>';
+  }
+  function syncFullscreenNav(){
+    ['live','iptv'].forEach(function(kind){ if(!SURF[kind]) return; var s=SURF[kind]; if(isStageFullscreen(s)){ renderFsNav(kind); showFsNav(s,true) } else showFsNav(s,false) });
+  }
+  document.addEventListener('fullscreenchange',syncFullscreenNav);
+  document.addEventListener('webkitfullscreenchange',syncFullscreenNav);
   /* Loading and self-healing stay invisible so playback is never obscured. */
   function busy(s,on){ s.player.setAttribute('aria-busy',on?'true':'false') }
   function fail(s,msg){ s.err.textContent=(msg||'Stream failed to load')+' — tap to retry'; s.err.classList.remove('hide'); busy(s,false) }
@@ -2144,10 +2180,11 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
          4. restart it through the relay's transcoder (fixes streams whose
             audio or video codec this device cannot decode)
        While everything plays, none of this runs. */
-    var healN=0,lastT=-1,lastMove=Date.now(),healing=false;
+    var healN=0,lastT=-1,lastMove=Date.now(),healing=false,restartPending=false;
     if(s.hb){ clearInterval(s.hb); s.hb=null }
     function restart(useTc){
-      if(!alive()) return;
+      if(!alive()||restartPending) return;
+      restartPending=true;
       var wait=Math.min(1200*healN,5000);
       setTimeout(function(){
         if(!alive()) return;
@@ -2159,8 +2196,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       try{
         var b=v.buffered,moved=false;
         for(var i=0;i<b.length;i++){
-          if(b.start(i)>v.currentTime){ v.currentTime=b.start(i)+0.1; moved=true; break }
-          if(b.end(i)-v.currentTime>1.2){ v.currentTime=b.end(i)-0.6; moved=true; break }
+          if(b.start(i)>v.currentTime&&b.start(i)-v.currentTime<3){ v.currentTime=b.start(i)+0.08; moved=true; break }
         }
         if(!moved&&s.hls){ try{ s.hls.startLoad(-1) }catch(_){} }
         v.play().catch(function(){});
@@ -2309,8 +2345,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
                 liveBufferLatencyChasing:false,lazyLoad:false,
                 autoCleanupSourceBuffer:true,autoCleanupMaxBackwardDuration:60,
                 autoCleanupMinBackwardDuration:30}
-              :{enableStashBuffer:true,stashInitialSize:512*1024,
-                 liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:10,
+               :{enableStashBuffer:true,stashInitialSize:1024*1024,
+                  liveBufferLatencyChasing:false,
                 lazyLoad:false,autoCleanupSourceBuffer:true});
       }catch(_){ retryable('Stream failed to load'); return }
       s.mts=p;
@@ -2485,6 +2521,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 
   function renderDirect(items){
     var list=filtered(items,'name').slice(0,600);
+    ltv.channels=list;
+    if(SURF.live&&isStageFullscreen(SURF.live)) renderFsNav('live');
     if(!list.length){ ltvBody.innerHTML=''; ltvSet('No channels here.'); return }
     ltvSet('');
     var playing=surf('live').last;
@@ -2624,6 +2662,13 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     if(back){ loadTab(); }
   });
 
+  document.getElementById('ltvFsNav').addEventListener('click',function(e){
+    var cat=e.target.closest('[data-fscat]');
+    if(cat){ ltv.cat=cat.getAttribute('data-fscat')||''; loadTab(); showFsNav(surf('live'),true); return }
+    var ch=e.target.closest('[data-fsch]');
+    if(ch){ playById('live',ch.getAttribute('data-fsch'),'',ch.getAttribute('data-name'),'● LIVE · '+(ltvSub.textContent.split(' ·')[0]),true); renderFsNav('live'); showFsNav(surf('live'),false) }
+  });
+
   function openSeries(id,title){
     ltvBody.innerHTML=skelRows(6); ltvSet('');
     api({action:'series_info',source:ltv.prov,series_id:id})
@@ -2703,6 +2748,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     var list=ip.channels.filter(function(c){
       return (!ip.group||c.group===ip.group) && (!q||c.name.toLowerCase().indexOf(q)>-1);
     });
+    if(SURF.iptv&&isStageFullscreen(SURF.iptv)) renderFsNav('iptv');
     if(!list.length){ ipBody.innerHTML=''; ipSet('No channels match that search.'); return }
     ipSet('');
     var playing=surf('iptv').last;
@@ -2774,6 +2820,15 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     s.now.textContent=name; s.sub.textContent='Preparing…';
     ipApi({action:'play',source:ip.src,id:ch.getAttribute('data-ipch')})
       .then(function(d){ lvPlay('iptv',d.token,name,'LIVE · IPTV playlist',true) })
+      .catch(function(){ fail(s,'Could not start this channel') });
+  });
+  document.getElementById('ipFsNav').addEventListener('click',function(e){
+    var cat=e.target.closest('[data-fscat]');
+    if(cat){ ip.group=cat.getAttribute('data-fscat')||''; renderIpGroups(); renderIpChannels(); showFsNav(surf('iptv'),true); return }
+    var ch=e.target.closest('[data-fsch]'); if(!ch) return;
+    var name=ch.getAttribute('data-name'), s=surf('iptv');
+    ipApi({action:'play',source:ip.src,id:ch.getAttribute('data-fsch')})
+      .then(function(d){ lvPlay('iptv',d.token,name,'LIVE · IPTV playlist',true); renderFsNav('iptv'); showFsNav(surf('iptv'),false) })
       .catch(function(){ fail(s,'Could not start this channel') });
   });
 
