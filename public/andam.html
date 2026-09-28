@@ -540,7 +540,16 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
-.lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
+.lvstage:fullscreen,.lvstage:-webkit-full-screen{position:fixed;inset:0;margin:0;width:100vw;height:100vh;aspect-ratio:auto}
+/* Pseudo-fullscreen fallback: some engines collapse the native fullscreen box
+   to 0x0; this class pins the stage over the viewport instead. */
+.lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
+html.fslock,html.fslock body{overflow:hidden;height:100%}
+/* An ancestor transform/contain traps the fullscreen element and collapses it
+   to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
+   any stage inside it is fullscreen. */
+.lvplayer:has(.lvstage:fullscreen),.lvplayer:has(.lvstage:-webkit-full-screen){
+  position:static;transform:none;contain:none;overflow:visible;border:0;border-radius:0}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
   justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw) max(88px,13vh);background:linear-gradient(90deg,rgba(5,5,5,.92),rgba(5,5,5,.18) 46%,rgba(5,5,5,.88));
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
@@ -2047,14 +2056,38 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
     }catch(_){}
     try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
   }
+  function pseudoFs(s,on){
+    s.stage.classList.toggle('fspseudo',!!on);
+    document.documentElement.classList.toggle('fslock',!!on);
+    if(on){ lockLandscape(); renderFsNav(s.kind); showControls(s,true) } else unlockOrientation();
+  }
   function toggleStageFullscreen(s){
+    if(s.stage.classList.contains('fspseudo')){ pseudoFs(s,false); return }
     if(isStageFullscreen(s)){
       var exit=document.exitFullscreen||document.webkitExitFullscreen; if(exit) try{ exit.call(document) }catch(_){};
       unlockOrientation();
       return;
     }
     var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
-    if(req) try{ var p=req.call(s.stage); if(p&&p.then) p.then(function(){ lockLandscape(); showControls(s,true) }).catch(function(){}) }catch(_){}
+    var fallback=function(){ pseudoFs(s,true) };
+    if(!req){ fallback(); return }
+    try{
+      var p=req.call(s.stage);
+      if(p&&p.then) p.then(function(){
+        lockLandscape(); showControls(s,true);
+        /* Some engines size the native fullscreen box to 0x0 (broken screen).
+           Verify the box a beat after entering; if collapsed, switch to the
+           pseudo-fullscreen overlay instead. */
+        setTimeout(function(){
+          if(!isStageFullscreen(s)) return;
+          var r=s.stage.getBoundingClientRect();
+          if(r.width<window.innerWidth*0.5||r.height<window.innerHeight*0.5){
+            var ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex) try{ ex.call(document) }catch(_){}
+            pseudoFs(s,true);
+          }
+        },350);
+      }).catch(fallback);
+    }catch(_){ fallback() }
   }
   function installControls(s){
     s.controls.innerHTML=controlsMarkup();
@@ -2108,7 +2141,8 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       if((e.key==='f'||e.key==='F')&&!isStageFullscreen(s)){
         e.preventDefault(); toggleStageFullscreen(s);
       }
-      if(e.key==='Escape'&&s.stage.classList.contains('fsactive')){ e.preventDefault(); showFsNav(s,false); showControls(s) }
+      if(e.key==='Escape'&&s.stage.classList.contains('fsactive')){ e.preventDefault(); showFsNav(s,false); showControls(s); return }
+      if(e.key==='Escape'&&s.stage.classList.contains('fspseudo')){ e.preventDefault(); pseudoFs(s,false) }
       if((e.key==='Enter'||e.key===' ')&&e.target===s.stage){ e.preventDefault(); if(s.video.paused) s.video.play().catch(function(){}); else s.video.pause() }
       if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key)>=0&&s.stage.classList.contains('fsactive')){
         var item=e.target.closest&&e.target.closest('.fscat,.fsch'); if(!item) return;
@@ -2126,7 +2160,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   }
   function isStageFullscreen(s){
     var f=document.fullscreenElement||document.webkitFullscreenElement;
-    return f===s.stage||s.stage.classList.contains('fsnative');
+    return f===s.stage||s.stage.classList.contains('fsnative')||s.stage.classList.contains('fspseudo');
   }
   function showFsNav(s,on){
     if(!s||!s.fsnav) return;
