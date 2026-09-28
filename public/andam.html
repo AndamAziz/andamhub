@@ -544,6 +544,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 /* Pseudo-fullscreen fallback: some engines collapse the native fullscreen box
    to 0x0; this class pins the stage over the viewport instead. */
 .lvstage.fspseudo{position:fixed;inset:0;z-index:9999;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
+html.fslock,html.fslock body{overflow:hidden;height:100%}
 /* An ancestor transform/contain traps the fullscreen element and collapses it
    to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
    any stage inside it is fullscreen. */
