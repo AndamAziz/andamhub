@@ -539,6 +539,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage{position:relative;aspect-ratio:16/9;background:#000}
 .lvstage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
+.lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
 .lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
   justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw);background:linear-gradient(90deg,rgba(5,5,5,.9),rgba(5,5,5,.2) 45%,rgba(5,5,5,.86));
@@ -778,7 +779,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   <div class="lvmain">
     <div class="lvplayer" id="ltvPlayer">
       <div class="lvstage" id="ltvStage" aria-label="Live TV player. Double tap for fullscreen navigation">
-        <video id="ltvVideo" controls playsinline preload="auto"></video>
+        <video id="ltvVideo" controls controlslist="nofullscreen nodownload" playsinline preload="auto"></video>
         <div class="lvidle" id="ltvIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ltvErr" role="button" tabindex="0"></div>
         <div class="fsnav" id="ltvFsNav" aria-hidden="true"></div>
@@ -820,7 +821,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   <div class="lvmain">
     <div class="lvplayer" id="ipPlayer">
       <div class="lvstage" id="ipStage" aria-label="IPTV player. Double tap for fullscreen navigation">
-        <video id="ipVideo" controls playsinline preload="auto"></video>
+        <video id="ipVideo" controls controlslist="nofullscreen nodownload" playsinline preload="auto"></video>
         <div class="lvidle" id="ipIdle">Pick a channel below to start watching</div>
         <div class="lverr hide" id="ipErr" role="button" tabindex="0"></div>
         <div class="fsnav" id="ipFsNav" aria-hidden="true"></div>
@@ -1985,6 +1986,12 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
       if(e.target.closest('.fsnav')) return;
       var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
       try{ if(req) req.call(s.stage).then(function(){ showFsNav(s,true) }).catch(function(){}) }catch(_){}
+    });
+    s.stage.addEventListener('keydown',function(e){
+      if((e.key==='f'||e.key==='F')&&!isStageFullscreen(s)){
+        var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
+        if(req){ e.preventDefault(); try{ req.call(s.stage).then(function(){ showFsNav(s,true) }).catch(function(){}) }catch(_){} }
+      }
     });
     ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(){ if(isStageFullscreen(s)) showFsNav(s,true) },{passive:true}) });
     SURF[kind]=s; return s;
