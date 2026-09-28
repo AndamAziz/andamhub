@@ -467,7 +467,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   .card:hover .ph{transform:none}
 }
 /* ================= LIVE TV / IPTV SECTION (shared design) ================= */
-.ltv{display:none;padding:74px clamp(14px,3.5vw,44px) 72px}
+.ltv{display:none;padding:60px clamp(14px,3.5vw,44px) 72px}
 .ltv.open{display:block}
 /* The head holds the section tabs, so it MUST stay reachable: without
    position:sticky it scrolls under the fixed nav and every click on the
@@ -476,7 +476,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
    of everything behind it on every scroll frame (the visible flicker). An
    opaque bar on its own compositor layer scrolls clean. */
 .lvhead{position:sticky;top:56px;z-index:30;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
-  margin:0 calc(-1 * clamp(14px,3.5vw,44px)) 14px;padding:9px clamp(14px,3.5vw,44px);
+  margin:0 calc(-1 * clamp(14px,3.5vw,44px)) 6px;padding:6px clamp(14px,3.5vw,44px);
   background:#07070A;border-bottom:1px solid var(--hair);
   transform:translateZ(0);backface-visibility:hidden;will-change:transform;contain:paint}
 .lvhead h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(17px,1.6vw,22px);margin:0;letter-spacing:-.3px}
@@ -533,7 +533,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvmain{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
 /* sticky + a compositor layer: without translateZ the blurred head and the
    video repaint on every scroll frame, which is what flickered. */
-.lvplayer{position:sticky;top:152px;z-index:20;border-radius:14px;overflow:hidden;
+.lvplayer{position:sticky;top:116px;z-index:20;border-radius:14px;overflow:hidden;
   border:1px solid var(--hair);background:#000;
   transform:translateZ(0);backface-visibility:hidden;contain:paint}
 .lvstage{position:relative;aspect-ratio:16/9;background:#000}
@@ -676,13 +676,14 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
 /* mobile: dropdowns go full width in their own row; player stays pinned on top
    and only the channel list scrolls (no mini / floating player). */
 @media (max-width:719px){
-  .lvhead{gap:10px;top:54px;padding:10px clamp(14px,3.5vw,44px)}
+  .ltv{padding-top:64px}
+  .lvhead{gap:6px;top:64px;padding:4px clamp(14px,3.5vw,44px);margin-bottom:4px}
   .lvhead h1,.lvhead .sub{display:none}
   .lvtools{width:100%;margin-left:0;align-items:stretch}
   .seg{width:100%;justify-content:space-between;padding:3px}
   .seg .pill{flex:1 1 0;text-align:center;padding:0 6px;min-height:38px;font-size:12.5px}
   .chips .pill{min-height:36px;padding:0 13px;font-size:12.5px}
-  .lvplayer{top:154px}
+  .lvplayer{top:85px}
 }
 @media (max-width:1099px){
   /* single column: reserve the player's height (16:9 + now-playing bar) and
@@ -693,13 +694,13 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
 @media (min-width:1100px){
   .lvmain{grid-template-columns:minmax(0,1fr) clamp(320px,32%,440px)}
   .lvhead{top:60px}
-  .lvplayer{top:128px}
-  .lvbrowse{position:sticky;top:128px;max-height:calc(100vh - 148px)}
+  .lvplayer{top:108px}
+  .lvbrowse{position:sticky;top:108px;max-height:calc(100vh - 128px)}
 }
 
 
 @media (min-width:1536px){
-  .ltv{padding:7vh 5vw 5vh}
+  .ltv{padding:92px 5vw 5vh}
   .lvmain{grid-template-columns:minmax(0,1fr) 34%}
   .lvhead h1{font-size:28px}
   .lvsel select,.repbox select,.repbox input[type=date],.repbox input[type=time]{min-height:50px;font-size:15px;max-width:300px;padding:0 38px 0 18px}
@@ -2031,29 +2032,34 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     s.playBtn.textContent=v.paused?'▶':'Ⅱ';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
   }
-  /* Rotate to landscape when entering fullscreen; restore on exit.
-     Uses the Capacitor ScreenOrientation plugin inside the APK and the
-     Screen Orientation API in browsers; both fail silently if unavailable. */
-  function lockLandscape(){
+  /* Rotate before native fullscreen begins. Rotating only after the fullscreen
+     promise resolves can make Android leave fullscreen during its resize. */
+  function nativeOrientation(){
     try{
       var cap=window.Capacitor;
-      if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.ScreenOrientation){
-        cap.Plugins.ScreenOrientation.lock({orientation:'landscape'}).catch(function(){});
-        return;
-      }
+      if(!cap) return null;
+      if(cap.Plugins&&cap.Plugins.ScreenOrientation) return cap.Plugins.ScreenOrientation;
+      if(cap.registerPlugin) return cap.registerPlugin('ScreenOrientation');
     }catch(_){}
+    return null;
+  }
+  function isNativeApp(){
     try{
-      if(screen.orientation&&screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){});
-    }catch(_){}
+      var cap=window.Capacitor;
+      return !!(cap&&((cap.isNativePlatform&&cap.isNativePlatform())||(cap.getPlatform&&cap.getPlatform()!=='web')));
+    }catch(_){ return /AndamApp\//.test(navigator.userAgent) }
+  }
+  function lockLandscape(){
+    var plugin=nativeOrientation();
+    if(isNativeApp()&&plugin&&plugin.lock){
+      try{ return Promise.resolve(plugin.lock({orientation:'landscape'})).catch(function(){}) }catch(_){}
+    }
+    try{ if(screen.orientation&&screen.orientation.lock) return Promise.resolve(screen.orientation.lock('landscape')).catch(function(){}) }catch(_){}
+    return Promise.resolve();
   }
   function unlockOrientation(){
-    try{
-      var cap=window.Capacitor;
-      if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.ScreenOrientation){
-        cap.Plugins.ScreenOrientation.unlock().catch(function(){});
-        return;
-      }
-    }catch(_){}
+    var plugin=nativeOrientation();
+    if(isNativeApp()&&plugin&&plugin.unlock){ try{ plugin.unlock().catch(function(){}) }catch(_){}; return }
     try{ if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock() }catch(_){}
   }
   function pseudoFs(s,on){
@@ -2071,23 +2077,28 @@ html.fslock,html.fslock body{overflow:hidden;height:100%}
     var req=s.stage.requestFullscreen||s.stage.webkitRequestFullscreen;
     var fallback=function(){ pseudoFs(s,true) };
     if(!req){ fallback(); return }
-    try{
-      var p=req.call(s.stage);
-      if(p&&p.then) p.then(function(){
-        lockLandscape(); showControls(s,true);
+    var enter=function(){
+      try{
+        var p=req.call(s.stage,{navigationUI:'hide'});
+        if(p&&p.then) p.then(function(){
+          if(!isNativeApp()) lockLandscape();
+          showControls(s,true);
         /* Some engines size the native fullscreen box to 0x0 (broken screen).
            Verify the box a beat after entering; if collapsed, switch to the
            pseudo-fullscreen overlay instead. */
-        setTimeout(function(){
-          if(!isStageFullscreen(s)) return;
-          var r=s.stage.getBoundingClientRect();
-          if(r.width<window.innerWidth*0.5||r.height<window.innerHeight*0.5){
-            var ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex) try{ ex.call(document) }catch(_){}
-            pseudoFs(s,true);
-          }
-        },350);
-      }).catch(fallback);
-    }catch(_){ fallback() }
+          setTimeout(function(){
+            if(!isStageFullscreen(s)) return;
+            var r=s.stage.getBoundingClientRect();
+            if(r.width<window.innerWidth*0.5||r.height<window.innerHeight*0.5){
+              var ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex) try{ ex.call(document) }catch(_){}
+              pseudoFs(s,true);
+            }
+          },500);
+        }).catch(fallback);
+      }catch(_){ fallback() }
+    };
+    if(isNativeApp()) lockLandscape().then(function(){ requestAnimationFrame(enter) });
+    else enter();
   }
   function installControls(s){
     s.controls.innerHTML=controlsMarkup();
