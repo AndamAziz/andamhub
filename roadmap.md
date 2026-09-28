@@ -18,3 +18,6 @@
 - [x] Force landscape orientation before fullscreen playback in the Android app.
 - [x] Remove excess space between the fixed header and Live TV/IPTV player.
 - [x] Verify compact spacing and fullscreen fallback on mobile and laptop.
+- [x] Make fullscreen reliable on Android and laptop without replacing the active player.
+- [x] Prevent fullscreen transitions and app backgrounding from triggering playback restart loops.
+- [ ] Verify repeated fullscreen entry/exit, preserved playback state, and project health.
