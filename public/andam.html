@@ -541,6 +541,11 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvstage video::-webkit-media-controls-loading-panel{display:none!important}
 .lvstage video::-webkit-media-controls-fullscreen-button{display:none!important}
 .lvstage:fullscreen,.lvstage:-webkit-full-screen{width:100vw;height:100vh;aspect-ratio:auto}
+/* An ancestor transform/contain traps the fullscreen element and collapses it
+   to 0x0 (the "broken screen" on laptops). Neutralize the player shell while
+   any stage inside it is fullscreen. */
+.lvplayer:has(.lvstage:fullscreen),.lvplayer:has(.lvstage:-webkit-full-screen){
+  position:static;transform:none;contain:none;overflow:visible;border:0;border-radius:0}
 .fsnav{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(170px,24vw) minmax(280px,36vw);
   justify-content:space-between;gap:18px;padding:max(22px,4vh) max(22px,4vw) max(88px,13vh);background:linear-gradient(90deg,rgba(5,5,5,.92),rgba(5,5,5,.18) 46%,rgba(5,5,5,.88));
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
