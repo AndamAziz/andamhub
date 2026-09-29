@@ -28,3 +28,5 @@
 - [x] Move channel browsing to page chips/search and a reusable bottom sheet.
 - [x] Make fullscreen orientation-neutral and add non-fullscreen landscape columns.
 - [x] Apply the same compact visual language to Movies and Series.
+- [x] Remove the mobile gap below the player and show more channel rows.
+- [x] Reduce expensive mobile list effects for smoother scrolling.
