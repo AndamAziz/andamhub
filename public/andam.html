@@ -1162,6 +1162,37 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   .tabbar a{font-size:9.5px}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* ---------- v2.6: desktop settings panel, category dropdown, idle player ---------- */
+/* nothing playing yet: the idle hint alone, no controls drawn over it */
+.lvidle:not(.hide) ~ .lvcontrols{display:none!important}
+/* laptops/desktops: settings as a compact floating panel, not a full-width sheet */
+@media (min-width:900px){
+  .lvstage:not(.fspseudo):not(.fsnative):not(:fullscreen) .ctrlsettings:not([hidden]){
+    left:auto!important;right:28px!important;bottom:28px!important;width:400px!important;
+    max-height:min(72vh,560px)!important;border-radius:20px!important;border:1px solid var(--hair)!important}
+  .ctrlsettings .grab{display:none!important}
+}
+/* category dropdown (laptops/desktops) — replaces the chip rows there */
+.catsel{display:none;position:relative;margin:4px 12px 8px}
+.catsel-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px;border-radius:12px;
+  background:var(--surface);border:1px solid var(--hair);color:var(--text);cursor:pointer;text-align:left}
+.catsel-btn:hover{border-color:var(--hair-2)}
+.catsel-btn .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.catsel-btn .v{flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.catsel-btn .c{width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);transition:transform .15s}
+.catsel.open .catsel-btn .c{transform:rotate(-135deg) translateY(-2px)}
+.catsel-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:40;max-height:min(420px,60vh);overflow-y:auto;
+  padding:6px;border-radius:14px;background:var(--surface-2);border:1px solid var(--hair-2);box-shadow:0 18px 50px rgba(0,0,0,.55)}
+.catsel.open .catsel-menu{display:block}
+.catsel-find{width:100%;height:38px;margin:0 0 6px;padding:0 12px;border-radius:10px;border:1px solid var(--hair);background:var(--surface);color:var(--text);font-size:13px}
+.catsel-opt{display:block;width:100%;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:13.5px;font-weight:600;text-align:left;cursor:pointer}
+.catsel-opt:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.catsel-opt.on{background:var(--ember-dim);color:#fff}
+@media (min-width:720px){
+  .ltv .lvchips{display:none!important}
+  .catsel.has{display:block}
+}
 </style>
 
 </head>
@@ -4107,6 +4138,44 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(!c||c.scrollWidth<=c.clientWidth+2||Math.abs(e.deltaY)<=Math.abs(e.deltaX)) return;
     c.scrollLeft+=e.deltaY; e.preventDefault();
   },{passive:false});
+
+  /* ---- category dropdown for laptops/desktops, mirrored from the chip row ---- */
+  function buildCatSel(host){
+    var sel=document.createElement('div'); sel.className='catsel';
+    sel.innerHTML='<button type="button" class="catsel-btn" aria-haspopup="listbox"><span class="k">Category</span><span class="v">All</span><span class="c"></span></button>'+
+      '<div class="catsel-menu" role="listbox"><input class="catsel-find" type="search" placeholder="Find a category" aria-label="Find a category"><div class="catsel-list"></div></div>';
+    host.parentNode.insertBefore(sel,host);
+    var btn=sel.querySelector('.catsel-btn'), val=sel.querySelector('.v'), list=sel.querySelector('.catsel-list'), find=sel.querySelector('.catsel-find');
+    function paint(){
+      var chips=[].slice.call(host.querySelectorAll('[data-chip]'));
+      sel.classList.toggle('has',chips.length>1&&!host.hidden);
+      var q=(find.value||'').toLowerCase();
+      var on=host.querySelector('.chip.on'); val.textContent=on?on.textContent:'All';
+      find.style.display=chips.length>10?'':'none';
+      list.innerHTML=chips.filter(function(c){return !q||c.textContent.toLowerCase().indexOf(q)>-1}).map(function(c){
+        var id=c.getAttribute('data-chip');
+        return '<button type="button" class="catsel-opt'+(c.classList.contains('on')?' on':'')+'" role="option" data-pick="'+id.replace(/"/g,'&quot;')+'" dir="auto"></button>';
+      }).join('');
+      /* labels via textContent (category names are provider data) */
+      var opts=list.querySelectorAll('.catsel-opt'), shown=chips.filter(function(c){return !q||c.textContent.toLowerCase().indexOf(q)>-1});
+      for(var i=0;i<opts.length;i++) opts[i].textContent=shown[i].textContent;
+    }
+    function close(){ sel.classList.remove('open') }
+    btn.addEventListener('click',function(e){ e.stopPropagation(); sel.classList.toggle('open'); if(sel.classList.contains('open')){ find.value=''; paint(); if(find.style.display!=='none') find.focus() } });
+    find.addEventListener('input',paint);
+    find.addEventListener('click',function(e){ e.stopPropagation() });
+    list.addEventListener('click',function(e){
+      var o=e.target.closest('[data-pick]'); if(!o) return; e.stopPropagation();
+      var id=o.getAttribute('data-pick');
+      var chip=[].slice.call(host.querySelectorAll('[data-chip]')).filter(function(c){return c.getAttribute('data-chip')===id})[0];
+      close(); if(chip) chip.click();
+    });
+    document.addEventListener('click',function(e){ if(!sel.contains(e.target)) close() });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape') close() });
+    new MutationObserver(paint).observe(host,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});
+    paint();
+  }
+  ['ltvChips','ipChips'].forEach(function(id){ var h=document.getElementById(id); if(h) buildCatSel(h) });
   /* keep the chosen category chip in view after every repaint */
   ['ltvChips','ipChips'].forEach(function(id){
     var host=document.getElementById(id); if(!host) return;

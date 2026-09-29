@@ -9,7 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -37,6 +39,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
@@ -303,11 +307,11 @@ private fun PlayerScreen(
 
         AnimatedVisibility(
             visible = ui.panel,
-            enter = slideInHorizontally { -it },
-            exit = slideOutHorizontally { -it },
-            modifier = Modifier.fillMaxHeight(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            ChannelPanel(ui, onPick = { onPick(it); ui.panel = false })
+            ChannelPanel(ui, onPick = { onPick(it); ui.panel = false }, onClose = { ui.panel = false })
         }
 
         AnimatedVisibility(
@@ -411,76 +415,140 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
     }
 }
 
-/** Two columns: categories on the left, the chosen category's channels on the right. */
+/**
+ * Full-screen channel guide over the video (TV-style): a big "TV CHANNELS" list in the middle,
+ * and a round arrow that slides a "CATEGORIES" column in from the left.
+ */
 @Composable
-private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit) {
+private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -> Unit) {
     val groups = remember { listOf("" to "All") + PlayQueue.groups.map { it.id to it.name } }
     val items = PlayQueue.items
+    var showCats by remember { mutableStateOf(false) }
     val shown = remember(ui.panelGroup) {
         items.indices.filter { ui.panelGroup.isEmpty() || items[it].group == ui.panelGroup }
     }
     val listState = rememberLazyListState()
     LaunchedEffect(ui.panelGroup) {
         val at = shown.indexOf(PlayQueue.index)
-        if (at > 2) listState.scrollToItem(at - 2)
+        listState.scrollToItem(if (at > 1) at - 1 else 0)
     }
-    Row(
+    Box(
         Modifier
-            .fillMaxHeight()
-            .background(Color(0xF20A0B0F))
-            .safeDrawingPadding()
-            .padding(8.dp),
+            .fillMaxSize()
+            .background(Brush.horizontalGradient(listOf(Color(0xEB000000), Color(0xA6000000), Color(0x73000000))))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
     ) {
-        if (groups.size > 1) {
-            LazyColumn(Modifier.width(170.dp).fillMaxHeight()) {
-                itemsIndexed(groups) { _, g ->
-                    val on = g.first == ui.panelGroup
-                    Text(
-                        g.second,
-                        color = if (on) Color.White else C.Muted,
-                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (on) C.EmberDim else Color.Transparent)
-                            .clickable { ui.panelGroup = g.first }
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-        }
-        LazyColumn(state = listState, modifier = Modifier.width(320.dp).fillMaxHeight()) {
-            itemsIndexed(shown) { _, idx ->
-                val it = items[idx]
-                val on = idx == PlayQueue.index
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (on) C.EmberDim else Color.Transparent)
-                        .clickable { onPick(idx) }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Row(
+            Modifier
+                .fillMaxHeight()
+                .align(if (showCats) Alignment.CenterStart else Alignment.Center)
+                .safeDrawingPadding()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (groups.size > 1) {
+                AnimatedVisibility(
+                    visible = showCats,
+                    enter = expandHorizontally() + fadeIn(),
+                    exit = shrinkHorizontally() + fadeOut(),
                 ) {
-                    AsyncImage(
-                        model = it.logo.ifBlank { null }, contentDescription = null,
-                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(C.Surface2).padding(3.dp),
-                    )
-                    Text(
-                        it.title, color = if (on) Color.White else C.Text, fontSize = 14.sp,
-                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 12.dp),
+                    Column(Modifier.width(250.dp).fillMaxHeight()) {
+                        GuideHeader("CATEGORIES", Alignment.Start)
+                        LazyColumn(Modifier.fillMaxHeight()) {
+                            itemsIndexed(groups) { _, g ->
+                                val on = g.first == ui.panelGroup
+                                Text(
+                                    g.second,
+                                    color = Color.White.copy(alpha = if (on) 1f else 0.88f),
+                                    fontSize = 18.sp,
+                                    fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                                    lineHeight = 23.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(if (on) Color(0x3DFFFFFF) else Color.Transparent)
+                                        .clickable { ui.panelGroup = g.first }
+                                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                Box(
+                    Modifier
+                        .padding(horizontal = 14.dp)
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x40FFFFFF))
+                        .clickable { showCats = !showCats },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (showCats) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = if (showCats) "Hide categories" else "Show categories",
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp),
                     )
                 }
             }
+            Column(Modifier.width(430.dp).fillMaxHeight()) {
+                GuideHeader("TV CHANNELS", Alignment.CenterHorizontally)
+                LazyColumn(state = listState, modifier = Modifier.fillMaxHeight()) {
+                    itemsIndexed(shown) { _, idx ->
+                        val ch = items[idx]
+                        val on = idx == PlayQueue.index
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(if (on) Color(0x47FFFFFF) else Color.Transparent)
+                                .clickable { onPick(idx) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                Modifier.size(60.dp).clip(RoundedCornerShape(6.dp)).background(Color(0x33FFFFFF)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(ch.title.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                                if (ch.logo.isNotBlank()) {
+                                    AsyncImage(
+                                        model = ch.logo, contentDescription = null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
+                            Text(
+                                ch.title, color = Color.White, fontSize = 19.sp,
+                                fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 16.dp).weight(1f),
+                            )
+                            Text("${idx + 1}", color = Color(0xD9FFFFFF), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun GuideHeader(text: String, align: Alignment.Horizontal) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = align) {
+        Text(
+            text,
+            color = Color(0xE6FFFFFF),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 3.sp,
+            modifier = Modifier.padding(top = 14.dp, bottom = 12.dp, start = 18.dp),
+        )
     }
 }
 
