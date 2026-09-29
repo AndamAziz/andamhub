@@ -197,10 +197,11 @@ private fun PosterGrid(
                 val shown = remember(s.value, q) { s.value.filter { q.isBlank() || it.title.contains(q, ignoreCase = true) } }
                 if (shown.isEmpty()) ErrorBox("Nothing here yet.") else
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(112.dp),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        // 3 posters per row on phones, more on tablets/TV — like pro streaming apps.
+                        columns = GridCells.Adaptive(96.dp),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${shown.size} titles") }

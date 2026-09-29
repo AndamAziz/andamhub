@@ -236,7 +236,7 @@ fun Logo(url: String, name: String, sizeDp: Int) {
 fun PosterCard(title: String, poster: String, sub: String, rating: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(modifier.clickable(onClick = onClick)) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(14.dp)).background(C.Surface2),
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(C.Surface2),
             contentAlignment = Alignment.Center,
         ) {
             Text(title.take(1).uppercase(), color = C.Faint, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -251,8 +251,8 @@ fun PosterCard(title: String, poster: String, sub: String, rating: String, modif
                 )
             }
         }
-        Text(title, color = C.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-        if (sub.isNotBlank()) Text(sub, color = C.Faint, fontSize = 11.sp, maxLines = 1)
+        Text(title, color = C.Text, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 5.dp))
+        if (sub.isNotBlank()) Text(sub, color = C.Faint, fontSize = 10.sp, maxLines = 1)
     }
 }
 

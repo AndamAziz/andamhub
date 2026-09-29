@@ -1079,6 +1079,17 @@ h1,h2,h3{letter-spacing:-.3px}
 }
 @media (min-width:768px){.links{margin-left:14px}}
 
+
+/* ---------- posters v2.4: compact grids like pro streaming apps ---------- */
+.vodgrid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr))!important;gap:12px 10px!important}
+.vodgrid .pcard img,.grid .pcard img{border-radius:10px}
+.vodgrid .pcard .pi{padding:6px 1px 2px}
+.vodgrid .pcard .pt{font-size:12px;line-height:1.25}
+.vodgrid .pcard .pm{font-size:10.5px;margin-top:3px}
+@media (min-width:1100px){.vodgrid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))!important}}
+@media (min-width:1536px){.vodgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important}}
+@media (min-width:768px){.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:18px 14px}}
+@media (max-width:767px){.ltv .vodgrid{padding:0 4px}}
 /* ---------- player v2.2 ---------- */
 /* category chips must keep their height inside the flex column (they were squashed to 14px) */
 .ltv .lvbrowse>.lvchips,.ltv .lvbrowse>.lvsearch,.ltv .lvbrowse>.repbox{flex:0 0 auto!important}
@@ -3433,6 +3444,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function loadTab(){
     var my=++ltv.req;
     if(ltvEl) ltvEl.setAttribute('data-tab',ltv.tab);
+    if(ltvSearch) ltvSearch.placeholder=ltv.tab==='direct'?'Search channels':'Search titles';
     repBox.classList.toggle('hide',ltv.tab!=='replay');
     ltvSearch.parentNode.classList.toggle('hide',ltv.tab==='replay');
     ltvCatBtn.hidden=ltv.tab==='replay';

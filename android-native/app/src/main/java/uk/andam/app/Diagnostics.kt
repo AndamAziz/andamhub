@@ -66,7 +66,15 @@ object Diagnostics {
                     }
                     return@withContext Result(false, if (label.isNotEmpty()) "$label: $why" else why)
                 }
+                val type = res.header("Content-Type").orEmpty().lowercase()
                 val input = res.body?.byteStream() ?: return@withContext Result(false, "Empty response")
+                // An HLS channel answers with a small playlist, not a byte stream: speed is not
+                // measurable this way, so report that the route works and how fast it answered.
+                if ("mpegurl" in type) {
+                    val ms = (System.nanoTime() - t0) / 1_000_000
+                    val prefix = if (label.isNotEmpty()) "$label · " else ""
+                    return@withContext Result(true, prefix + "HLS playlist OK · answered in $ms ms")
+                }
                 val buf = ByteArray(64 * 1024)
                 while ((System.nanoTime() - t0) / 1_000_000 < windowMs) {
                     val n = input.read(buf)

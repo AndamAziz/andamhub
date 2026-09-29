@@ -25,7 +25,6 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
-import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -118,12 +117,11 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             spec.withAdditionalHeaders(extra)
         }
 
+        // Default TS parsing. The NON_IDR_KEYFRAMES / DETECT_ACCESS_UNITS flags split
+        // multi-slice broadcast frames after their first slice: only a thin garbled strip
+        // at the top was decoded and the rest stayed black (provider live + series).
         val extractors = DefaultExtractorsFactory()
             .setConstantBitrateSeekingEnabled(true)
-            .setTsExtractorFlags(
-                DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-                    DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS,
-            )
 
         val sources = DefaultMediaSourceFactory(http, extractors)
             .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(3))
