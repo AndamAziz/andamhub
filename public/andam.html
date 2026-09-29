@@ -2851,6 +2851,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
     var label=active?active.name:'All categories';
     ltvCatBtn.setAttribute('aria-label','Choose category · '+label);
     ltvCatBtn.setAttribute('title',label);
+    window.AndamChips&&window.AndamChips.paint('live');
   }
   function catName(id){
     var m=(ltv.cats||[]).filter(function(c){return c.id===id})[0];
@@ -2891,8 +2892,8 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
       var on=playing&&playing.title===c.name?' on':'';
       return '<button class="chanrow'+on+'" data-id="'+esc(c.id)+'" data-name="'+esc(c.name)+'" type="button">'+
         '<span class="no">'+esc(c.num)+'</span>'+
-        (c.logo?'<img class="lg" loading="lazy" src="'+esc(c.logo)+'" alt="" />':'<span class="lg"></span>')+
-        '<span class="nm">'+esc(c.name)+'</span>'+
+        (c.logo?'<img class="lg" loading="lazy" src="'+esc(c.logo)+'" alt="" />':'<span class="lg mono">'+esc(String(c.name||'?').trim().charAt(0))+'</span>')+
+        '<span class="nm" dir="auto">'+esc(c.name)+'</span><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>'+
         (c.archive?'<span class="arc">REPLAY</span>':'')+'</button>';
     });
   }
@@ -3098,9 +3099,24 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
     var label=active?active.name:'All groups ('+ip.channels.length+')';
     ipGroupBtn.setAttribute('aria-label','Choose group · '+label);
     ipGroupBtn.setAttribute('title',label);
+    window.AndamChips&&window.AndamChips.paint('iptv');
   }
 
 
+  window.AndamChips={
+    paint:function(kind){
+      var host=document.getElementById(kind==='iptv'?'ipChips':'ltvChips'); if(!host) return;
+      var list=kind==='iptv'?[{id:'',name:'All'}].concat((ip.groups||[]).map(function(g){return {id:g.name,name:g.name}})):[{id:'',name:'All'}].concat((ltv.cats||[]).map(function(c){return {id:c.id,name:c.name}}));
+      var act=kind==='iptv'?ip.group:ltv.cat;
+      var html=list.map(function(c){return '<button class="chip'+(String(act||'')===String(c.id)?' on':'')+'" type="button" data-chip="'+esc(c.id)+'" dir="auto">'+esc(c.name)+'</button>'}).join('');
+      host.innerHTML=html; host.hidden=list.length<2;
+      var sh=document.getElementById('lsChips'); if(sh&&window.AndamSheet&&window.AndamSheet.kind===kind) sh.innerHTML=html;
+    },
+    pick:function(kind,id){
+      if(kind==='iptv'){ ip.group=id; renderIpGroups(); renderIpChannels() }
+      else { ltv.cat=id; renderCats(ltv.cats||[]); loadTab() }
+    }
+  };
   function renderIpChannels(){
     var q=ip.q.toLowerCase();
     var list=ip.channels.filter(function(c){
@@ -3117,8 +3133,8 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
       var on=playing&&playing.title===c.name?' on':'';
       return '<button class="chanrow'+on+'" type="button" data-ipch="'+esc(c.id)+'" data-name="'+esc(c.name)+'">'+
         '<span class="no">'+c.num+'</span>'+
-        (c.logo?'<img class="lg" src="'+esc(c.logo)+'" alt="" loading="lazy" />':'<span class="lg"></span>')+
-        '<span class="nm">'+esc(c.name)+'</span></button>';
+        (c.logo?'<img class="lg" src="'+esc(c.logo)+'" alt="" loading="lazy" />':'<span class="lg mono">'+esc(String(c.name||'?').trim().charAt(0))+'</span>')+
+        '<span class="nm" dir="auto">'+esc(c.name)+'</span><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></button>';
     });
   }
 
