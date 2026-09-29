@@ -839,7 +839,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
    the remaining viewport instead of offsetting the search bar into empty space. */
 @media (max-width:719px){
   .ltv.open{height:100dvh;min-height:0;overflow:hidden;padding-top:48px!important}
-  .ltv .lvhead{position:relative;top:auto!important;height:48px;margin:0;padding:4px 12px;z-index:12;background:var(--bg)}
+  .ltv .lvhead{position:relative;top:auto!important;height:48px;margin:0;padding:4px 12px;z-index:12;background:var(--void)}
   #ltvTabs{height:40px;max-width:none;border:1px solid var(--hair);background:var(--surface)}
   #ltvTabs>*{min-height:32px}
   .ltv .lvmain{height:calc(100dvh - 96px);min-height:0;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;overflow:hidden}
@@ -848,9 +848,9 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   .ltv .lvbar{height:44px;min-height:44px;padding:6px 12px!important}
   .ltv .lvbar .lgo{width:28px!important;height:28px!important}
   .ltv .lvbrowse{height:auto!important;min-height:0!important;max-height:none!important;overflow:hidden!important;gap:0;padding:0 0 env(safe-area-inset-bottom)}
-  .ltv .lvsearch{position:relative!important;top:auto!important;z-index:2;order:0;padding:8px 12px 6px;background:var(--bg)}
+  .ltv .lvsearch{position:relative!important;top:auto!important;z-index:2;order:1;padding:2px 12px 8px;background:var(--void)}
   .ltv .lvsearch input{height:44px;min-height:44px;border-radius:12px;background:var(--surface);border-color:var(--hair)}
-  .ltv .lvchips{order:1;min-height:0;padding:2px 12px 8px;gap:6px;background:var(--bg);scroll-snap-type:x proximity}
+  .ltv .lvchips{order:0;min-height:0;padding:8px 12px 6px;gap:6px;background:var(--void);scroll-snap-type:x proximity}
   .ltv .chip{height:40px;min-height:40px;padding:0 14px;scroll-snap-align:start}
   .ltv .lvscroll{order:2;min-height:0;overflow-y:auto!important;padding:0 8px 12px;overscroll-behavior:contain;scrollbar-width:none;touch-action:pan-y;will-change:scroll-position}
   .ltv .lvscroll::-webkit-scrollbar{display:none}
