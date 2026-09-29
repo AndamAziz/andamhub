@@ -96,6 +96,10 @@ private fun Main(onSignIn: () -> Unit) {
         Store.refresh(context)
         ready = true
     }
+    // Quiet update check once per launch; a banner appears when a newer build exists.
+    LaunchedEffect(Unit) {
+        runCatching { uk.andam.app.Updater.check() }.getOrNull()?.let { UpdateState.available = it }
+    }
     BackHandler(enabled = account || tab != 0) { if (account) account = false else tab = 0 }
 
     Scaffold(
@@ -140,7 +144,9 @@ private fun Main(onSignIn: () -> Unit) {
             }
         },
     ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) {
+        Column(Modifier.padding(pad).fillMaxSize()) {
+          if (!account) UpdateBanner(onOpen = { account = true })
+          Box(Modifier.weight(1f).fillMaxWidth()) {
             if (!ready) {
                 Busy()
             } else if (account) {
@@ -155,6 +161,7 @@ private fun Main(onSignIn: () -> Unit) {
                     else -> IptvScreen()
                 }
             }
+          }
         }
     }
 }
@@ -199,6 +206,8 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
                 shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp),
             ) { Text("Sign out", color = C.Text) }
         }
+        UpdateCard()
+        DiagnosticsCard()
         OutlinedButton(
             onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(Config.BASE_URL)) },
             shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp),

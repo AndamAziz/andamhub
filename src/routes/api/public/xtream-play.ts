@@ -141,7 +141,7 @@ async function resolveRedirects(url: string, streamHeaders: StreamHeaders): Prom
           ...(streamHeaders.referer ? { Referer: streamHeaders.referer } : {}),
           ...(streamHeaders.origin ? { Origin: streamHeaders.origin } : {}),
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(3500),
       });
       try {
         await res.body?.cancel();
@@ -159,6 +159,18 @@ async function resolveRedirects(url: string, streamHeaders: StreamHeaders): Prom
     }
   }
   return current;
+}
+
+/**
+ * Only playlists need the redirect probe (relative segment paths must resolve against the
+ * final host). Progressive links — Xtream live `.ts`, VOD `.mp4/.mkv` — skip it: the probe
+ * cost up to 6 s per start and opened an extra provider connection, which single-connection
+ * Xtream accounts answer by dropping the real stream.
+ */
+function needsRedirectProbe(url: string): boolean {
+  const path = (url.split('?')[0] ?? '').toLowerCase();
+  if (/\.m3u8?$/.test(path)) return true;
+  return !/\.[a-z0-9]{2,4}$/.test(path.split('/').pop() ?? '');
 }
 
 /** Providers often mislabel segments (text/css, text/html); fix by extension. */
@@ -228,7 +240,11 @@ async function fetchUpstream(
 ): Promise<Response> {
   // Only chunks we pulled out of a manifest are known-finite. A first-hop
   // `.ts` link is an endless live stream and stays on the relay.
-  if (fromManifest && isSegment(upstream)) {
+  // Header-protected (Referer/Origin) restreams bind segments to the IP that fetched the
+  // playlist: keep them on the relay with the manifest instead of trying the edge first
+  // (that detour cost up to 8 s per segment and caused the stalls).
+  const protectedStream = Boolean(streamHeaders.referer || streamHeaders.origin);
+  if (fromManifest && isSegment(upstream) && !protectedStream) {
     const direct = await fetchDirectSegment(upstream, request, streamHeaders);
     if (direct) return direct;
   }
@@ -371,7 +387,9 @@ export const Route = createFileRoute('/api/public/xtream-play')({
 
         // Only the first hop (the link the UI hands us) may still redirect.
         const upstream =
-          url.searchParams.get('s') === '1' ? target : await resolveRedirects(target, streamHeaders);
+          url.searchParams.get('s') === '1' || !needsRedirectProbe(target)
+            ? target
+            : await resolveRedirects(target, streamHeaders);
 
         // Repair path: the player asks for a transcode only after the plain
         // stream stalled or the decoder refused it. If the transcoder is not

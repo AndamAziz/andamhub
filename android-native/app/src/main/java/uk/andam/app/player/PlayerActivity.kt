@@ -256,12 +256,16 @@ private fun PlayerScreen(
                 },
         )
 
+        // Loading ring: same inset-aware centre as the controls, so it wraps the play button exactly.
         if (engine.buffering && engine.error == null) {
-            CircularProgressIndicator(
-                color = C.Ember,
-                strokeWidth = 3.dp,
-                modifier = Modifier.align(Alignment.Center).size(52.dp),
-            )
+            Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    color = C.Ember,
+                    trackColor = Color(0x33FFFFFF),
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(78.dp),
+                )
+            }
         }
 
         engine.status?.let {

@@ -98,7 +98,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             .setEnableDecoderFallback(true)
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(20_000, 60_000, 1_500, 3_000)
+            .setBufferDurationsMs(15_000, 50_000, 1_000, 2_500)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -119,7 +119,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             )
 
         val sources = DefaultMediaSourceFactory(http, extractors)
-            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(6))
+            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(3))
 
         player = ExoPlayer.Builder(context, renderers)
             .setLoadControl(loadControl)
@@ -180,7 +180,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 val stalled = player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && item != null && error == null
                 if (stalled) {
                     stallSeconds++
-                    if (stallSeconds >= 12) {
+                    if (stallSeconds >= (if (live) 8 else 12)) {
                         stallSeconds = 0
                         stallReloads++
                         if (stallReloads >= 3) nextAttempt() else reconnect("Reconnecting…", 0)
