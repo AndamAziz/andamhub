@@ -1078,6 +1078,33 @@ h1,h2,h3{letter-spacing:-.3px}
   .ltv .lvmain>.lvbrowse>.lvscroll{flex:1 1 auto;min-height:0}
 }
 @media (min-width:768px){.links{margin-left:14px}}
+
+/* ---------- player v2.2 ---------- */
+/* category chips must keep their height inside the flex column (they were squashed to 14px) */
+.ltv .lvbrowse>.lvchips,.ltv .lvbrowse>.lvsearch,.ltv .lvbrowse>.repbox{flex:0 0 auto!important}
+.ltv .lvchips:not([hidden]){display:flex;padding:8px 12px 6px!important;scroll-padding-left:12px}
+/* an old phone rule hid every .chip (meant for the nav) — category chips must stay visible */
+.lvchips .chip{display:inline-flex!important;align-items:center;flex:none}
+/* controls layout: icons top, timeline pinned to the bottom edge */
+.lvcontrols .ctrlbottom{position:static!important;padding:0!important}
+.lvcontrols .ctrlrow{position:absolute;top:0;left:0;right:0;min-height:48px;padding:4px max(6px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));gap:2px}
+.lvcontrols .ctrlseek{position:absolute;left:0;right:0;bottom:0;gap:6px;padding:0 max(6px,env(safe-area-inset-right)) max(2px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
+.lvcontrols .ctrlseek .ctrlskip{min-width:36px!important;min-height:36px!important;width:36px;height:36px;font-size:11px!important;font-weight:700}
+.lvcontrols .ctrltime{font-size:11px;min-width:34px;text-align:center}
+.lvcontrols .ctrlrow .ctrlbtn{width:40px;height:40px;min-width:40px;min-height:40px;font-size:18px}
+.lvcontrols{background:linear-gradient(180deg,rgba(0,0,0,.55) 0,transparent 30%,transparent 60%,rgba(0,0,0,.75) 100%)!important}
+/* Movies / Series: previous/next channel makes no sense there */
+#ltv[data-tab="movies"] .ctrlnav,#ltv[data-tab="series"] .ctrlnav{visibility:hidden}
+/* the category drawer opens from the bottom on phones, like the other sheets */
+@media (max-width:719px){
+  .catdrawer{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-height:75dvh;
+    border:1px solid var(--hair);border-bottom:0;border-radius:22px 22px 0 0;transform:translateY(102%)!important;z-index:2147483100;background:var(--surface)}
+  .catdrawer.open{transform:none!important}
+  #catScrim{z-index:2147483090}
+  .catdrawerhead{background:var(--surface)!important;padding:18px 18px 12px}
+  .catoption{min-height:52px;border-radius:12px;border-bottom:0;margin-bottom:4px}
+  .catoption.on{border-left:0;background:var(--ember-dim);color:#fff}
+}
 /* ---------- player v2.1: auto-hiding controls + full-width settings sheet ---------- */
 /* keyboard/TV focus may keep controls up; a tap that leaves focus on the stage must not */
 .lvstage:focus-within:not(.controls-on):not(.fsactive) .lvcontrols{opacity:0}
@@ -1155,12 +1182,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 <script>
 (function(){
   // Bump APP_VERSION and edit NOTES on every release — the popup shows once per new version.
-  var APP_VERSION='1.5', APP_DATE='29 Sep 2026';
+  var APP_VERSION='1.6', APP_DATE='29 Sep 2026';
   var NOTES=[
-    'New look: bottom tab bar, cleaner home screen, posters for movies and shows.',
-    'Player controls now hide by themselves — tap the picture to show or hide them.',
-    'Player settings open as a full sheet instead of inside the small video.',
-    'Channel list scrolls properly on phones.'
+    'Movies and Series: the list button now opens the category picker.',
+    'Category chips are visible again under the search box.',
+    'Player timeline moved to the bottom edge; buttons sit at the top.',
+    'Controls hide by themselves; settings open as a full sheet.'
   ];
   var m=document.getElementById('wnModal');
   document.getElementById('appVer').textContent='v'+APP_VERSION+' · '+APP_DATE.replace(/ \d{4}$/,'');
@@ -2680,7 +2707,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       if(u==='mute'){ v.muted=!v.muted; updateControls(s) }
       else if(u==='liveedge'){ try{ var sk=v.seekable; if(sk&&sk.length) v.currentTime=sk.end(sk.length-1)-1 }catch(_){} v.play().catch(function(){}) }
       else if(u==='prev'||u==='next') stepChannel(s,u==='next'?1:-1);
-      else if(u==='list') window.AndamSheet&&window.AndamSheet.open(s.kind);
+      else if(u==='list'){
+        if(s.kind==='live'&&ltv.tab!=='direct'){ if(isStageFullscreen(s)) toggleStageFullscreen(s); openCatDrawer('live') }
+        else window.AndamSheet&&window.AndamSheet.open(s.kind);
+      }
       showControls(s);
     });
     s.controls.querySelector('[data-control="settings"]').addEventListener('click',function(){ fillSettings(s) });
@@ -3402,6 +3432,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* ---- data loading per tab ---- */
   function loadTab(){
     var my=++ltv.req;
+    if(ltvEl) ltvEl.setAttribute('data-tab',ltv.tab);
     repBox.classList.toggle('hide',ltv.tab!=='replay');
     ltvSearch.parentNode.classList.toggle('hide',ltv.tab==='replay');
     ltvCatBtn.hidden=ltv.tab==='replay';
