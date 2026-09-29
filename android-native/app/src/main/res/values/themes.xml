@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Andam" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/andam_bg</item>
+        <item name="android:statusBarColor">@color/andam_bg</item>
+        <item name="android:navigationBarColor">@color/andam_bg</item>
+        <item name="android:colorAccent">#FF3B4E</item>
+    </style>
+    <style name="Theme.Andam.Player" parent="Theme.Andam">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>

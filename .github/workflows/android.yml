@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "android-app/**"
+      - "android-native/**"
       - ".github/workflows/android.yml"
 
 permissions:
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: android-app
+        working-directory: android-native
 
     steps:
       - uses: actions/checkout@v4
@@ -44,21 +44,9 @@ jobs:
             echo "sdkmanager not found, skipping license accept"
           fi
 
-      - name: Install Capacitor
-        run: npm install --no-audit --no-fund
-
-      - name: Create Android project
-        run: |
-          npx --yes cap add android
-          npx --yes cap sync android
-          node configure-android.mjs
-
-      - name: Set version
-        working-directory: android-app/android
-        run: |
-          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" app/build.gradle
-          sed -i "s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" app/build.gradle
-          chmod +x gradlew
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
 
       - name: Prepare signing key
         id: sign
@@ -121,10 +109,11 @@ jobs:
           echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
           echo "key_pass=$KEY_PASS" >> "$GITHUB_OUTPUT"
 
-      - name: Build signed APK + AAB
-        working-directory: android-app/android
+      - name: Build signed APK + AAB (native app)
         run: |
-          ./gradlew assembleRelease bundleRelease \
+          gradle --no-daemon assembleRelease bundleRelease \
+            -PandamVersionCode=$((1000 + ${{ github.run_number }})) \
+            -PandamVersionName="2.0.${{ github.run_number }}" \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
             -Pandroid.injected.signing.store.password="${{ steps.sign.outputs.store_pass }}" \
             -Pandroid.injected.signing.key.alias="${{ steps.sign.outputs.key_alias }}" \
@@ -133,9 +122,9 @@ jobs:
       - name: Prepare release downloads
         run: |
           mkdir -p release-files
-          cp android/app/build/outputs/apk/release/app-release.apk \
+          cp app/build/outputs/apk/release/app-release.apk \
             release-files/Andam-${{ github.run_number }}.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab \
+          cp app/build/outputs/bundle/release/app-release.aab \
             release-files/Andam-${{ github.run_number }}.aab
           if [ "${{ steps.sign.outputs.generated }}" = "true" ]; then
             cp "$RUNNER_TEMP/release.jks" release-files/Andam-signing-key.jks
@@ -148,5 +137,5 @@ jobs:
         run: |
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" release-files/* \
-            --title "Andam Android build ${{ github.run_number }}" \
+            --title "Andam Android ${{ github.run_number }} (native)" \
             --notes "Signed Android APK and AAB generated from commit ${{ github.sha }}."

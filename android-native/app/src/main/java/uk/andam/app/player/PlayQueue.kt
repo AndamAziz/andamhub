@@ -1,0 +1,54 @@
+package uk.andam.app.player
+
+import android.content.Context
+import android.content.Intent
+import uk.andam.app.net.Category
+
+enum class Kind { LIVE, VOD, EPISODE, IPTV }
+
+data class PlayItem(
+    val kind: Kind,
+    /** Provider slug (Xtream) or playlist slug (IPTV). */
+    val source: String,
+    val id: String,
+    val title: String,
+    val subtitle: String = "",
+    val logo: String = "",
+    val ext: String = "",
+    /** Category id (Live) or group name (IPTV) — drives the in-player channel panel. */
+    val group: String = "",
+    /** Pre-minted token (series episodes arrive with one). */
+    val token: String? = null,
+) {
+    val isLive: Boolean get() = kind == Kind.LIVE || kind == Kind.IPTV
+    val resumeKey: String get() = "${kind.name}:$source:$id"
+}
+
+/** Hand-off between the catalog screens and the player activity (lists can be thousands long). */
+object PlayQueue {
+    var items: List<PlayItem> = emptyList()
+        private set
+    var index: Int = 0
+    var groups: List<Category> = emptyList()
+        private set
+
+    fun open(context: Context, items: List<PlayItem>, index: Int, groups: List<Category> = emptyList()) {
+        if (items.isEmpty()) return
+        this.items = items
+        this.index = index.coerceIn(0, items.lastIndex)
+        this.groups = groups
+        context.startActivity(Intent(context, PlayerActivity::class.java))
+    }
+
+    fun current(): PlayItem? = items.getOrNull(index)
+}
+
+/** Where VOD / episodes stopped, so they resume. */
+object Resume {
+    private fun prefs(c: Context) = c.getSharedPreferences("andam_resume", Context.MODE_PRIVATE)
+    fun get(c: Context, key: String): Long = prefs(c).getLong(key, 0L)
+    fun put(c: Context, key: String, positionMs: Long, durationMs: Long) {
+        val done = durationMs > 0 && positionMs > durationMs - 90_000
+        prefs(c).edit().apply { if (done || positionMs < 30_000) remove(key) else putLong(key, positionMs) }.apply()
+    }
+}
