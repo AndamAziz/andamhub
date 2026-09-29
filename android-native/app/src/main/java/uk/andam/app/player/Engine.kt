@@ -21,6 +21,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
@@ -92,9 +93,15 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     init {
         val renderers = DefaultRenderersFactory(context)
             // FFmpeg audio (AC3 / E-AC3 / DTS / MP2) when the device has no decoder of its own.
-            // PREFER: FFmpeg decodes the sound first, so phones whose own AC3/E-AC3 decoder
-            // claims support but plays silence still get audio.
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            // Hardware decoders first for everything (PREFER also switched the picture to
+            // FFmpeg's experimental software video decoder: black/garbled video with sound).
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            // …except Dolby/DTS sound: phones often claim those decoders but play silence,
+            // so hide them and let FFmpeg's audio decoder take these formats.
+            .setMediaCodecSelector { mimeType, secure, tunneling ->
+                if (mimeType in SOFTWARE_AUDIO) emptyList()
+                else MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)
+            }
             .setEnableDecoderFallback(true)
 
         val loadControl = DefaultLoadControl.Builder()
@@ -417,5 +424,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     companion object {
         private const val TAG = "AndamEngine"
+        private val SOFTWARE_AUDIO = setOf(
+            MimeTypes.AUDIO_AC3, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC,
+            MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_TRUEHD,
+        )
     }
 }

@@ -27,32 +27,45 @@ object Diagnostics {
     /** Download speed to the internet (Cloudflare test file), measured for up to 8 s. */
     suspend fun internet(): Result = measure("https://speed.cloudflare.com/__down?bytes=50000000", 8_000)
 
-    /** Throughput of a real live stream through the Andam relay, measured for 6 s. */
-    suspend fun streamRoute(): Result {
-        return try {
-            val src = Store.provider
-            val url = if (src.isNotEmpty()) {
-                val first = Api.live(src).firstOrNull() ?: return Result(false, "No channel to test")
-                Api.streamUrl(Api.play(src, "live", first.id).play)
-            } else {
-                val ip = Store.iptvSource.ifEmpty { return Result(false, "No channel to test") }
-                val first = Api.iptvChannels(ip).channels.firstOrNull() ?: return Result(false, "No channel to test")
-                Api.streamUrl(Api.iptvPlay(ip, first.id).token)
-            }
-            measure(url, 6_000)
-        } catch (e: Exception) {
-            Result(false, e.message ?: "Stream test failed")
+    /** Throughput of a real provider live channel through the Andam relay, measured for 6 s. */
+    suspend fun providerRoute(): Result = try {
+        val src = Store.provider
+        if (src.isEmpty()) Result(false, "No provider on this account")
+        else {
+            val first = Api.live(src).firstOrNull()
+            if (first == null) Result(false, "No channel to test")
+            else measure(Api.streamUrl(Api.play(src, "live", first.id).play), 6_000, first.name)
         }
+    } catch (e: Exception) {
+        Result(false, e.message ?: "Stream test failed")
     }
 
-    private suspend fun measure(url: String, windowMs: Long): Result = withContext(Dispatchers.IO) {
+    /** Same for the first IPTV playlist channel. */
+    suspend fun iptvRoute(): Result = try {
+        val ip = Store.iptvSource
+        val first = if (ip.isEmpty()) null else Api.iptvChannels(ip).channels.firstOrNull()
+        if (first == null) Result(false, "No channel to test")
+        else measure(Api.streamUrl(Api.iptvPlay(ip, first.id).token), 6_000, first.name)
+    } catch (e: Exception) {
+        Result(false, e.message ?: "Stream test failed")
+    }
+
+    private suspend fun measure(url: String, windowMs: Long, label: String = ""): Result = withContext(Dispatchers.IO) {
         try {
             val req = Request.Builder().url(url).header("User-Agent", Config.USER_AGENT).build()
             val t0 = System.nanoTime()
             var firstByteMs = -1L
             var bytes = 0L
             Api.media.newCall(req).execute().use { res ->
-                if (!res.isSuccessful) return@withContext Result(false, "HTTP ${res.code}")
+                if (!res.isSuccessful) {
+                    val why = when (res.code) {
+                        504 -> "provider not responding (timeout)"
+                        502 -> "relay could not reach the provider"
+                        403, 401 -> "refused by the provider"
+                        else -> "HTTP ${res.code}"
+                    }
+                    return@withContext Result(false, if (label.isNotEmpty()) "$label: $why" else why)
+                }
                 val input = res.body?.byteStream() ?: return@withContext Result(false, "Empty response")
                 val buf = ByteArray(64 * 1024)
                 while ((System.nanoTime() - t0) / 1_000_000 < windowMs) {
@@ -70,7 +83,8 @@ object Diagnostics {
                 mbps >= 2 -> "SD only"
                 else -> "too slow"
             }
-            Result(mbps >= 2, "%.1f Mbps · first byte %d ms · %s".format(mbps, firstByteMs.coerceAtLeast(0), verdict))
+            val prefix = if (label.isNotEmpty()) "$label · " else ""
+            Result(mbps >= 2, prefix + "%.1f Mbps · first byte %d ms · %s".format(mbps, firstByteMs.coerceAtLeast(0), verdict))
         } catch (e: Exception) {
             Result(false, e.message ?: "Failed")
         }

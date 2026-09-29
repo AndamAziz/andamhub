@@ -240,11 +240,11 @@ async function fetchUpstream(
 ): Promise<Response> {
   // Only chunks we pulled out of a manifest are known-finite. A first-hop
   // `.ts` link is an endless live stream and stays on the relay.
-  // Header-protected (Referer/Origin) restreams bind segments to the IP that fetched the
-  // playlist: keep them on the relay with the manifest instead of trying the edge first
-  // (that detour cost up to 8 s per segment and caused the stalls).
+  // Header-protected (Referer/Origin) channels: browsers cannot send those headers, so this
+  // server sends them itself — playlist AND segments straight from here, where the headers
+  // are guaranteed. The relay stays as the fallback when the host refuses us.
   const protectedStream = Boolean(streamHeaders.referer || streamHeaders.origin);
-  if (fromManifest && isSegment(upstream) && !protectedStream) {
+  if (protectedStream || (fromManifest && isSegment(upstream))) {
     const direct = await fetchDirectSegment(upstream, request, streamHeaders);
     if (direct) return direct;
   }

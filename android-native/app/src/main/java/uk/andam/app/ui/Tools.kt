@@ -113,22 +113,25 @@ fun DiagnosticsCard() {
     var server by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var internet by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var stream by remember { mutableStateOf<Diagnostics.Result?>(null) }
+    var iptv by remember { mutableStateOf<Diagnostics.Result?>(null) }
     val hevc = remember { Diagnostics.hevcSupported() }
 
     Card {
         Text("Server & speed test", color = C.Faint, style = MaterialTheme.typography.labelMedium)
         ResultRow("Andam server", server, running && server == null)
         ResultRow("Internet speed", internet, running && server != null && internet == null)
-        ResultRow("Stream route", stream, running && internet != null && stream == null)
+        ResultRow("Provider stream (relay)", stream, running && internet != null && stream == null)
+        ResultRow("IPTV stream", iptv, running && stream != null && iptv == null)
         ResultRow("H.265 (HEVC) video", Diagnostics.Result(hevc, if (hevc) "Supported on this device" else "Not supported on this device"), false)
         Button(
             enabled = !running,
             onClick = {
-                running = true; server = null; internet = null; stream = null
+                running = true; server = null; internet = null; stream = null; iptv = null
                 scope.launch {
                     server = Diagnostics.server()
                     internet = Diagnostics.internet()
-                    stream = Diagnostics.streamRoute()
+                    stream = Diagnostics.providerRoute()
+                    iptv = Diagnostics.iptvRoute()
                     running = false
                 }
             },
