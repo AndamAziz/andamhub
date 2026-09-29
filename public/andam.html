@@ -2012,34 +2012,48 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
     return (h?h+':':'')+(h&&m<10?'0':'')+m+':'+(s<10?'0':'')+s;
   }
   function controlsMarkup(){
-    return '<div class="ctrlseek"><span class="ctrltime" data-current>0:00</span><input class="ctrlrange" data-seek type="range" min="0" max="1000" value="0" aria-label="Playback position"><span class="ctrltime" data-duration>LIVE</span></div>'+
-      '<div class="ctrlrow"><button class="ctrlbtn primary" data-control="play" type="button" aria-label="Play or pause">▶</button>'+
-      '<button class="ctrlbtn" data-control="back" type="button" aria-label="Rewind 10 seconds">↶<span class="small">10</span></button>'+
-      '<button class="ctrlbtn" data-control="forward" type="button" aria-label="Forward 10 seconds">↷<span class="small">10</span></button>'+
-      '<span class="ctrllabel" data-title>Andam</span><span class="ctrlspacer"></span>'+
-      '<button class="ctrlbtn" data-control="menu" type="button" aria-label="Categories and channels">☰</button>'+
-      '<button class="ctrlbtn" data-control="mute" type="button" aria-label="Mute or unmute">🔊</button>'+
-      '<button class="ctrlbtn" data-control="fit" type="button" aria-label="Change video fit">Fit</button>'+
-      '<button class="ctrlbtn" data-control="settings" type="button" aria-label="Playback settings">⚙</button>'+
-      '<button class="ctrlbtn" data-control="fullscreen" type="button" aria-label="Enter fullscreen">⛶</button></div>'+
-      '<div class="ctrlsettings" data-settings hidden><div class="ctitle">Playback speed</div>'+
-      '<button class="ctrlsetting" data-speed="0.75" type="button"><span>Slower</span><span>0.75×</span></button>'+
-      '<button class="ctrlsetting on" data-speed="1" type="button"><span>Normal</span><span>1×</span></button>'+
-      '<button class="ctrlsetting" data-speed="1.25" type="button"><span>Faster</span><span>1.25×</span></button></div>';
+    return '<button class="ctrlbtn ctrlexit" data-control="fullscreen" type="button" aria-label="Exit fullscreen">✕</button>'+
+      '<div class="ctrlcenter"><button class="ctrlbtn ctrlnav" data-ui="prev" type="button" aria-label="Previous channel">⏮</button>'+
+      '<button class="ctrlbtn primary" data-control="play" type="button" aria-label="Play or pause">▶</button>'+
+      '<button class="ctrlbtn ctrlnav" data-ui="next" type="button" aria-label="Next channel">⏭</button></div>'+
+      '<div class="ctrlbottom"><div class="ctrlseek"><button class="ctrlbtn ctrlskip" data-control="back" type="button" aria-label="Rewind 10 seconds">-10</button>'+
+      '<span class="ctrltime" data-current>0:00</span><input class="ctrlrange" data-seek type="range" min="0" max="1000" value="0" aria-label="Playback position"><span class="ctrltime" data-duration>0:00</span>'+
+      '<button class="ctrlbtn ctrlskip" data-control="forward" type="button" aria-label="Forward 10 seconds">+10</button></div>'+
+      '<div class="ctrlrow"><button class="livepill" data-ui="liveedge" type="button" aria-label="Jump to live"><i></i>LIVE</button>'+
+      '<span class="ctrllabel" data-title dir="auto">Andam</span><span class="ctrlspacer"></span>'+
+      '<button class="ctrlbtn" data-ui="list" type="button" aria-label="Channel list">☰</button>'+
+      '<button class="ctrlbtn" data-control="settings" type="button" aria-label="Settings">⚙</button>'+
+      '<button class="ctrlbtn" data-control="fullscreen" type="button" aria-label="Fullscreen">⛶</button>'+
+      '<button class="ctrlbtn ctrlhidden" data-control="mute" type="button" aria-label="Mute or unmute">🔊</button>'+
+      '<button class="ctrlbtn ctrlhidden" data-control="fit" type="button" aria-label="Change video fit">Fit</button></div></div>'+
+      '<div class="ctrlsettings" data-settings hidden><span class="grab"></span>'+
+      '<div class="ctitle">Audio</div><div class="sgrp"><button class="ctrlsetting" data-ui="mute" type="button"><span>Sound</span><span data-mutelbl>On</span></button><div data-audiotracks></div></div>'+
+      '<div class="ctitle">Aspect ratio</div><div class="sgrp srow">'+
+      '<button class="ctrlsetting on" data-aspect="contain" type="button">Fit</button><button class="ctrlsetting" data-aspect="cover" type="button">Fill</button><button class="ctrlsetting" data-aspect="fill" type="button">16:9</button></div>'+
+      '<div class="ctitle">Quality</div><div class="sgrp"><div class="ctrlsetting static"><span>Current</span><span data-quality>Auto</span></div></div>'+
+      '<div class="ctitle">Speed</div><div class="sgrp srow">'+
+      '<button class="ctrlsetting" data-speed="0.75" type="button">0.75×</button>'+
+      '<button class="ctrlsetting on" data-speed="1" type="button">1×</button>'+
+      '<button class="ctrlsetting" data-speed="1.25" type="button">1.25×</button></div></div>';
   }
   function showControls(s,hold){
     if(!s||!s.stage) return;
     clearTimeout(s.ctrlTimer); s.stage.classList.add('controls-on');
-    if(!hold&&!s.video.paused) s.ctrlTimer=setTimeout(function(){ s.stage.classList.remove('controls-on'); if(s.settings) s.settings.hidden=true },3500);
+    if(!hold&&!s.video.paused) s.ctrlTimer=setTimeout(function(){ if(s.settings&&!s.settings.hidden) return; s.stage.classList.remove('controls-on') },3000);
   }
   function updateControls(s){
     if(!s||!s.controls) return;
     var v=s.video,d=v.duration,finite=isFinite(d)&&d>0;
+    var sk=v.seekable, win=0; try{ if(sk&&sk.length) win=sk.end(sk.length-1)-sk.start(0) }catch(_){}
+    var seekable=finite||win>30;
+    s.stage.classList.toggle('is-seekable',seekable);
+    s.stage.classList.toggle('is-live',!finite);
     s.current.textContent=timeText(v.currentTime);
-    s.duration.textContent=finite?timeText(d):'LIVE';
+    s.duration.textContent=finite?timeText(d):(win>30?timeText(win):'');
     s.seek.disabled=!finite; s.seek.value=finite?String(Math.round((v.currentTime/d)*1000)):'1000';
-    s.playBtn.textContent=v.paused?'▶':'Ⅱ';
+    s.playBtn.textContent=v.paused?'▶':'❚❚';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
+    var ml=s.controls.querySelector('[data-mutelbl]'); if(ml) ml.textContent=(v.muted||v.volume===0)?'Muted':'On';
   }
   /* Orientation is independent from the media element. The Android app uses a
      stable viewport-sized player while the native plugin rotates the screen. */
@@ -2128,7 +2142,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
     document.body.classList.toggle('player-fullscreen',!!on);
     if(on){
       nativeStatusBar(true); bindPseudoViewport(s,true); sizePseudoFullscreen(s);
-      lockLandscape().then(function(){ requestAnimationFrame(function(){ sizePseudoFullscreen(s) }); setTimeout(function(){ sizePseudoFullscreen(s) },450) });
+      requestAnimationFrame(function(){ sizePseudoFullscreen(s) }); setTimeout(function(){ sizePseudoFullscreen(s) },300);
       renderFsNav(s.kind); showControls(s,true); if(s.fsWasPlaying) s.video.play().catch(function(){})
     }else{
       bindPseudoViewport(s,false); clearTimeout(s.fsSizeTimer); s.fsSizeTimer=null;
