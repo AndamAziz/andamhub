@@ -111,6 +111,12 @@ export const Route = createFileRoute('/api/public/iptv')({
               name: channel.name,
               logo: channel.logo,
               token: await sealUrl(tagStreamHeaders(channel.url, channel.headers)),
+              // Channels that need Referer/Origin/User-Agent play best when the device requests
+              // them itself (same IP for playlist and segments). Only the native app uses this;
+              // the link and headers already come from the playlist source.
+              ...(channel.headers && Object.keys(channel.headers).length
+                ? { direct: { url: channel.url, headers: channel.headers } }
+                : {}),
             });
           }
 

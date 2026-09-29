@@ -308,18 +308,26 @@ fun HomeScreen(onTab: (Int) -> Unit) {
     val context = LocalContext.current
     val access = Store.access
     var live by remember(Store.provider) { mutableStateOf<List<PlayItem>>(emptyList()) }
+    var liveCats by remember(Store.provider) { mutableStateOf<List<Category>>(emptyList()) }
     var iptv by remember(Store.iptvSource) { mutableStateOf<List<PlayItem>>(emptyList()) }
+    var iptvCats by remember(Store.iptvSource) { mutableStateOf<List<Category>>(emptyList()) }
     LaunchedEffect(Store.provider) {
         val src = Store.provider
-        if (src.isNotEmpty()) live = runCatching {
-            Api.live(src).map { PlayItem(Kind.LIVE, src, it.id, it.name, logo = it.logo, group = it.categoryId) }
-        }.getOrDefault(emptyList())
+        if (src.isNotEmpty()) runCatching {
+            val cats = runCatching { Api.categories(src, "live") }.getOrDefault(emptyList())
+            liveCats = cats
+            live = Api.live(src).map { ch ->
+                PlayItem(Kind.LIVE, src, ch.id, ch.name, subtitle = cats.firstOrNull { it.id == ch.categoryId }?.name.orEmpty(), logo = ch.logo, group = ch.categoryId)
+            }
+        }
     }
     LaunchedEffect(Store.iptvSource) {
         val src = Store.iptvSource
-        if (src.isNotEmpty()) iptv = runCatching {
-            Api.iptvChannels(src).channels.map { PlayItem(Kind.IPTV, src, it.id, it.name, subtitle = it.group, logo = it.logo, group = it.group) }
-        }.getOrDefault(emptyList())
+        if (src.isNotEmpty()) runCatching {
+            val l = Api.iptvChannels(src)
+            iptvCats = l.groups
+            iptv = l.channels.map { PlayItem(Kind.IPTV, src, it.id, it.name, subtitle = it.group, logo = it.logo, group = it.group) }
+        }
     }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
@@ -351,11 +359,11 @@ fun HomeScreen(onTab: (Int) -> Unit) {
         }
         if (live.isNotEmpty()) {
             item { SectionTitle("Live channels", "See all") { onTab(1) } }
-            item { ChannelStrip(live) { i -> PlayQueue.open(context, live, i) } }
+            item { ChannelStrip(live) { i -> PlayQueue.open(context, live, i, liveCats) } }
         }
         if (iptv.isNotEmpty()) {
             item { SectionTitle("IPTV", "See all") { onTab(4) } }
-            item { ChannelStrip(iptv) { i -> PlayQueue.open(context, iptv, i) } }
+            item { ChannelStrip(iptv) { i -> PlayQueue.open(context, iptv, i, iptvCats) } }
         }
         if (access?.live != true) {
             item {

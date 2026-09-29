@@ -180,8 +180,18 @@ object Api {
         )
     }
 
-    suspend fun iptvPlay(source: String, id: String): String =
-        get(I, mapOf("action" to "play", "source" to source, "id" to id)).str("token")
+    suspend fun iptvPlay(source: String, id: String): IptvPlay {
+        val j = get(I, mapOf("action" to "play", "source" to source, "id" to id))
+        val d = j.optJSONObject("direct")
+        val h = d?.optJSONObject("headers")
+        val headers = LinkedHashMap<String, String>()
+        if (h != null) {
+            h.optString("referer").takeIf { it.isNotBlank() }?.let { headers["Referer"] = it }
+            h.optString("origin").takeIf { it.isNotBlank() }?.let { headers["Origin"] = it }
+            h.optString("userAgent").takeIf { it.isNotBlank() }?.let { headers["User-Agent"] = it }
+        }
+        return IptvPlay(j.str("token"), d?.optString("url")?.takeIf { it.startsWith("http") }, headers)
+    }
 
     // ---------------- stream URLs ----------------
 

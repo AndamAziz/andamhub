@@ -16,6 +16,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -46,7 +47,15 @@ import uk.andam.app.net.Api
 @OptIn(UnstableApi::class)
 class Engine(private val context: Context, private val scope: CoroutineScope) {
 
-    private data class Attempt(val url: String, val hls: Boolean, val fix: Boolean)
+    /** One way of reaching a stream. `headers` is set only for direct (Referer-protected) IPTV links. */
+    private data class Attempt(
+        val url: String,
+        val hls: Boolean,
+        val fix: Boolean,
+        val headers: Map<String, String> = emptyMap(),
+    ) {
+        val direct: Boolean get() = headers.isNotEmpty()
+    }
 
     // ---- observable UI state ----
     var title by mutableStateOf("")
@@ -71,6 +80,11 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     private var stallSeconds = 0
     private var stallReloads = 0
     private var playingSince = 0L
+    private var audioChecked = false
+
+    /** Headers for the attempt being played; read on ExoPlayer's loader threads. */
+    @Volatile
+    private var requestHeaders: Map<String, String> = emptyMap()
     private var session = 0
     private var resolveJob: Job? = null
     private var retryJob: Job? = null
@@ -78,7 +92,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     init {
         val renderers = DefaultRenderersFactory(context)
             // FFmpeg audio (AC3 / E-AC3 / DTS / MP2) when the device has no decoder of its own.
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            // PREFER: FFmpeg decodes the sound first, so phones whose own AC3/E-AC3 decoder
+            // claims support but plays silence still get audio.
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             .setEnableDecoderFallback(true)
 
         val loadControl = DefaultLoadControl.Builder()
@@ -86,7 +102,14 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        val http = OkHttpDataSource.Factory(Api.media).setUserAgent(Config.USER_AGENT)
+        // Every request carries the current attempt's headers (Referer/Origin/User-Agent for
+        // protected channels — applied to the playlist and to every segment alike).
+        val okhttp = OkHttpDataSource.Factory(Api.media)
+        val http = ResolvingDataSource.Factory(okhttp) { spec ->
+            val extra = HashMap(requestHeaders)
+            if (!extra.containsKey("User-Agent")) extra["User-Agent"] = Config.USER_AGENT
+            spec.withAdditionalHeaders(extra)
+        }
 
         val extractors = DefaultExtractorsFactory()
             .setConstantBitrateSeekingEnabled(true)
@@ -165,6 +188,17 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 } else {
                     stallSeconds = 0
                 }
+                // Silent-audio check: the picture plays but no sound was decoded → audio fixer route.
+                if (!audioChecked && player.isPlaying && playingSince > 0 && System.currentTimeMillis() - playingSince > 6_000) {
+                    audioChecked = true
+                    val cur = attempts.getOrNull(attemptIndex)
+                    val counters = player.audioDecoderCounters
+                    val hasAudio = player.currentTracks.containsType(C.TRACK_TYPE_AUDIO)
+                    if (cur != null && !cur.fix && hasAudio && (counters == null || counters.renderedOutputBufferCount == 0)) {
+                        Log.w(TAG, "no audio decoded, switching to audio fix")
+                        jumpToFix()
+                    }
+                }
                 if (player.isPlaying && playingSince > 0 && System.currentTimeMillis() - playingSince > 15_000) {
                     retries = 0
                     stallReloads = 0
@@ -201,20 +235,27 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         player.clearMediaItems()
         resolveJob = scope.launch {
             try {
+                val list = ArrayList<Attempt>()
                 val tokens: List<String> = when (next.kind) {
                     Kind.LIVE -> Api.play(next.source, "live", next.id).let { listOfNotNull(it.play, it.fallback) }
                     Kind.VOD -> listOf(Api.play(next.source, "vod", next.id, next.ext).play)
                     Kind.EPISODE -> listOf(next.token ?: Api.play(next.source, "series", next.id, next.ext).play)
-                    Kind.IPTV -> listOf(Api.iptvPlay(next.source, next.id))
+                    Kind.IPTV -> Api.iptvPlay(next.source, next.id).let { p ->
+                        // Referer-protected channel: the phone asks for it directly with the
+                        // playlist's headers first (like VLC); the relay routes stay as fallbacks.
+                        if (p.directUrl != null && p.headers.isNotEmpty()) {
+                            list.add(Attempt(p.directUrl, hls = p.directUrl.contains(".m3u8", true), fix = false, headers = p.headers))
+                        }
+                        listOf(p.token)
+                    }
                 }.filter { it.isNotBlank() }
                 if (mine != session) return@launch
-                if (tokens.isEmpty()) {
+                if (tokens.isEmpty() && list.isEmpty()) {
                     fail("This stream is not available right now.")
                     return@launch
                 }
-                val list = ArrayList<Attempt>()
                 tokens.forEachIndexed { i, t -> list.add(Attempt(Api.streamUrl(t), hls = i > 0, fix = false)) }
-                list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
+                if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
                 attempts = list
                 start(0)
                 if (!next.isLive) {
@@ -273,6 +314,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         attemptIndex = index
         stallSeconds = 0
         playingSince = 0
+        audioChecked = false
+        requestHeaders = a.headers
         val builder = MediaItem.Builder().setUri(a.url)
         if (a.hls) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
         if (live) builder.setLiveConfiguration(
@@ -348,8 +391,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             }
 
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
-                // 403/404 from the server: the token or channel is gone — re-mint once, then give up.
-                if (remints++ < 1) retry() else nextAttempt()
+                // A direct link refused us: move on to the relay route.
+                // From our own server: the token or channel is gone — re-mint once, then move on.
+                if (current.direct) nextAttempt() else if (remints++ < 1) retry() else nextAttempt()
             }
 
             else -> {

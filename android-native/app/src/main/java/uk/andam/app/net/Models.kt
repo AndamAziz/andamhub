@@ -62,6 +62,9 @@ data class IptvSource(val id: String, val name: String)
 data class IptvChannel(val id: String, val num: Int, val name: String, val logo: String, val group: String)
 data class IptvList(val groups: List<Category>, val channels: List<IptvChannel>)
 
+/** IPTV play answer: opaque token, plus a direct link + headers for Referer-protected channels. */
+data class IptvPlay(val token: String, val directUrl: String?, val headers: Map<String, String>)
+
 /** Opaque playback tokens: the app never sees provider URLs or credentials. */
 data class PlayTokens(val play: String, val fallback: String?)
 

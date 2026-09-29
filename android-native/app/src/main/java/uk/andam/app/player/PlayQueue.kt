@@ -36,7 +36,14 @@ object PlayQueue {
         if (items.isEmpty()) return
         this.items = items
         this.index = index.coerceIn(0, items.lastIndex)
-        this.groups = groups
+        // Always give the in-player panel a category column: when the caller had no list,
+        // derive one from the items themselves.
+        this.groups = groups.ifEmpty {
+            items.filter { it.group.isNotEmpty() }
+                .distinctBy { it.group }
+                .map { Category(it.group, it.subtitle.ifBlank { it.group }) }
+                .takeIf { it.size > 1 } ?: emptyList()
+        }
         context.startActivity(Intent(context, PlayerActivity::class.java))
     }
 
