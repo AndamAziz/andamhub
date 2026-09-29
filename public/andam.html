@@ -866,7 +866,42 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   <a id="mSearch" href="#">Search</a>
   <a id="mAdmin" href="/admin" target="_top" hidden>Admin</a>
   <a id="mAccount" href="/auth" target="_top">Sign in</a>
+  <button type="button" id="appVer" style="margin-top:auto;align-self:flex-start;background:none;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);font:500 12px 'IBM Plex Mono',monospace;padding:6px 12px;border-radius:999px;cursor:pointer;min-height:32px">v1.2 · 29 Sep</button>
 </div>
+<div id="wnModal" role="dialog" aria-modal="true" aria-labelledby="wnTitle" hidden style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#111;border:1px solid rgba(255,255,255,.1);border-radius:12px;max-width:420px;width:100%;padding:24px;color:#eee;font-family:Inter,sans-serif;max-height:80dvh;overflow:auto">
+    <div style="font:500 12px 'IBM Plex Mono',monospace;color:#FF4500;margin-bottom:8px" id="wnVer"></div>
+    <h2 id="wnTitle" style="margin:0 0 16px;font:700 22px 'Space Grotesk',sans-serif">What's new</h2>
+    <ul id="wnList" style="margin:0 0 24px;padding-left:20px;line-height:1.6;font-size:14px;color:rgba(255,255,255,.8)"></ul>
+    <button type="button" id="wnOk" style="width:100%;min-height:44px;border:0;border-radius:999px;background:#FF4500;color:#fff;font:600 15px Inter,sans-serif;cursor:pointer">Got it</button>
+  </div>
+</div>
+<script>
+(function(){
+  // Bump APP_VERSION and edit NOTES on every release — the popup shows once per new version.
+  var APP_VERSION='1.2', APP_DATE='29 Sep 2026';
+  var NOTES=[
+    'Redesigned Live TV and IPTV player with a compact header.',
+    'Account moved into the menu for a cleaner top bar.',
+    'Auto-hiding player controls with play/pause and next/previous channel.',
+    'Channel list opens as a bottom sheet from the player.',
+    'Fullscreen now works in both portrait and landscape.',
+    'Version badge and this "What\'s new" screen.'
+  ];
+  var m=document.getElementById('wnModal');
+  document.getElementById('appVer').textContent='v'+APP_VERSION+' · '+APP_DATE.replace(/ \d{4}$/,'');
+  document.getElementById('wnVer').textContent='Version '+APP_VERSION+' — '+APP_DATE;
+  document.getElementById('wnList').innerHTML=NOTES.map(function(n){var li=document.createElement('li');li.textContent=n;return li.outerHTML}).join('');
+  function show(){m.hidden=false;m.style.display="flex";document.getElementById('wnOk').focus()}
+  function hide(){m.hidden=true;m.style.display="none";try{localStorage.setItem('andam_seen_version',APP_VERSION)}catch(e){}}
+  document.getElementById('wnOk').onclick=hide;
+  m.addEventListener('click',function(e){if(e.target===m)hide()});
+  document.addEventListener('keydown',function(e){if(!m.hidden&&(e.key==='Escape'||e.key==='Backspace'))hide()});
+  document.getElementById('appVer').onclick=show;
+  var seen=null;try{seen=localStorage.getItem('andam_seen_version')}catch(e){}
+  if(seen!==APP_VERSION)setTimeout(show,800);
+})();
+</script>
 
 
 
