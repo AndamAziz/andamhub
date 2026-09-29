@@ -5,10 +5,17 @@
   "server": {
     "url": "https://ip.andam.uk",
     "androidScheme": "https",
-    "allowNavigation": ["ip.andam.uk", "*.andam.uk", "andam-stream-show.lovable.app", "*.supabase.co"]
+    "allowNavigation": [
+      "ip.andam.uk",
+      "*.andam.uk",
+      "andam-stream-show.lovable.app",
+      "*.supabase.co"
+    ]
   },
   "appendUserAgent": " AndamApp/1.0",
   "android": {
-    "allowMixedContent": true
-  }
+    "allowMixedContent": true,
+    "backgroundColor": "#0A0B0F"
+  },
+  "backgroundColor": "#0A0B0F"
 }

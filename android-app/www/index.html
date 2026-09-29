@@ -3,10 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0A0B0F" />
     <title>Andam</title>
     <meta http-equiv="refresh" content="0; url=https://ip.andam.uk" />
+    <style>
+      html,body{margin:0;height:100%;background:#0A0B0F;color:#F4F5F7;
+        font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      body{display:grid;place-items:center}
+      .w{display:flex;flex-direction:column;align-items:center;gap:18px}
+      .m{width:72px;height:72px;border-radius:18px;display:grid;place-items:center;
+        background:linear-gradient(160deg,#FF5C6C,#B2162C);font-size:34px;font-weight:800;color:#fff;
+        box-shadow:0 10px 40px rgba(255,59,78,.35)}
+      .b{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.12);border-top-color:#FF3B4E;
+        animation:s .8s linear infinite}
+      @keyframes s{to{transform:rotate(360deg)}}
+    </style>
   </head>
-  <body style="background:#050505;color:#fff;font-family:sans-serif;text-align:center;padding-top:40vh">
-    Andam…
+  <body>
+    <div class="w"><div class="m">A</div><div class="b" aria-label="Loading"></div></div>
   </body>
 </html>

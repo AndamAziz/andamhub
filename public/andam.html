@@ -7,7 +7,8 @@
 <meta name="description" content="Andam streaming homepage: live matches, movies, shows, IPTV channels and prayer times." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<meta name="theme-color" content="#0A0B0F" />
 <style>
 :root{
   --void:#08090C; --surface:#141419; --surface-2:#1D1E24;
@@ -57,8 +58,8 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
   border:1px solid var(--hair);background:rgba(255,255,255,.03);font-size:12.5px;font-weight:500;
   color:var(--muted);white-space:nowrap;text-decoration:none}
 .authbtn:hover{color:var(--text);background:rgba(255,255,255,.07)}
-.authbtn.admin{color:var(--ember);border-color:rgba(255,69,0,.35);background:var(--ember-dim)}
-.authbtn.admin:hover{color:var(--ember);background:rgba(255,69,0,.22)}
+.authbtn.admin{color:var(--ember);border-color:rgba(255,59,78,.35);background:var(--ember-dim)}
+.authbtn.admin:hover{color:var(--ember);background:rgba(255,59,78,.22)}
 .authbtn .ai{font-size:13px;line-height:1}
 .autharea[hidden],.authbtn[hidden]{display:none}
 .menu .authbtn{border-bottom:1px solid var(--hair)}
@@ -309,7 +310,7 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
   padding:8px 10px;color:var(--text);font-size:12.5px}
 @media (max-width:820px){.mbody{flex-direction:column}.chanlist{width:100%;flex:1 1 auto;max-height:38vh;border-left:0;border-top:1px solid var(--hair)}}
 /* ===== HAMBURGER / MOBILE MENU ===== */
-.status.retry{cursor:pointer;color:var(--ember);border:1px solid rgba(255,69,0,.45);background:rgba(255,69,0,.12);border-radius:999px;padding:10px 18px;min-height:44px;display:inline-flex;align-items:center}
+.status.retry{cursor:pointer;color:var(--ember);border:1px solid rgba(255,59,78,.45);background:rgba(255,59,78,.12);border-radius:999px;padding:10px 18px;min-height:44px;display:inline-flex;align-items:center}
 .burger{display:grid;order:3;width:40px;height:40px;border-radius:10px;border:1px solid var(--hair);
   background:rgba(255,255,255,.03);color:var(--text);font-size:18px;place-items:center}
 .menu{position:fixed;inset:0;z-index:60;display:none;background:rgba(6,7,10,.94);backdrop-filter:blur(12px);
@@ -499,9 +500,9 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
 .lvsel select:hover{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05));border-color:rgba(255,255,255,.18)}
 .lvsel select:focus{outline:none;border-color:var(--ember);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 3px rgba(255,59,78,.18)}
 .lvsel select option{background:#141419;color:#f0f0f3}
-.lvsel.accent select{border-color:rgba(255,69,0,.55);background:linear-gradient(180deg,rgba(255,69,0,.18),rgba(255,69,0,.08));color:#ffd9c9}
-.lvsel.accent select:hover{background:linear-gradient(180deg,rgba(255,69,0,.24),rgba(255,69,0,.1));border-color:rgba(255,69,0,.7)}
-.lvsel.accent select:focus{border-color:var(--ember);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 3px rgba(255,69,0,.22)}
+.lvsel.accent select{border-color:rgba(255,59,78,.55);background:linear-gradient(180deg,rgba(255,59,78,.18),rgba(255,59,78,.08));color:#ffd9c9}
+.lvsel.accent select:hover{background:linear-gradient(180deg,rgba(255,59,78,.24),rgba(255,59,78,.1));border-color:rgba(255,59,78,.7)}
+.lvsel.accent select:focus{border-color:var(--ember);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 3px rgba(255,59,78,.22)}
 .lvsel[hidden]{display:none}
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
 .chips::-webkit-scrollbar{display:none}
@@ -512,7 +513,7 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .12s ease}
 .chips .pill:hover,.repbox .pill:hover{background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.05));color:#fff;border-color:rgba(255,255,255,.18);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 16px rgba(0,0,0,.28)}
 .chips .pill:active,.repbox .pill:active{transform:scale(.97) translateY(0)}
-.chips .pill.on,.repbox .pill.on{background:linear-gradient(135deg,var(--ember),#ff5a2e);border-color:transparent;color:#0f0503;
+.chips .pill.on,.repbox .pill.on{background:linear-gradient(135deg,var(--ember),#ff5f6d);border-color:transparent;color:#0f0503;
   box-shadow:0 6px 20px rgba(255,59,78,.35),inset 0 1px 0 rgba(255,255,255,.25);font-weight:700}
 /* segmented control for Direct/Movies/Series/Replay */
 .seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;border:1px solid rgba(255,255,255,.1);
@@ -522,9 +523,9 @@ html.tvmode .card:focus-visible .cwrm{opacity:1}
   transition:background .18s ease,color .18s ease,box-shadow .18s ease,transform .12s ease}
 .seg .pill:hover{color:#fff;background:rgba(255,255,255,.08)}
 .seg .pill:active{transform:scale(.97)}
-.seg .pill.on{background:linear-gradient(135deg,var(--ember),#ff5a2e);color:#0f0503;font-weight:700;
+.seg .pill.on{background:linear-gradient(135deg,var(--ember),#ff5f6d);color:#0f0503;font-weight:700;
   box-shadow:0 6px 20px rgba(255,59,78,.35),inset 0 1px 0 rgba(255,255,255,.25)}
-.seg .pill.on:hover{background:linear-gradient(135deg,#ff4f5e,#ff6a3a);color:#0f0503}
+.seg .pill.on:hover{background:linear-gradient(135deg,#ff4f5e,#ff7480);color:#0f0503}
 
 
 
@@ -573,7 +574,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 .fsch img,.fsch .flogo{width:38px;height:38px;border-radius:7px;object-fit:contain;background:rgba(255,255,255,.06)}
 .fsch .fn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fscat:hover,.fscat:focus-visible,.fsch:hover,.fsch:focus-visible{background:rgba(255,255,255,.12);color:var(--text);border-color:rgba(255,255,255,.16)}
-.fscat.on,.fsch.on{background:rgba(255,69,0,.2);border-color:rgba(255,69,0,.55);color:var(--text)}
+.fscat.on,.fsch.on{background:rgba(255,59,78,.2);border-color:rgba(255,59,78,.55);color:var(--text)}
 .fsnavhint{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);font:500 10px/1 'IBM Plex Mono',monospace;
   letter-spacing:.08em;color:rgba(246,246,248,.65);white-space:nowrap}
 .lvcontrols{position:absolute;left:0;right:0;bottom:0;z-index:12;padding:42px 16px 12px;
@@ -583,7 +584,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 .ctrlseek{display:grid;grid-template-columns:auto minmax(70px,1fr) auto;align-items:center;gap:10px;margin-bottom:8px}
 .ctrltime{font:600 10px/1 'IBM Plex Mono',monospace;color:rgba(245,245,245,.85);white-space:nowrap}
 .ctrlrange{appearance:none;width:100%;height:3px;border:0;border-radius:99px;background:rgba(255,255,255,.34);accent-color:var(--ember);cursor:pointer}
-.ctrlrange::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 3px rgba(255,69,0,.2)}
+.ctrlrange::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 3px rgba(255,59,78,.2)}
 .ctrlrow{display:flex;align-items:center;gap:6px;min-height:44px}
 .ctrlbtn{display:grid;place-items:center;width:42px;height:42px;min-width:42px;border:1px solid transparent;border-radius:50%;
   background:transparent;color:#f5f5f5;font:600 18px/1 Inter,sans-serif;cursor:pointer}
@@ -618,7 +619,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 .catpick:hover,.catpick:focus-visible{color:var(--text);border-color:rgba(255,59,78,.55);background:var(--ember-dim)}
 .catpick[hidden]{display:none}
 .lverr{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:88%;
-  background:rgba(8,9,12,.9);border:1px solid rgba(255,69,0,.4);border-radius:10px;color:#fff;
+  background:rgba(8,9,12,.9);border:1px solid rgba(255,59,78,.4);border-radius:10px;color:#fff;
   font:500 12.5px/1.35 Inter,sans-serif;padding:10px 14px;cursor:pointer;text-align:center}
 /* slim now-playing bar: logo + name + category tag + LIVE badge */
 .lvbar{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surface);
@@ -633,7 +634,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 .lvbar .tg:empty{display:none}
 .lvbar .live{display:inline-flex;align-items:center;gap:5px;flex:none;margin-left:auto;
   font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--ember);
-  border:1px solid rgba(255,69,0,.4);background:rgba(255,69,0,.12);border-radius:999px;padding:3px 8px}
+  border:1px solid rgba(255,59,78,.4);background:rgba(255,59,78,.12);border-radius:999px;padding:3px 8px}
 .lvbar .live[hidden]{display:none}
 .lvbar .live .ld{width:5px;height:5px;border-radius:50%;background:var(--ember);animation:pulse 1.4s ease-in-out infinite}
 .lvbar .sb{display:none}
@@ -658,7 +659,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
   transition:background .14s ease,border-color .14s ease}
 .chanrow:hover{background:rgba(255,255,255,.08)}
 .chanrow:active{background:rgba(255,255,255,.12)}
-.chanrow.on{border-left-color:var(--ember);background:rgba(255,69,0,.16);border-color:rgba(255,69,0,.45)}
+.chanrow.on{border-left-color:var(--ember);background:rgba(255,59,78,.16);border-color:rgba(255,59,78,.45)}
 .chanrow.on .nm{color:#ffd6c4}
 .chanrow .no{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7c7f88;width:34px;flex:none}
 .chanrow .lg{width:48px;height:48px;flex:none;object-fit:contain;background:rgba(255,255,255,.05);
@@ -747,7 +748,7 @@ html,body{overflow-x:hidden;max-width:100%}
 .lvbar .lgo{width:32px!important;height:32px!important;border-radius:8px}
 .lvbar .nm{font:600 14px/1.2 Inter,sans-serif!important}
 .lvbar .tg,.lvbar .sb{display:none!important}
-.lvbar .live{padding:4px 8px;border-radius:999px;background:rgba(255,69,0,.14);color:var(--ember);font:700 10px/1 Inter,sans-serif;letter-spacing:.08em}
+.lvbar .live{padding:4px 8px;border-radius:999px;background:rgba(255,59,78,.14);color:var(--ember);font:700 10px/1 Inter,sans-serif;letter-spacing:.08em}
 /* overlay controls */
 .lvcontrols{position:absolute;inset:0;display:block!important;pointer-events:none;opacity:0;transition:opacity .2s;
   background:linear-gradient(180deg,rgba(0,0,0,.45) 0,transparent 28%,transparent 62%,rgba(0,0,0,.7) 100%)}
@@ -807,7 +808,7 @@ html,body{overflow-x:hidden;max-width:100%}
 .chanrow .eq i{width:3px;background:var(--ember);border-radius:2px;animation:eqb .9s ease-in-out infinite}
 .chanrow .eq i:nth-child(2){animation-delay:.2s}.chanrow .eq i:nth-child(3){animation-delay:.4s}
 @keyframes eqb{0%,100%{height:4px}50%{height:14px}}
-.chanrow.on{border-left-color:var(--ember)!important;background:rgba(255,69,0,.08)!important}
+.chanrow.on{border-left-color:var(--ember)!important;background:rgba(255,59,78,.08)!important}
 .chanrow.on .eq{display:inline-flex}
 .lvlist:empty,.lvskel{min-height:300px;background:repeating-linear-gradient(180deg,rgba(255,255,255,.04) 0 52px,transparent 52px 60px);border-radius:12px;animation:skel 1.2s ease-in-out infinite}
 @keyframes skel{50%{opacity:.5}}
@@ -881,6 +882,206 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   .ctrlsettings .settingshead{position:sticky;top:0;z-index:2;background:#151515}
   .fsnav{grid-template-columns:minmax(104px,32vw) minmax(0,1fr)!important;padding:10px 6px calc(64px + env(safe-area-inset-bottom))!important}
 }
+
+/* ===================== ANDAM v2 DESIGN LAYER (presentation only) =====================
+   One font, one accent, app-style navigation. Loaded last so it settles the
+   earlier stacked layers; no playback, relay, auth or data logic depends on it. */
+:root{
+  --void:#0A0B0F; --surface:#15161C; --surface-2:#1E2028; --surface-3:#272A33;
+  --hair:rgba(255,255,255,.08); --hair-2:rgba(255,255,255,.14);
+  --ember:#FF3B4E; --ember-2:#E0263A; --ember-dim:rgba(255,59,78,.14);
+  --text:#F4F5F7; --muted:#A3A6B0; --faint:#6E717B;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Arabic",Tahoma,sans-serif;
+  --tabh:0px; --rad:14px;
+}
+html{background:var(--void)}
+body{background:var(--void);color:var(--text);-webkit-tap-highlight-color:transparent}
+/* a single typeface everywhere: no serif fallbacks when a web font is slow in the WebView */
+body,body *{font-family:var(--font)!important}
+h1,h2,h3{letter-spacing:-.3px}
+.chanrow .no,.ctrltime,.fsch .no,.dmeta,.pcard .pm,.rate,.card .s{font-variant-numeric:tabular-nums}
+.mono{letter-spacing:.02em}
+::selection{background:rgba(255,59,78,.35)}
+
+/* ---------- top bar ---------- */
+.mark{width:30px;height:30px;border-radius:9px;font-size:16px;font-weight:800;
+  background:linear-gradient(145deg,#FF5A6A 0%,var(--ember) 45%,#B81D31 100%);box-shadow:0 4px 14px rgba(255,59,78,.35)}
+.word{font-weight:800;font-size:18px;letter-spacing:-.4px}
+.nav{background:linear-gradient(to bottom,rgba(10,11,15,.92),rgba(10,11,15,0))}
+.nav.solid{background:rgba(10,11,15,.94);backdrop-filter:none;border-bottom-color:var(--hair)}
+.links a.active::after{height:2px;margin-top:6px}
+.burger{border:0;background:transparent;color:var(--text);border-radius:12px}
+.burger:active{background:rgba(255,255,255,.08)}
+.navsource .lvsel select{background:var(--surface);border-color:var(--hair);color:var(--text);font-weight:600}
+
+/* ---------- buttons, pills, tags ---------- */
+.btn{border-radius:12px;font-weight:600;letter-spacing:0}
+.btn.primary{background:var(--ember);color:#fff}
+.btn.primary:hover{background:#ff5363}
+.btn.glass{background:rgba(255,255,255,.08);border:1px solid var(--hair);backdrop-filter:none}
+.pill{background:var(--ember-dim);color:#FF6B7A;font-size:10.5px;font-weight:700;letter-spacing:.08em;padding:5px 10px}
+.tag{font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:3px 7px;border-radius:6px}
+.tag.live{background:var(--ember);color:#fff;border:0}
+.tag.live .dot{background:#fff}
+.rate{font-size:10.5px;font-weight:700;color:#FFD27A;background:rgba(10,11,15,.78);border:0;padding:3px 7px}
+.dwatch,.lockgo{color:#fff}
+.dwatch{border-radius:12px}
+.chips .pill.on,.repbox .pill.on,.seg .pill.on,.seg .pill.on:hover{background:var(--ember);color:#fff;box-shadow:none}
+.seg{background:var(--surface);box-shadow:none;border-color:var(--hair)}
+.chip{background:var(--surface);border-color:var(--hair);color:var(--muted);font-weight:600}
+.chip.on{background:var(--text);border-color:var(--text);color:#0A0B0F}
+
+/* ---------- home: hero ---------- */
+.hero .scrim{background:
+  linear-gradient(to top,var(--void) 2%,rgba(10,11,15,.6) 40%,rgba(10,11,15,.15) 75%),
+  linear-gradient(to right,rgba(10,11,15,.9),transparent 65%)}
+.hero h1{font-weight:800;letter-spacing:-.8px}
+.dots button{height:4px;width:18px}
+.dots button.active{width:28px}
+
+/* ---------- home: rows & cards ---------- */
+.rowhead h2{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.rowhead a{font-weight:600;color:var(--muted)}
+.card{border-radius:var(--rad);border-color:var(--hair);background:var(--surface)}
+.card .t{font-weight:700;font-size:13px}
+.card .s{color:rgba(255,255,255,.62)}
+.card .grad{background:linear-gradient(to top,rgba(6,7,10,.92),rgba(6,7,10,.2) 55%,transparent)}
+/* the play badge is only meaningful on resume cards */
+.card .cwplay{display:none}
+#cwRow .card .cwplay{display:grid;background:var(--ember);color:#fff}
+/* channel cards: a clean logo tile instead of a stretched 16:9 frame */
+.card.chan{background:linear-gradient(160deg,#1C1E26,#121318)}
+.card.chan .ph{object-fit:contain;padding:14px 22px 38px;background:none}
+.card.chan .grad{background:linear-gradient(to top,rgba(10,11,15,.95) 0,rgba(10,11,15,0) 45%)}
+.card.chan .tag.live{top:8px;left:8px}
+.card .ph.noimg{font-weight:800;font-size:24px}
+/* movie / show rows: proper 2:3 posters */
+#rowMovies .card,#rowShows .card{width:124px;height:auto;aspect-ratio:2/3}
+#rowMovies .card .grad,#rowShows .card .grad{background:linear-gradient(to top,rgba(6,7,10,.95),rgba(6,7,10,0) 48%)}
+#rowMovies .card .t,#rowShows .card .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:12.5px}
+
+/* ---------- catalog ---------- */
+.cathead h1{font-weight:800;letter-spacing:-.8px}
+.cathead .cnt{font-size:12px;color:var(--faint)}
+.cathead input{background:var(--surface);border-color:var(--hair);border-radius:12px}
+.pcard{border-radius:var(--rad);background:transparent;border:0;overflow:visible}
+.pcard img{border-radius:var(--rad);border:1px solid var(--hair)}
+.pcard .pi{padding:8px 2px 4px}
+.pcard .pt{font-weight:600;font-size:13px}
+.pcard .pm{font-size:11.5px;color:var(--faint)}
+.pcard .pm b{color:#FFD27A;font-weight:700}
+.skel{border-radius:var(--rad);border:0;background:var(--surface)}
+
+/* ---------- details drawer ---------- */
+.drawer{background:var(--void);border-color:var(--hair)}
+.dhero .grad{background:linear-gradient(to top,var(--void),rgba(10,11,15,.1) 70%)}
+.dbody h2{font-weight:800;font-size:26px}
+.dmeta{font-size:12.5px}
+.dsec h3{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.dgen span{background:var(--surface);font-size:12px}
+.dover{font-size:14px;color:rgba(255,255,255,.75)}
+.dclose,.vpclose,.vpfs{border-radius:50%;background:rgba(10,11,15,.7);border-color:var(--hair-2)}
+
+/* ---------- menu (More) ---------- */
+.menu{background:rgba(10,11,15,.985);backdrop-filter:none;padding-top:72px}
+.menu a{font-weight:700;font-size:20px;letter-spacing:-.3px;color:var(--text);border-bottom-color:var(--hair)}
+.menu a.active{color:var(--ember)}
+.menuclose{border-radius:50%;border-color:var(--hair-2)}
+
+/* ---------- lock gate & modals ---------- */
+.lockcard{background:var(--surface);border-radius:22px}
+.lockicon{border-radius:18px}
+.lockrow input,.lockacts button,.lockgo{border-radius:12px}
+.lockl{font-size:11.5px;font-weight:600}
+.modal,.vpwrap{border-radius:18px}
+
+/* ---------- Live TV / IPTV ---------- */
+.ltv .lvhead{background:var(--void)}
+.lvbar{background:var(--void)!important}
+.lvbar .nm{font-weight:700!important}
+.lvbar .live{background:var(--ember)!important;color:#fff!important;border:0}
+.lvbar .live .ld{background:#fff}
+.lvidle{background:radial-gradient(circle at 50% 38%,#1B1D25,#0A0B0F);font-weight:500;color:var(--faint)}
+.lvsearch input,.ltv .lvsearch input,.lsheet .lshead input{background:var(--surface)!important;border:1px solid var(--hair)!important;border-radius:12px!important}
+.lvsearch input:focus{border-color:rgba(255,59,78,.6)!important}
+.chanrow .lg,.chanrow .lg.mono{background:var(--surface-2)}
+.chanrow .nm{font-weight:500}
+.chanrow.on .nm{color:var(--text)!important;font-weight:700}
+.ltv .chanrow:active{background:rgba(255,255,255,.06)}
+.lsheet .lspanel{background:var(--surface)!important;border-radius:20px 20px 0 0}
+
+/* ---------- bottom tab bar (phones) ---------- */
+.tabbar{display:none}
+@media (max-width:767px){
+  :root{--tabh:62px}
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:55;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+    height:calc(var(--tabh) + env(safe-area-inset-bottom));padding:0 4px env(safe-area-inset-bottom);
+    background:rgba(12,13,18,.97);border-top:1px solid var(--hair)}
+  .tabbar a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    min-width:0;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.1px;transition:color .15s ease}
+  .tabbar a svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .tabbar a span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .tabbar a.active{color:var(--text)}
+  .tabbar a.active svg{color:var(--ember)}
+  .tabbar a.active::before{content:"";position:absolute;top:0;left:50%;width:26px;height:2.5px;margin-left:-13px;border-radius:0 0 3px 3px;background:var(--ember)}
+  .tabbar a:active{color:var(--text)}
+  .tabbar a.lockedlink::after{content:"";position:absolute;top:10px;left:calc(50% + 9px);width:7px;height:7px;margin:0;border-radius:50%;
+    background:var(--faint);box-shadow:0 0 0 2px #0C0D12;opacity:1;font-size:0}
+  body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom))}
+  html.fslock .tabbar,body.player-fullscreen .tabbar{display:none!important}
+
+  /* top bar: brand on the left, provider + More on the right */
+  .word{display:block;font-size:17px}
+  .nav .burger{width:42px;height:42px}
+
+  /* hero becomes a compact featured card */
+  .hero{height:auto;min-height:0;margin:60px 16px 0;padding:0;border-radius:20px;border:1px solid var(--hair);
+    background:radial-gradient(120% 90% at 100% 0%,rgba(255,59,78,.22),transparent 55%),linear-gradient(160deg,#1A1C24,#111217)}
+  .hero .scrim{display:none}
+  .hero img.bg{opacity:.35}
+  .hero img.bg.logo{position:absolute;inset:auto;top:18px;right:18px;left:auto;width:76px;height:76px;padding:10px;
+    border-radius:18px;background:rgba(255,255,255,.06);border:1px solid var(--hair);opacity:1;filter:none;animation:none;object-fit:contain}
+  .hero .inner{position:relative;left:0;bottom:auto;padding:20px 18px 18px;max-width:none}
+  .hero h1{font-size:22px;line-height:1.15;margin:12px 0 16px;padding-right:92px;min-height:50px}
+  .cta{gap:8px}
+  .cta .btn.primary,.cta .btn.glass{min-height:44px;padding:0 16px;font-size:13.5px}
+  .cta .btn.primary{flex:1 1 auto;justify-content:center}
+  .rows{margin-top:22px;padding-bottom:24px}
+  .row{margin-bottom:22px}
+  .rowhead{margin-bottom:10px}
+  .rowhead h2{font-size:17px}
+  .strip{gap:10px;padding:2px var(--pad) 8px;scroll-padding-left:var(--pad)}
+  .card{width:44vw;max-width:190px;height:auto;aspect-ratio:16/9;min-height:0}
+  .card.chan{width:120px;aspect-ratio:1/1}
+  .card.chan .ph{padding:16px 20px 36px}
+  .card.chan .txt{left:9px;right:9px;bottom:8px}
+  #rowMovies .card,#rowShows .card{width:31vw;max-width:140px;aspect-ratio:2/3}
+  .card .t{font-size:12.5px}
+  .catalog{padding:64px var(--pad) 28px}
+  .cathead{gap:10px;margin-bottom:16px}
+  .cathead h1{font-size:28px}
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
+  .pcard .pt{font-size:12px}
+  .pcard .pm{font-size:11px}
+  .menu{padding-bottom:calc(var(--tabh) + 24px)}
+
+}
+@media (max-width:719px){
+  /* Live TV / IPTV fill the space above the tab bar exactly */
+  .ltv.open{height:calc(100dvh - var(--tabh) - env(safe-area-inset-bottom))}
+  .ltv .lvmain{height:calc(100dvh - 96px - var(--tabh) - env(safe-area-inset-bottom))}
+  #iptv.open .lvmain{height:calc(100dvh - 48px - var(--tabh) - env(safe-area-inset-bottom))}
+  .ltv .lvscroll{padding-bottom:8px}
+  /* the channel column must fill the remaining row and scroll inside it
+     (align-items:start on .lvmain left it content-sized and clipped) */
+  .ltv .lvmain>.lvbrowse{align-self:stretch;min-height:0!important;height:100%!important;display:flex;flex-direction:column}
+  .ltv .lvmain>.lvbrowse>.lvscroll{flex:1 1 auto;min-height:0}
+}
+@media (min-width:768px){.links{margin-left:14px}}
+@media (max-width:360px){
+  .tabbar a{font-size:9.5px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 </style>
 
 </head>
@@ -889,7 +1090,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
 
 
 <nav class="nav" id="nav">
-  <div class="brand"><div class="mark">H</div><div class="word">Andam</div></div>
+  <div class="brand"><div class="mark" aria-hidden="true">A</div><div class="word">Andam</div></div>
   <div class="links">
     <a href="#" class="active">Home</a><a href="#">Live TV</a><a href="#">Movies</a>
     <a href="#">Shows</a><a href="#">IPTV</a>
@@ -902,7 +1103,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
     <div class="autharea" id="authArea">
       <a class="authbtn" id="authAccount" href="/auth" target="_top">Sign in</a>
     </div>
-    <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false">☰</button>
+    <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
   </div>
 </nav>
 
@@ -913,14 +1114,15 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   <a id="mSearch" href="#">Search</a>
   <a id="mAdmin" href="/admin" target="_top" hidden>Admin</a>
   <a id="mAccount" href="/auth" target="_top">Sign in</a>
-  <button type="button" id="appVer" style="margin-top:auto;align-self:flex-start;background:none;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);font:500 12px 'IBM Plex Mono',monospace;padding:6px 12px;border-radius:999px;cursor:pointer;min-height:32px">v1.2 · 29 Sep</button>
+  <button type="button" id="appVer" style="margin-top:auto;align-self:flex-start;background:none;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);font:500 12px Inter,sans-serif;padding:6px 12px;border-radius:999px;cursor:pointer;min-height:32px">v1.2 · 29 Sep</button>
 </div>
+<nav class="tabbar" id="tabbar" aria-label="Sections"><a href="#" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="m8 2.5 4 3.5 4-3.5"/><circle cx="17.5" cy="10" r="1.2" fill="currentColor" stroke="none"/></svg><span>Live TV</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4M3 12h18"/></svg><span>Movies</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="m10.5 8 4 2-4 2z" fill="currentColor"/></svg><span>Shows</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0"/><circle cx="12" cy="18.5" r="1.4" fill="currentColor" stroke="none"/><path d="M2 9.5a14.5 14.5 0 0 1 20 0"/></svg><span>IPTV</span></a></nav>
 <div id="wnModal" role="dialog" aria-modal="true" aria-labelledby="wnTitle" hidden style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:16px">
-  <div style="background:#111;border:1px solid rgba(255,255,255,.1);border-radius:12px;max-width:420px;width:100%;padding:24px;color:#eee;font-family:Inter,sans-serif;max-height:80dvh;overflow:auto">
-    <div style="font:500 12px 'IBM Plex Mono',monospace;color:#FF4500;margin-bottom:8px" id="wnVer"></div>
-    <h2 id="wnTitle" style="margin:0 0 16px;font:700 22px 'Space Grotesk',sans-serif">What's new</h2>
-    <ul id="wnList" style="margin:0 0 24px;padding-left:20px;line-height:1.6;font-size:14px;color:rgba(255,255,255,.8)"></ul>
-    <button type="button" id="wnOk" style="width:100%;min-height:44px;border:0;border-radius:999px;background:#FF4500;color:#fff;font:600 15px Inter,sans-serif;cursor:pointer">Got it</button>
+  <div class="wncard" style="background:#15161C;border:1px solid rgba(255,255,255,.08);border-radius:20px;max-width:400px;width:100%;padding:24px 22px 20px;color:#eee;font-family:Inter,sans-serif;max-height:80dvh;overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.6)">
+    <div style="display:inline-block;font:600 11px Inter,sans-serif;letter-spacing:.04em;color:#FF6B7A;background:rgba(255,59,78,.14);border-radius:999px;padding:5px 10px;margin-bottom:12px" id="wnVer"></div>
+    <h2 id="wnTitle" style="margin:0 0 12px;font:700 21px Inter,sans-serif;letter-spacing:-.3px">What's new</h2>
+    <ul id="wnList" style="margin:0 0 22px;padding-left:18px;line-height:1.55;font-size:14px;color:rgba(255,255,255,.72)"></ul>
+    <button type="button" id="wnOk" style="width:100%;min-height:48px;border:0;border-radius:14px;background:#FF3B4E;color:#fff;font:600 15px Inter,sans-serif;cursor:pointer">Got it</button>
   </div>
 </div>
 <script>
@@ -1458,7 +1660,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   /* a small padlock on locked nav items, so the gate is never a surprise.
      Drawn with CSS so the link text itself stays exactly "Live TV" etc. */
   function paintLocks(){
-    [].forEach.call(document.querySelectorAll('.links a, .menu a'),function(a){
+    [].forEach.call(document.querySelectorAll('.links a, .menu a, .tabbar a'),function(a){
       var label=a.textContent.trim();
       var sec=label==='Live TV'?'live':label==='Movies'?'movies':label==='Shows'?'series':null;
       if(!sec) return;
@@ -1536,13 +1738,13 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
     },80);
   }
 
-  [].forEach.call(document.querySelectorAll('.links a, .menu a'),function(a){
+  [].forEach.call(document.querySelectorAll('.links a, .menu a, .tabbar a'),function(a){
     a.addEventListener('click',function(e){
       var label=a.textContent.trim();
       if(['Movies','Shows','Home','Live TV','IPTV'].indexOf(label)<0) return;
       e.preventDefault();
       setMenu(false);
-      [].forEach.call(document.querySelectorAll('.links a, .menu a'),function(x){
+      [].forEach.call(document.querySelectorAll('.links a, .menu a, .tabbar a'),function(x){
         x.classList.toggle('active', x.textContent.trim()===label);
       });
       if(label==='Home') showView('home');
@@ -3036,7 +3238,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
 
 
   /* ---- rendering ---- */
-  var TABS=[['direct','Direct'],['movies','Movies'],['series','Series'],['replay','Replay']];
+  var TABS=[['direct','Channels'],['movies','Movies'],['series','Series'],['replay','Replay']];
   function renderTabs(){
     ltvTabs.innerHTML=TABS.filter(function(t){ return t[0]!=='replay'||ltv.hasArchive })
       .map(function(t){
@@ -3783,6 +3985,32 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   /* D-pad: arrow keys move between channel rows */
   document.addEventListener('keydown',function(e){ if(e.key!=='ArrowDown'&&e.key!=='ArrowUp') return; var r=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.chanrow'); if(!r) return;
     var rows=[].slice.call(r.parentNode.querySelectorAll('.chanrow')),n=rows[rows.indexOf(r)+(e.key==='ArrowDown'?1:-1)]; if(n){e.preventDefault();n.focus();n.scrollIntoView({block:'nearest'})} });
+})();
+</script>
+<script>
+/* v2: keep the tab bar / menu highlight in step with whatever view is showing,
+   including views opened from cards, "See all" links and the lock gate. */
+(function(){
+  var cat=document.getElementById('catalog'),ltv=document.getElementById('ltv'),ip=document.getElementById('iptv'),
+      title=document.getElementById('catTitle');
+  if(!cat||!ltv||!ip) return;
+  function label(){
+    if(ltv.classList.contains('open')) return 'Live TV';
+    if(ip.classList.contains('open')) return 'IPTV';
+    if(cat.classList.contains('open')) return (title&&title.textContent.trim()==='Shows')?'Shows':'Movies';
+    return 'Home';
+  }
+  function sync(){
+    var l=label();
+    [].forEach.call(document.querySelectorAll('.links a, .menu a, .tabbar a'),function(a){
+      var t=a.textContent.trim();
+      if(['Home','Live TV','Movies','Shows','IPTV'].indexOf(t)>-1) a.classList.toggle('active',t===l);
+    });
+  }
+  var mo=new MutationObserver(sync);
+  [cat,ltv,ip].forEach(function(el){ mo.observe(el,{attributes:true,attributeFilter:['class']}) });
+  if(title) mo.observe(title,{childList:true,characterData:true,subtree:true});
+  sync();
 })();
 </script>
 </body>
