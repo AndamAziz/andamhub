@@ -53,9 +53,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val hls: Boolean,
         val fix: Boolean,
         val headers: Map<String, String> = emptyMap(),
-    ) {
-        val direct: Boolean get() = headers.isNotEmpty()
-    }
+        /** Straight from the channel's own host (IPTV), not through the Andam server. */
+        val direct: Boolean = false,
+    )
 
     // ---- observable UI state ----
     var title by mutableStateOf("")
@@ -248,8 +248,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     Kind.IPTV -> Api.iptvPlay(next.source, next.id).let { p ->
                         // Referer-protected channel: the phone asks for it directly with the
                         // playlist's headers first (like VLC); the relay routes stay as fallbacks.
-                        if (p.directUrl != null && p.headers.isNotEmpty()) {
-                            list.add(Attempt(p.directUrl, hls = p.directUrl.contains(".m3u8", true), fix = false, headers = p.headers))
+                        if (p.directUrl != null) {
+                            list.add(Attempt(p.directUrl, hls = p.directUrl.contains(".m3u8", true), fix = false, headers = p.headers, direct = true))
                         }
                         listOf(p.token)
                     }

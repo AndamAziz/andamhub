@@ -1080,6 +1080,21 @@ h1,h2,h3{letter-spacing:-.3px}
 @media (min-width:768px){.links{margin-left:14px}}
 
 
+
+/* ---------- categories v2.5: one bar, usable with mouse and touch ---------- */
+/* the player's channel sheet lists the channels of the chosen category; the category
+   bar itself lives once, above the list (it was repeated inside the sheet) */
+#lsChips{display:none!important}
+/* laptops/desktops: wrap into rows instead of a sideways strip a mouse cannot scroll */
+@media (min-width:720px){
+  .ltv .lvchips:not([hidden]){flex-wrap:wrap;overflow-x:visible;overflow-y:auto;max-height:132px;
+    padding:6px 12px 8px!important;scroll-snap-type:none;scrollbar-width:thin}
+  .ltv .lvchips .chip{height:34px;min-height:34px;padding:0 14px;font-size:12.5px}
+}
+/* channel list is already beside the player on wide screens: no extra list button there */
+@media (min-width:1100px){
+  .lvstage:not(.fspseudo):not(.fsnative):not(:fullscreen) .lvcontrols [data-ui="list"]{display:none!important}
+}
 /* ---------- posters v2.4: compact grids like pro streaming apps ---------- */
 .vodgrid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr))!important;gap:12px 10px!important}
 .vodgrid .pcard img,.grid .pcard img{border-radius:10px}
@@ -4086,6 +4101,20 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   [cat,ltv,ip].forEach(function(el){ mo.observe(el,{attributes:true,attributeFilter:['class']}) });
   if(title) mo.observe(title,{childList:true,characterData:true,subtree:true});
   sync();
+  /* a mouse wheel scrolls a sideways category strip (phones/tablets layout) */
+  document.addEventListener('wheel',function(e){
+    var c=e.target.closest&&e.target.closest('.lvchips');
+    if(!c||c.scrollWidth<=c.clientWidth+2||Math.abs(e.deltaY)<=Math.abs(e.deltaX)) return;
+    c.scrollLeft+=e.deltaY; e.preventDefault();
+  },{passive:false});
+  /* keep the chosen category chip in view after every repaint */
+  ['ltvChips','ipChips'].forEach(function(id){
+    var host=document.getElementById(id); if(!host) return;
+    new MutationObserver(function(){
+      var on=host.querySelector('.chip.on');
+      if(on&&host.scrollWidth>host.clientWidth) host.scrollLeft=Math.max(0,on.offsetLeft-host.clientWidth/2+on.offsetWidth/2);
+    }).observe(host,{childList:true});
+  });
 })();
 </script>
 </body>

@@ -111,11 +111,14 @@ export const Route = createFileRoute('/api/public/iptv')({
               name: channel.name,
               logo: channel.logo,
               token: await sealUrl(tagStreamHeaders(channel.url, channel.headers)),
-              // Channels that need Referer/Origin/User-Agent play best when the device requests
-              // them itself (same IP for playlist and segments). Only the native app uses this;
-              // the link and headers already come from the playlist source.
-              ...(channel.headers && Object.keys(channel.headers).length
-                ? { direct: { url: channel.url, headers: channel.headers } }
+              // The native app plays these straight from the source (faster start, and the
+              // Referer/Origin/User-Agent a channel needs are sent by the phone itself).
+              // Public playlists only for plain links — a private playlist may carry account
+              // credentials in its URLs; header-protected channels are always included.
+              ...(/^https?:\/\//i.test(channel.url) &&
+              (source.is_public !== false ||
+                (channel.headers && Object.keys(channel.headers).length))
+                ? { direct: { url: channel.url, headers: channel.headers ?? {} } }
                 : {}),
             });
           }
