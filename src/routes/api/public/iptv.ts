@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { sealUrl } from '@/lib/xtream-crypto';
+import { tagStreamHeaders } from '@/lib/xtream';
 import {
   getPlaylistChannels,
   loadPlaylistSource,
@@ -109,7 +110,7 @@ export const Route = createFileRoute('/api/public/iptv')({
             return json({
               name: channel.name,
               logo: channel.logo,
-              token: await sealUrl(channel.url),
+              token: await sealUrl(tagStreamHeaders(channel.url, channel.headers)),
             });
           }
 

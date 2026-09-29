@@ -1,6 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { openUrl, sealUrl } from '@/lib/xtream-crypto';
-import { readRelay, relayHeaders, relayUrl, tagWithRelay, type RelayConfig } from '@/lib/xtream';
+import {
+  readRelay,
+  readStreamHeaders,
+  relayHeaders,
+  relayUrl,
+  tagStreamHeaders,
+  tagWithRelay,
+  type RelayConfig,
+  type StreamHeaders,
+} from '@/lib/xtream';
 
 /**
  * Playback proxy.
@@ -85,9 +94,12 @@ async function fetchRelay(
   url: string,
   request: Request,
   relay: RelayConfig | null,
+  streamHeaders: StreamHeaders,
 ): Promise<Response> {
   const headers = new Headers(relayHeaders(relay));
-  headers.set('User-Agent', 'AndamTV/1.0');
+  headers.set('User-Agent', streamHeaders.userAgent || 'AndamTV/1.0');
+  if (streamHeaders.referer) headers.set('Referer', streamHeaders.referer);
+  if (streamHeaders.origin) headers.set('Origin', streamHeaders.origin);
   const range = request.headers.get('range');
   if (range) headers.set('Range', range);
   // The 15s budget covers *answering*, not streaming. `AbortSignal.timeout`
@@ -117,14 +129,18 @@ async function fetchRelay(
  * Peek at the redirect chain ourselves; if the provider refuses us directly we
  * simply keep the original URL and let the relay handle it.
  */
-async function resolveRedirects(url: string): Promise<string> {
+async function resolveRedirects(url: string, streamHeaders: StreamHeaders): Promise<string> {
   let current = url;
   for (let hop = 0; hop < 4; hop++) {
     try {
       const res = await fetch(current, {
         method: 'GET',
         redirect: 'manual',
-        headers: { 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20' },
+        headers: {
+          'User-Agent': streamHeaders.userAgent || 'VLC/3.0.20 LibVLC/3.0.20',
+          ...(streamHeaders.referer ? { Referer: streamHeaders.referer } : {}),
+          ...(streamHeaders.origin ? { Origin: streamHeaders.origin } : {}),
+        },
         signal: AbortSignal.timeout(6000),
       });
       try {
@@ -173,8 +189,16 @@ function isSegment(url: string): boolean {
  * started. Those hosts need no relay at all, so try them directly first and
  * fall back to the relay whenever the host refuses us (IP-bound providers).
  */
-async function fetchDirectSegment(url: string, request: Request): Promise<Response | null> {
-  const headers = new Headers({ 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20' });
+async function fetchDirectSegment(
+  url: string,
+  request: Request,
+  streamHeaders: StreamHeaders,
+): Promise<Response | null> {
+  const headers = new Headers({
+    'User-Agent': streamHeaders.userAgent || 'VLC/3.0.20 LibVLC/3.0.20',
+  });
+  if (streamHeaders.referer) headers.set('Referer', streamHeaders.referer);
+  if (streamHeaders.origin) headers.set('Origin', streamHeaders.origin);
   const range = request.headers.get('range');
   if (range) headers.set('Range', range);
   const ac = new AbortController();
@@ -199,15 +223,16 @@ async function fetchUpstream(
   upstream: string,
   request: Request,
   relay: RelayConfig | null,
+  streamHeaders: StreamHeaders,
   fromManifest = false,
 ): Promise<Response> {
   // Only chunks we pulled out of a manifest are known-finite. A first-hop
   // `.ts` link is an endless live stream and stays on the relay.
   if (fromManifest && isSegment(upstream)) {
-    const direct = await fetchDirectSegment(upstream, request);
+    const direct = await fetchDirectSegment(upstream, request, streamHeaders);
     if (direct) return direct;
   }
-  let res = await fetchRelay(upstream, request, relay);
+  let res = await fetchRelay(upstream, request, relay, streamHeaders);
   // 403/411/5xx from the relay are usually transient — retry once.
   if (!res.ok && (res.status === 403 || res.status === 411 || res.status >= 500)) {
     try {
@@ -216,7 +241,7 @@ async function fetchUpstream(
       /* nothing to drain */
     }
     await new Promise((r) => setTimeout(r, 350));
-    res = await fetchRelay(upstream, request, relay);
+    res = await fetchRelay(upstream, request, relay, streamHeaders);
   }
   return res;
 }
@@ -293,13 +318,16 @@ async function rewriteManifest(
   text: string,
   upstream: string,
   relay: RelayConfig | null,
+  streamHeaders: StreamHeaders,
 ): Promise<string> {
   const base = new URL(upstream);
   const absolute = (ref: string) => new URL(ref, base).toString();
   // `s=1` marks a URL we generated from an already-resolved manifest, so the
   // handler can skip the redirect probe for it.
   const token = async (ref: string) =>
-    `/api/public/xtream-play?s=1&t=${encodeURIComponent(await sealUrl(tagWithRelay(absolute(ref), relay)))}`;
+    `/api/public/xtream-play?s=1&t=${encodeURIComponent(
+      await sealUrl(tagStreamHeaders(tagWithRelay(absolute(ref), relay), streamHeaders)),
+    )}`;
 
   const lines = text.split(/\r?\n/);
   const out: string[] = [];
@@ -337,11 +365,13 @@ export const Route = createFileRoute('/api/public/xtream-play')({
 
         // Providers may carry their own relay host/token; the marker travels
         // inside the sealed link and never reaches the provider itself.
-        const { upstream: target, relay } = readRelay(sealed);
+        const decoded = readStreamHeaders(sealed);
+        const { upstream: target, relay } = readRelay(decoded.upstream);
+        const streamHeaders = decoded.headers;
 
         // Only the first hop (the link the UI hands us) may still redirect.
         const upstream =
-          url.searchParams.get('s') === '1' ? target : await resolveRedirects(target);
+          url.searchParams.get('s') === '1' ? target : await resolveRedirects(target, streamHeaders);
 
         // Repair path: the player asks for a transcode only after the plain
         // stream stalled or the decoder refused it. If the transcoder is not
@@ -366,6 +396,7 @@ export const Route = createFileRoute('/api/public/xtream-play')({
             upstream,
             request,
             relay,
+            streamHeaders,
             url.searchParams.get('s') === '1',
           );
         } catch (err) {
@@ -420,7 +451,7 @@ export const Route = createFileRoute('/api/public/xtream-play')({
           // The relay may follow redirects; resolve relative URIs against the
           // URL the manifest actually came from when the relay reports it.
           const finalUrl = res.headers.get('x-final-url') || upstream;
-          const body = await rewriteManifest(text, finalUrl, relay);
+          const body = await rewriteManifest(text, finalUrl, relay, streamHeaders);
           headers.set('Content-Type', 'application/vnd.apple.mpegurl');
           return new Response(body, { status: 200, headers });
         }

@@ -862,6 +862,25 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   .ltv .chanrow.on{border-left-color:var(--ember)!important;background:var(--ember-dim)!important}
   .ltv .lvcontrols .ctrlbtn.primary{-webkit-backdrop-filter:none;backdrop-filter:none}
 }
+
+/* v1.4 lightweight player: avoid GPU-heavy glass layers in Android WebView. */
+.lvcontrols{transition:opacity .14s ease!important;transform:none!important;will-change:opacity}
+.lvcontrols .ctrlbtn.primary{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(20,20,20,.88)!important;border-color:rgba(255,255,255,.24)!important}
+.ctrlsettings{width:auto!important;max-width:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#151515!important;box-shadow:0 -10px 32px rgba(0,0,0,.38)!important;overscroll-behavior:contain}
+.ctrlsettings .settingshead{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;gap:8px;min-height:44px;border-bottom:1px solid var(--hair)}
+.ctrlsettings .settingshead strong{font:650 15px/1 Inter,sans-serif}
+.ctrlsettings .settingsclose{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:var(--text);font-size:18px}
+.fsnav{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:linear-gradient(90deg,rgba(5,5,5,.97),rgba(5,5,5,.58) 52%,rgba(5,5,5,.94))!important}
+.fscat,.fsch{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(18,18,18,.94)!important}
+.lsheet .lspanel{background:#111!important;box-shadow:0 -18px 45px rgba(0,0,0,.46)}
+.lsheet .lslist .chanrow:nth-child(n+161){display:none}
+@media (max-width:719px){
+  .ctrlcenter{gap:16px}.lvcontrols .ctrlbtn.primary{width:52px;height:52px}
+  .ctrlsettings{max-height:100%!important;padding-left:12px!important;padding-right:12px!important}
+  .ctrlsettings .grab{display:none}
+  .ctrlsettings .settingshead{position:sticky;top:0;z-index:2;background:#151515}
+  .fsnav{grid-template-columns:minmax(104px,32vw) minmax(0,1fr)!important;padding:10px 6px calc(64px + env(safe-area-inset-bottom))!important}
+}
 </style>
 
 </head>
@@ -907,12 +926,12 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
 <script>
 (function(){
   // Bump APP_VERSION and edit NOTES on every release — the popup shows once per new version.
-  var APP_VERSION='1.3', APP_DATE='29 Sep 2026';
+  var APP_VERSION='1.4', APP_DATE='29 Sep 2026';
   var NOTES=[
-    'Live TV and IPTV channel lists now show more channels at once.',
-    'Removed the large empty gap below the player on mobile.',
-    'Improved scrolling and touch response across long channel lists.',
-    'Refined compact channel rows for easier one-handed browsing.'
+    'Player menus now open faster and use less memory in the Android app.',
+    'Stopped repeated recovery loops that could freeze or close the app.',
+    'Added support for IPTV channels that require Referer, Origin, or User-Agent headers.',
+    'Refined player controls and settings for faster one-handed use.'
   ];
   var m=document.getElementById('wnModal');
   document.getElementById('appVer').textContent='v'+APP_VERSION+' · '+APP_DATE.replace(/ \d{4}$/,'');
@@ -2198,7 +2217,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
       '<button class="ctrlbtn" data-control="fullscreen" type="button" aria-label="Fullscreen">⛶</button>'+
       '<button class="ctrlbtn ctrlhidden" data-control="mute" type="button" aria-label="Mute or unmute">🔊</button>'+
       '<button class="ctrlbtn ctrlhidden" data-control="fit" type="button" aria-label="Change video fit">Fit</button></div></div>'+
-      '<div class="ctrlsettings" data-settings hidden><span class="grab"></span>'+
+      '<div class="ctrlsettings" data-settings hidden><span class="grab"></span><div class="settingshead"><strong>Player settings</strong><button class="settingsclose" data-ui="settings-close" type="button" aria-label="Close settings">✕</button></div>'+
       '<div class="ctitle">Audio</div><div class="sgrp"><button class="ctrlsetting" data-ui="mute" type="button"><span>Sound</span><span data-mutelbl>On</span></button><div data-audiotracks></div></div>'+
       '<div class="ctitle">Aspect ratio</div><div class="sgrp srow">'+
       '<button class="ctrlsetting on" data-aspect="contain" type="button">Fit</button><button class="ctrlsetting" data-aspect="cover" type="button">Fill</button><button class="ctrlsetting" data-aspect="fill" type="button">16:9</button></div>'+
@@ -2428,6 +2447,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
         [].forEach.call(s.settings.querySelectorAll('[data-aspect]'),function(x){x.classList.toggle('on',x===b)}); return }
       if(b.hasAttribute('data-atrack')){ try{ var t=v.audioTracks,i=+b.getAttribute('data-atrack'); for(var k=0;k<t.length;k++) t[k].enabled=(k===i) }catch(_){} fillSettings(s); return }
       var u=b.getAttribute('data-ui');
+      if(u==='settings-close'){ s.settings.hidden=true; showControls(s); return }
       if(u==='mute'){ v.muted=!v.muted; updateControls(s) }
       else if(u==='liveedge'){ try{ var sk=v.seekable; if(sk&&sk.length) v.currentTime=sk.end(sk.length-1)-1 }catch(_){} v.play().catch(function(){}) }
       else if(u==='prev'||u==='next') stepChannel(s,u==='next'?1:-1);
@@ -2493,8 +2513,16 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
         if(next){ e.preventDefault(); next.focus(); next.scrollIntoView({block:'nearest'}) }
       }
     });
-    s.stage.addEventListener('click',function(e){ if(e.target.closest('.fsnav,.lvcontrols')) return; showControls(s) });
-    ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(e){ if(e.target.closest&&e.target.closest('.fsnav')) return; showControls(s) },{passive:true}) });
+    s.stage.addEventListener('click',function(e){
+      if(e.target.closest('.fsnav,.lvcontrols')) return;
+      if(s.settings&&!s.settings.hidden) s.settings.hidden=true;
+      showControls(s);
+    });
+    var lastMoveUi=0;
+    ['mousemove','touchstart'].forEach(function(ev){ s.stage.addEventListener(ev,function(e){
+      if(e.target.closest&&e.target.closest('.fsnav')) return;
+      var now=Date.now(); if(ev==='mousemove'&&now-lastMoveUi<120) return; lastMoveUi=now; showControls(s);
+    },{passive:true}) });
     SURF[kind]=s; return s;
   }
   function isStageFullscreen(s){
@@ -2569,6 +2597,9 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   function lvStop(kind){
     var s=surf(kind); s.session++;
     if(s.hb){ clearInterval(s.hb); s.hb=null }
+    clearTimeout(s.ctrlTimer); clearTimeout(s.fsTimer); clearTimeout(s.restartTimer);
+    if(s.progressHandler){ s.video.removeEventListener('timeupdate',s.progressHandler); s.progressHandler=null }
+    if(s.audioHandler){ s.video.removeEventListener('timeupdate',s.audioHandler); s.audioHandler=null }
     if(s.hls){ var dead=s.hls; s.hls=null; setTimeout(function(){ try{dead.destroy()}catch(_){} },0) }
     if(s.mts){ var deadM=s.mts; s.mts=null; setTimeout(function(){ try{deadM.destroy()}catch(_){} },0) }
     try{ s.video.pause() }catch(_){}
@@ -2647,6 +2678,8 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
     var s=surf(kind),
         src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':'');
+    var repeated=!!(s.last&&s.last.token===token);
+    s.repairCount=repeated?(s.repairCount||0)+1:0;
     lvStop(kind);
     var mine=++s.session, alive=function(){ return mine===s.session };
     s.idle.classList.add('hide');
@@ -2656,6 +2689,8 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
     s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:tc};
     showControls(s,true); updateControls(s);
     var ok=false,timer=null;
+
+    if(s.repairCount>5){ fail(s,'This channel is not responding'); return }
 
 
 
@@ -2669,9 +2704,11 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
       ok=true; clearTimeout(timer); busy(s,false); clearFail(s);
     }
     function onProgress(){
-      if(!alive()||s.video.currentTime<=0.05) return;
-      settled(); s.video.removeEventListener('timeupdate',onProgress);
+      if(!alive()){ s.video.removeEventListener('timeupdate',onProgress); return }
+      if(s.video.currentTime<=0.05) return;
+      settled(); s.video.removeEventListener('timeupdate',onProgress); s.progressHandler=null;
     }
+    s.progressHandler=onProgress;
     s.video.addEventListener('timeupdate',onProgress);
     s.video.addEventListener('loadeddata',settled,{once:true});
     s.video.addEventListener('canplay',settled,{once:true});
@@ -2683,13 +2720,14 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
        Only runs when the sound is actually missing. */
     if(!tc){
       var audioCheck=function(){
-        if(!alive()) return;
+        if(!alive()){ s.video.removeEventListener('timeupdate',audioCheck); return }
         var v=s.video; if(v.currentTime<3) return;
-        v.removeEventListener('timeupdate',audioCheck);
+        v.removeEventListener('timeupdate',audioCheck); s.audioHandler=null;
         var silent=(typeof v.webkitAudioDecodedByteCount==='number'&&v.webkitAudioDecodedByteCount===0)||
                    (typeof v.mozHasAudio==='boolean'&&v.mozHasAudio===false);
         if(silent){ console.warn('[player] no decodable audio — switching to audio fix'); lvPlay(kind,token,title,sub,isHls,alt,true) }
       };
+      s.audioHandler=audioCheck;
       s.video.addEventListener('timeupdate',audioCheck);
     }
 
@@ -2709,8 +2747,8 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
       if(!alive()||restartPending) return;
       restartPending=true;
       var wait=Math.min(1200*healN,5000);
-      setTimeout(function(){
-        if(!alive()) return;
+      s.restartTimer=setTimeout(function(){
+        if(!alive()){ restartPending=false; return }
         lvPlay(kind,token,title,sub,isHls,alt,useTc||tc);
       },wait);
     }
@@ -2757,6 +2795,7 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
       if(v.currentTime>lastT+0.05){
         lastT=v.currentTime; lastMove=Date.now();
         if(healN){ healN=0; nextHealAt=0; clearFail(s) }
+        if(v.currentTime>15) s.repairCount=0;
         busy(s,false);
         return;
       }
@@ -2962,6 +3001,28 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
   /* Controls are ready before providers load, including on an intentionally
      empty APK installation. No media request is made by this initialization. */
   surf('live'); surf('iptv');
+
+  /* Android Back closes the top player layer instead of exiting the WebView. */
+  (function bindAndroidBack(){
+    if(!isNativeApp()) return;
+    try{
+      var cap=window.Capacitor, app=cap&&cap.Plugins&&cap.Plugins.App;
+      if(!app&&cap&&cap.registerPlugin) app=cap.registerPlugin('App');
+      if(!app||!app.addListener) return;
+      app.addListener('backButton',function(){
+        var sheet=document.getElementById('lSheet');
+        if(sheet&&sheet.classList.contains('open')&&window.AndamSheet){ window.AndamSheet.close(); return }
+        if(catDrawer&&catDrawer.classList.contains('open')){ closeCatDrawer(); return }
+        for(var i=0;i<2;i++){
+          var s=SURF[i?'iptv':'live']; if(!s) continue;
+          if(s.settings&&!s.settings.hidden){ s.settings.hidden=true; showControls(s); return }
+          if(s.stage.classList.contains('fsactive')){ showFsNav(s,false); return }
+          if(s.stage.classList.contains('fspseudo')){ pseudoFs(s,false); return }
+        }
+        var exit=app.exitApp; if(exit) exit.call(app);
+      });
+    }catch(_){}
+  })();
 
   /* The player is always pinned in place at the top of the section; the channel
      list scrolls inside its own container. No mini / floating player, so any
@@ -3700,10 +3761,13 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
 (function(){
   var sh=document.getElementById('lSheet'),list=document.getElementById('lsList'),q=document.getElementById('lsSearch'),chips=document.getElementById('lsChips');
   function body(k){return document.getElementById(k==='iptv'?'ipBody':'ltvBody')}
-  function copy(){var k=api.kind;list.innerHTML=body(k).innerHTML.replace(/ id="[^"]*"/g,'');chips.innerHTML=document.getElementById(k==='iptv'?'ipChips':'ltvChips').innerHTML}
-  var mo=new MutationObserver(function(){ if(api.kind) copy() });
-  var api={kind:null,open:function(k){api.kind=k;q.value=document.getElementById(k==='iptv'?'ipSearch':'ltvSearch').value;copy();mo.disconnect();mo.observe(body(k),{childList:true,subtree:true,attributes:true,attributeFilter:['class']});sh.classList.add('open');setTimeout(function(){var a=list.querySelector('.chanrow.on')||list.querySelector('.chanrow');a&&a.focus({preventScroll:true})},50)},
-    close:function(){sh.classList.remove('open');mo.disconnect();api.kind=null}};
+  function copy(){
+    var k=api.kind,source=body(k),rows=[].slice.call(source.querySelectorAll('.chanrow'),0,160);
+    list.innerHTML='<div class="lvlist">'+rows.map(function(row){return row.outerHTML.replace(/ id="[^"]*"/g,'')}).join('')+'</div>';
+    chips.innerHTML=document.getElementById(k==='iptv'?'ipChips':'ltvChips').innerHTML;
+  }
+  var api={kind:null,open:function(k){api.kind=k;q.value=document.getElementById(k==='iptv'?'ipSearch':'ltvSearch').value;copy();sh.classList.add('open');setTimeout(function(){var a=list.querySelector('.chanrow.on')||list.querySelector('.chanrow');a&&a.focus({preventScroll:true})},30)},
+    close:function(){sh.classList.remove('open');api.kind=null;list.innerHTML='';chips.innerHTML=''}};
   window.AndamSheet=api;
   sh.addEventListener('click',function(e){
     if(e.target.closest('[data-close]')){api.close();return}
@@ -3712,7 +3776,8 @@ body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{w
     var rows=[].slice.call(list.querySelectorAll('.chanrow')),i=rows.indexOf(r),orig=body(api.kind).querySelectorAll('.chanrow')[i];
     if(orig){var sc=document.scrollingElement,y=sc.scrollTop;orig.click();sc.scrollTop=y} api.close();
   });
-  q.addEventListener('input',function(){var o=document.getElementById(api.kind==='iptv'?'ipSearch':'ltvSearch');o.value=q.value;o.dispatchEvent(new Event('input',{bubbles:true}))});
+  var searchTimer=null;
+  q.addEventListener('input',function(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){if(!api.kind)return;var o=document.getElementById(api.kind==='iptv'?'ipSearch':'ltvSearch');o.value=q.value;o.dispatchEvent(new Event('input',{bubbles:true}));setTimeout(copy,240)},120)});
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&api.kind) api.close() });
   document.addEventListener('click',function(e){var c=e.target.closest('.ltv .lvchips [data-chip]'); if(!c) return; window.AndamChips.pick(c.closest('#iptv')?'iptv':'live',c.getAttribute('data-chip'))});
   /* D-pad: arrow keys move between channel rows */

@@ -10,6 +10,8 @@
  */
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 
+export type M3uHeaders = { referer?: string; origin?: string; userAgent?: string };
+
 export type M3uChannel = {
   id: string;
   num: number;
@@ -17,6 +19,7 @@ export type M3uChannel = {
   logo: string;
   group: string;
   url: string;
+  headers?: M3uHeaders;
 };
 
 export type PlaylistSource = {
@@ -39,7 +42,7 @@ const attr = (line: string, key: string): string => {
 export function parseM3u(text: string): M3uChannel[] {
   const lines = text.split(/\r?\n/);
   const channels: M3uChannel[] = [];
-  let pending: { name: string; logo: string; group: string } | null = null;
+  let pending: { name: string; logo: string; group: string; headers: M3uHeaders } | null = null;
 
   for (const raw of lines) {
     const line = raw.trim();
@@ -52,20 +55,53 @@ export function parseM3u(text: string): M3uChannel[] {
         name: title || attr(line, 'tvg-name') || 'Unnamed channel',
         logo: attr(line, 'tvg-logo'),
         group: attr(line, 'group-title') || 'Uncategorised',
+        headers: {},
       };
+      continue;
+    }
+
+    if (pending && /^#EXTVLCOPT:http-referrer=/i.test(line)) {
+      pending.headers.referer = line.slice(line.indexOf('=') + 1).trim();
+      continue;
+    }
+    if (pending && /^#EXTVLCOPT:http-user-agent=/i.test(line)) {
+      pending.headers.userAgent = line.slice(line.indexOf('=') + 1).trim();
+      continue;
+    }
+    if (pending && /^#KODIPROP:inputstream\.adaptive\.stream_headers=/i.test(line)) {
+      const rawHeaders = line.slice(line.indexOf('=') + 1);
+      for (const pair of rawHeaders.split('&')) {
+        const [rawKey, ...rawValue] = pair.split('=');
+        const key = decodeURIComponent(rawKey ?? '').toLowerCase();
+        const value = decodeURIComponent(rawValue.join('='));
+        if (key === 'referer' || key === 'referrer') pending.headers.referer = value;
+        if (key === 'origin') pending.headers.origin = value;
+        if (key === 'user-agent' || key === 'useragent') pending.headers.userAgent = value;
+      }
       continue;
     }
 
     if (line.startsWith('#')) continue; // #EXTM3U, #EXTGRP, #KODIPROP, comments
 
     if (pending) {
+      const [streamUrl, pipeHeaders = ''] = line.split('|', 2);
+      for (const pair of pipeHeaders.split('&')) {
+        if (!pair) continue;
+        const [rawKey, ...rawValue] = pair.split('=');
+        const key = decodeURIComponent(rawKey ?? '').toLowerCase();
+        const value = decodeURIComponent(rawValue.join('='));
+        if (key === 'referer' || key === 'referrer') pending.headers.referer = value;
+        if (key === 'origin') pending.headers.origin = value;
+        if (key === 'user-agent' || key === 'useragent') pending.headers.userAgent = value;
+      }
       channels.push({
         id: String(channels.length + 1),
         num: channels.length + 1,
         name: pending.name,
         logo: pending.logo,
         group: pending.group,
-        url: line,
+        url: streamUrl ?? line,
+        ...(Object.keys(pending.headers).length ? { headers: pending.headers } : {}),
       });
       pending = null;
     }
