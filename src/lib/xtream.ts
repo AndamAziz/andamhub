@@ -25,6 +25,9 @@ export type XtreamKind = 'live' | 'vod' | 'series';
 /** A resolved relay endpoint: the `?url=` prefix plus the token to send. */
 export type RelayConfig = { base: string; token: string };
 
+/** Optional request headers declared by an M3U playlist. */
+export type StreamHeaders = { referer?: string; origin?: string; userAgent?: string };
+
 /**
  * Query parameter that carries a per-provider relay through a sealed token.
  *
@@ -34,6 +37,7 @@ export type RelayConfig = { base: string; token: string };
  * stripped again before anything is sent upstream.
  */
 export const RELAY_PARAM = '__arly';
+export const STREAM_HEADERS_PARAM = '__arhd';
 
 /** The relay token shipped with the project; overridable through a secret. */
 const DEFAULT_RELAY_TOKEN =
@@ -94,6 +98,38 @@ export function tagWithRelay(upstream: string, relay: RelayConfig | null): strin
   if (relay.base === shared.base && relay.token === shared.token) return upstream;
   const mark = b64url(JSON.stringify(relay));
   return upstream + (upstream.includes('?') ? '&' : '?') + `${RELAY_PARAM}=${mark}`;
+}
+
+/** Keeps M3U request headers inside the encrypted playback token. */
+export function tagStreamHeaders(upstream: string, headers?: StreamHeaders): string {
+  const clean: StreamHeaders = {};
+  if (headers?.referer) clean.referer = headers.referer.slice(0, 2048);
+  if (headers?.origin) clean.origin = headers.origin.slice(0, 2048);
+  if (headers?.userAgent) clean.userAgent = headers.userAgent.slice(0, 512);
+  if (!Object.keys(clean).length) return upstream;
+  const mark = b64url(JSON.stringify(clean));
+  return upstream + (upstream.includes('?') ? '&' : '?') + `${STREAM_HEADERS_PARAM}=${mark}`;
+}
+
+/** Removes and validates the optional M3U request-header marker. */
+export function readStreamHeaders(tagged: string): { upstream: string; headers: StreamHeaders } {
+  const at = tagged.indexOf(`${STREAM_HEADERS_PARAM}=`);
+  if (at < 0) return { upstream: tagged, headers: {} };
+  const separator = tagged[at - 1];
+  const raw = tagged.slice(at + STREAM_HEADERS_PARAM.length + 1).split('&')[0] ?? '';
+  const rest = tagged.slice(at + STREAM_HEADERS_PARAM.length + 1 + raw.length).replace(/^&/, '');
+  const upstream =
+    tagged.slice(0, at - 1) + (rest ? (separator === '?' ? `?${rest}` : `&${rest}`) : '');
+  try {
+    const value = JSON.parse(fromB64url(raw)) as StreamHeaders;
+    const headers: StreamHeaders = {};
+    if (typeof value.referer === 'string') headers.referer = value.referer;
+    if (typeof value.origin === 'string') headers.origin = value.origin;
+    if (typeof value.userAgent === 'string') headers.userAgent = value.userAgent;
+    return { upstream, headers };
+  } catch {
+    return { upstream, headers: {} };
+  }
 }
 
 /** Splits a tagged URL back into the real upstream URL and its relay. */

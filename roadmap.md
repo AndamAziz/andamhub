@@ -30,3 +30,7 @@
 - [x] Apply the same compact visual language to Movies and Series.
 - [x] Remove the mobile gap below the player and show more channel rows.
 - [x] Reduce expensive mobile list effects for smoother scrolling.
+- [ ] Replace heavy player menus with lightweight, bounded channel and settings views.
+- [ ] Prevent failed streams from causing endless recovery loops or APK crashes.
+- [ ] Support M3U channels that require Referer, Origin, or User-Agent headers.
+- [ ] Verify repeated controls, fullscreen, mobile layout, and stream-header forwarding.

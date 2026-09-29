@@ -13,3 +13,4 @@
 - Android OAuth uses Lovable's allowed `lovable://oauth-callback` deep link with state validation and Capacitor Browser/App plugins so social sign-in returns to the installed app.
 - Android player fullscreen portals the existing video stage to the document body so WebView rotation cannot trap it inside the page layout.
 - Live TV visual work in `public/andam.html` must remain presentation-only; preserve playback engines, relay/proxy calls, authentication, data sources, and routes.
+- M3U request headers stay inside encrypted playback tokens and are allowlisted server-side, because protected channels must work without exposing provider metadata.
