@@ -725,6 +725,115 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 }
 
 
+
+/* ===== Live TV UI redesign layer (presentation only) ===== */
+:root{--r:12px;--g:8px}
+html,body{overflow-x:hidden;max-width:100%}
+.nav{height:48px;min-height:48px;padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))!important;gap:8px}
+.nav .autharea{display:none!important}
+.nav .burger{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center}
+.navsource .lvsel select{height:32px;border-radius:999px;font:500 12px/1 Inter,sans-serif;padding:0 26px 0 12px;max-width:140px}
+.ltv{padding:56px 0 0!important;font-family:Inter,sans-serif}
+.ltv .lvhead{padding:0 16px 8px;margin:0}
+.ltv .lvhead h1,.ltv .lvhead .sub{display:none!important}
+#iptv .lvhead{display:none}
+#ltvTabs{height:40px;display:flex;gap:4px;padding:4px;border-radius:999px;background:var(--surface);width:100%;max-width:480px}
+#ltvTabs>*{flex:1;min-height:32px;border-radius:999px;font:600 13px/1 Inter,sans-serif;transition:background .18s,color .18s}
+.lvmain{gap:0!important;grid-template-columns:minmax(0,1fr)!important}
+.lvplayer{position:sticky!important;top:48px!important;z-index:30;border-radius:0!important;margin:0!important;background:#000}
+.lvstage{aspect-ratio:16/9;width:100%;height:auto!important;max-height:none;overflow:hidden}
+.lvstage video{width:100%;height:100%;object-fit:contain;display:block}
+.lvbar{min-height:48px;padding:8px 16px!important;gap:8px!important;background:var(--bg,#050505)!important;border-bottom:1px solid rgba(255,255,255,.06)}
+.lvbar .lgo{width:32px!important;height:32px!important;border-radius:8px}
+.lvbar .nm{font:600 14px/1.2 Inter,sans-serif!important}
+.lvbar .tg,.lvbar .sb{display:none!important}
+.lvbar .live{padding:4px 8px;border-radius:999px;background:rgba(255,69,0,.14);color:var(--ember);font:700 10px/1 Inter,sans-serif;letter-spacing:.08em}
+/* overlay controls */
+.lvcontrols{position:absolute;inset:0;display:block!important;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:linear-gradient(180deg,rgba(0,0,0,.45) 0,transparent 28%,transparent 62%,rgba(0,0,0,.7) 100%)}
+.lvstage.controls-on .lvcontrols,.lvstage:focus-within .lvcontrols{opacity:1}
+.lvstage.controls-on .lvcontrols>*{pointer-events:auto}
+.lvcontrols .ctrlhidden{display:none!important}
+.ctrlcenter{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:24px}
+.lvcontrols .ctrlbtn{min-width:44px;min-height:44px;border:0;background:transparent;color:#fff;font-size:20px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s,transform .15s}
+.lvcontrols .ctrlnav{width:40px;height:40px;min-width:40px;min-height:40px;background:rgba(0,0,0,.35);font-size:16px}
+.lvcontrols .ctrlbtn.primary{width:56px;height:56px;background:rgba(255,255,255,.14);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.22);font-size:20px;color:#fff}
+.lvcontrols .ctrlbtn:hover{background:rgba(255,255,255,.12)}
+.ctrlexit{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));display:none!important}
+.fspseudo .ctrlexit,.fsnative .ctrlexit,.lvstage:fullscreen .ctrlexit{display:inline-flex!important;opacity:1}
+.ctrlbottom{position:absolute;left:0;right:0;bottom:0;padding:0 max(8px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.ctrlseek{display:none;align-items:center;gap:8px;padding:0 4px}
+.lvstage.is-seekable .ctrlseek{display:flex}
+.ctrlseek .ctrlskip{font:600 12px/1 Inter,sans-serif}
+.ctrltime{font:500 12px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.85)}
+.ctrlrange{flex:1;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.3);border-radius:3px;accent-color:var(--ember)}
+.ctrlrange::-webkit-slider-thumb{-webkit-appearance:none;width:0;height:0;border-radius:50%;background:var(--ember)}
+.ctrlrange:active::-webkit-slider-thumb,.ctrlrange:focus-visible::-webkit-slider-thumb{width:14px;height:14px}
+.ctrlrow{display:flex;align-items:center;gap:4px;min-height:44px}
+.ctrlrow .ctrlbtn{font-size:18px}
+.ctrllabel{font:500 13px/1.2 Inter,sans-serif;color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctrlspacer{flex:1}
+.livepill{display:none;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;border:0;background:var(--ember);color:#fff;font:700 11px/1 Inter,sans-serif;letter-spacing:.08em;cursor:pointer}
+.livepill i{width:6px;height:6px;border-radius:50%;background:#fff}
+.lvstage.is-live .livepill{display:inline-flex}
+.ctrlsettings{position:absolute!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;max-height:80%;overflow:auto;background:rgba(18,18,18,.97);border-radius:16px 16px 0 0;padding:8px 16px max(16px,env(safe-area-inset-bottom));z-index:5;animation:shUp .2s ease}
+.ctrlsettings .grab{display:block;width:36px;height:4px;border-radius:4px;background:rgba(255,255,255,.25);margin:0 auto 8px}
+.ctrlsettings .ctitle{font:600 11px/1 Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:12px 0 8px}
+.ctrlsettings .sgrp{display:flex;flex-direction:column;gap:4px}.ctrlsettings .srow{flex-direction:row}
+.ctrlsettings .ctrlsetting{min-height:44px;flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#fff;font:500 13px/1 Inter,sans-serif;cursor:pointer}
+.ctrlsettings .srow .ctrlsetting{justify-content:center}
+.ctrlsettings .ctrlsetting.on{border-color:var(--ember);color:var(--ember)}
+.ctrlsettings .static{cursor:default}
+@keyframes shUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+/* hide old in-player groups panel outside fullscreen */
+.lvstage:not(.fspseudo):not(.fsnative):not(:fullscreen) .fsnav{display:none!important}
+/* browse */
+.lvbrowse{padding:0 0 max(24px,env(safe-area-inset-bottom));min-width:0}
+.lvsearch{position:sticky;top:calc(48px + 56.25vw + 48px);z-index:15;display:flex;gap:8px;padding:8px 16px;background:var(--bg,#050505)}
+.lvsearch input{flex:1;height:44px;border-radius:999px;padding:0 16px;font:400 14px/1 Inter,sans-serif}
+.lvsearch .catpick{display:none!important}
+.lvchips{display:flex;gap:8px;overflow-x:auto;padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.lvchips::-webkit-scrollbar{display:none}
+.lvchips[hidden]{display:none}
+.chip{flex:none;height:36px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font:500 13px/1 Inter,sans-serif;white-space:nowrap;cursor:pointer;transition:background .18s,border-color .18s}
+.chip.on{background:var(--ember);border-color:var(--ember);color:#fff}
+.lvscroll{padding:0 8px}
+.chanrow{min-height:60px!important;height:60px;gap:12px!important;padding:0 12px!important;border-radius:12px!important;border-left:3px solid transparent!important;transition:background .15s}
+.chanrow .no{width:28px;flex:none;font:500 12px/1 Inter,sans-serif;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums}
+.chanrow .lg{width:40px!important;height:40px!important;flex:none;border-radius:8px;object-fit:contain;background:rgba(255,255,255,.05)}
+.chanrow .lg.mono{display:inline-flex;align-items:center;justify-content:center;font:700 15px/1 Inter,sans-serif;color:rgba(255,255,255,.7)}
+.chanrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 14px/1.2 Inter,sans-serif}
+.chanrow .eq{display:none;gap:2px;align-items:flex-end;height:14px;flex:none}
+.chanrow .eq i{width:3px;background:var(--ember);border-radius:2px;animation:eqb .9s ease-in-out infinite}
+.chanrow .eq i:nth-child(2){animation-delay:.2s}.chanrow .eq i:nth-child(3){animation-delay:.4s}
+@keyframes eqb{0%,100%{height:4px}50%{height:14px}}
+.chanrow.on{border-left-color:var(--ember)!important;background:rgba(255,69,0,.08)!important}
+.chanrow.on .eq{display:inline-flex}
+.lvlist:empty,.lvskel{min-height:300px;background:repeating-linear-gradient(180deg,rgba(255,255,255,.04) 0 52px,transparent 52px 60px);border-radius:12px;animation:skel 1.2s ease-in-out infinite}
+@keyframes skel{50%{opacity:.5}}
+.ltv :focus-visible,.lsheet :focus-visible{outline:2px solid var(--ember)!important;outline-offset:2px}
+/* bottom sheet */
+.lsheet{position:fixed;inset:0;z-index:2147483646;display:none}
+.lsheet.open{display:block}
+.lsheet .lsbg{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.lsheet .lspanel{position:absolute;left:0;right:0;bottom:0;height:75dvh;display:flex;flex-direction:column;background:#101010;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom);animation:shUp .2s ease}
+.lsheet .grab{width:36px;height:4px;border-radius:4px;background:rgba(255,255,255,.25);margin:8px auto}
+.lsheet .lshead{display:flex;gap:8px;padding:0 16px 8px}
+.lsheet .lshead input{flex:1;height:44px;border-radius:999px;padding:0 16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:inherit;font:400 14px Inter,sans-serif}
+.lsheet .lshead button{width:44px;height:44px;border-radius:999px;border:0;background:rgba(255,255,255,.08);color:inherit}
+.lsheet .lslist{flex:1;overflow-y:auto;padding:0 8px 16px;overscroll-behavior:contain}
+/* fullscreen */
+body.player-fullscreen .lvstage.fspseudo,.lvstage:fullscreen,.lvstage.fsnative{width:100dvw!important;height:100dvh!important;aspect-ratio:auto!important;background:#000}
+.lvstage.fspseudo video,.lvstage:fullscreen video{width:100%!important;height:100%!important}
+/* landscape (not fullscreen): two columns */
+@media (orientation:landscape) and (min-width:640px){
+  .ltv .lvmain{grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr)!important;gap:16px!important;padding:0 16px}
+  .lvplayer{top:56px!important;border-radius:12px!important;overflow:hidden}
+  .lvbrowse{height:calc(100dvh - 120px);overflow-y:auto;position:sticky;top:56px}
+  .lvsearch{top:0}
+}
+@media (min-width:1600px){.chanrow{height:72px;min-height:72px!important}.chanrow .nm{font-size:17px}}
+@media (prefers-reduced-motion:reduce){.ltv *,.lsheet *{animation:none!important;transition:none!important}}
 </style>
 
 </head>
@@ -835,9 +944,10 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
     </div>
     <div class="lvbrowse">
       <div class="lvsearch" id="ltvSearchWrap">
-        <input id="ltvSearch" type="search" placeholder="Search in this section" aria-label="Search in this section" />
+        <input id="ltvSearch" type="search" placeholder="Search channels" aria-label="Search in this section" />
         <button class="catpick" id="ltvCatBtn" type="button" aria-haspopup="dialog" title="Choose category" aria-label="Choose category">☷</button>
       </div>
+      <div class="lvchips" id="ltvChips" hidden></div>
       <div class="repbox hide" id="repBox">
         <select id="repChan" aria-label="Archive channel"></select>
         <input id="repDate" type="date" aria-label="Replay date" />
@@ -881,6 +991,7 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
         <input id="ipSearch" type="search" placeholder="Search channels" aria-label="Search channels" />
         <button class="catpick" id="ipGroupBtn" type="button" aria-haspopup="dialog" title="Choose group" aria-label="Choose group">☷</button>
       </div>
+      <div class="lvchips" id="ipChips" hidden></div>
       <div class="lvscroll"><div id="ipBody"></div>
         <div class="ltvmsg hide" id="ipMsg"></div></div>
     </div>
@@ -3521,5 +3632,32 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 
 </script>
 
+<div class="lsheet" id="lSheet" role="dialog" aria-modal="true" aria-label="Channels"><div class="lsbg" data-close></div>
+<div class="lspanel"><span class="grab" data-close></span><div class="lshead"><input id="lsSearch" type="search" placeholder="Search channels" aria-label="Search channels"><button type="button" data-close aria-label="Close">✕</button></div>
+<div class="lvchips" id="lsChips"></div><div class="lslist" id="lsList"></div></div></div>
+<script>
+(function(){
+  var sh=document.getElementById('lSheet'),list=document.getElementById('lsList'),q=document.getElementById('lsSearch'),chips=document.getElementById('lsChips');
+  function body(k){return document.getElementById(k==='iptv'?'ipBody':'ltvBody')}
+  function copy(){var k=api.kind;list.innerHTML=body(k).innerHTML.replace(/ id="[^"]*"/g,'');chips.innerHTML=document.getElementById(k==='iptv'?'ipChips':'ltvChips').innerHTML}
+  var mo=new MutationObserver(function(){ if(api.kind) copy() });
+  var api={kind:null,open:function(k){api.kind=k;q.value=document.getElementById(k==='iptv'?'ipSearch':'ltvSearch').value;copy();mo.disconnect();mo.observe(body(k),{childList:true,subtree:true,attributes:true,attributeFilter:['class']});sh.classList.add('open');setTimeout(function(){var a=list.querySelector('.chanrow.on')||list.querySelector('.chanrow');a&&a.focus({preventScroll:true})},50)},
+    close:function(){sh.classList.remove('open');mo.disconnect();api.kind=null}};
+  window.AndamSheet=api;
+  sh.addEventListener('click',function(e){
+    if(e.target.closest('[data-close]')){api.close();return}
+    var c=e.target.closest('[data-chip]'); if(c){window.AndamChips.pick(api.kind,c.getAttribute('data-chip'));return}
+    var r=e.target.closest('.chanrow'); if(!r) return;
+    var rows=[].slice.call(list.querySelectorAll('.chanrow')),i=rows.indexOf(r),orig=body(api.kind).querySelectorAll('.chanrow')[i];
+    if(orig){var sc=document.scrollingElement,y=sc.scrollTop;orig.click();sc.scrollTop=y} api.close();
+  });
+  q.addEventListener('input',function(){var o=document.getElementById(api.kind==='iptv'?'ipSearch':'ltvSearch');o.value=q.value;o.dispatchEvent(new Event('input',{bubbles:true}))});
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&api.kind) api.close() });
+  document.addEventListener('click',function(e){var c=e.target.closest('.ltv .lvchips [data-chip]'); if(!c) return; window.AndamChips.pick(c.closest('#iptv')?'iptv':'live',c.getAttribute('data-chip'))});
+  /* D-pad: arrow keys move between channel rows */
+  document.addEventListener('keydown',function(e){ if(e.key!=='ArrowDown'&&e.key!=='ArrowUp') return; var r=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.chanrow'); if(!r) return;
+    var rows=[].slice.call(r.parentNode.querySelectorAll('.chanrow')),n=rows[rows.indexOf(r)+(e.key==='ArrowDown'?1:-1)]; if(n){e.preventDefault();n.focus();n.scrollIntoView({block:'nearest'})} });
+})();
+</script>
 </body>
 </html>
