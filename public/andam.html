@@ -2249,8 +2249,37 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
       s.video.playbackRate=parseFloat(b.getAttribute('data-speed'))||1;
       [].forEach.call(s.settings.querySelectorAll('[data-speed]'),function(x){x.classList.toggle('on',x===b)}); s.settings.hidden=true; showControls(s);
     });
+    /* UI-only actions: they reuse the existing list rows / video element. */
+    s.controls.addEventListener('click',function(e){
+      var b=e.target.closest('[data-ui],[data-aspect],[data-atrack]'); if(!b) return; e.stopPropagation(); var v=s.video;
+      if(b.hasAttribute('data-aspect')){ var a=b.getAttribute('data-aspect'); v.style.objectFit=a; s.fit=['contain','cover','fill'].indexOf(a);
+        [].forEach.call(s.settings.querySelectorAll('[data-aspect]'),function(x){x.classList.toggle('on',x===b)}); return }
+      if(b.hasAttribute('data-atrack')){ try{ var t=v.audioTracks,i=+b.getAttribute('data-atrack'); for(var k=0;k<t.length;k++) t[k].enabled=(k===i) }catch(_){} fillSettings(s); return }
+      var u=b.getAttribute('data-ui');
+      if(u==='mute'){ v.muted=!v.muted; updateControls(s) }
+      else if(u==='liveedge'){ try{ var sk=v.seekable; if(sk&&sk.length) v.currentTime=sk.end(sk.length-1)-1 }catch(_){} v.play().catch(function(){}) }
+      else if(u==='prev'||u==='next') stepChannel(s,u==='next'?1:-1);
+      else if(u==='list') window.AndamSheet&&window.AndamSheet.open(s.kind);
+      showControls(s);
+    });
+    s.controls.querySelector('[data-control="settings"]').addEventListener('click',function(){ fillSettings(s) });
     s.seek.addEventListener('input',function(e){ e.stopPropagation(); if(isFinite(s.video.duration)) s.video.currentTime=(Number(s.seek.value)/1000)*s.video.duration; updateControls(s) });
     ['timeupdate','durationchange','play','pause','volumechange','loadedmetadata'].forEach(function(ev){ s.video.addEventListener(ev,function(){ updateControls(s) }) });
+  }
+  function fillSettings(s){
+    var v=s.video, box=s.controls.querySelector('[data-audiotracks]'), q=s.controls.querySelector('[data-quality]');
+    try{ var t=v.audioTracks; box.innerHTML=(t&&t.length>1)?[].map.call(t,function(tr,i){return '<button class="ctrlsetting'+(tr.enabled?' on':'')+'" data-atrack="'+i+'" type="button"><span>'+esc(tr.label||tr.language||('Track '+(i+1)))+'</span></button>'}).join(''):'' }catch(_){ box.innerHTML='' }
+    if(q) q.textContent=v.videoHeight?(v.videoHeight+'p'):'Auto';
+  }
+  function stepChannel(s,dir){
+    var host=document.getElementById(s.kind==='iptv'?'ipBody':'ltvBody');
+    var rows=[].slice.call(host.querySelectorAll('.chanrow')); if(!rows.length) return;
+    var cur=host.querySelector('.chanrow.on'), i=cur?rows.indexOf(cur):-1;
+    if(i<0&&s.last) rows.forEach(function(r,k){ if(r.getAttribute('data-name')===s.last.title) i=k });
+    var n=rows[(i+dir+rows.length)%rows.length];
+    var sc=document.scrollingElement, y=sc?sc.scrollTop:0;
+    rows.forEach(function(r){r.classList.remove('on')}); n.classList.add('on'); n.click();
+    if(sc) sc.scrollTop=y;
   }
   function surf(kind){
     if(SURF[kind]) return SURF[kind];
