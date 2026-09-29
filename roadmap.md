@@ -33,4 +33,4 @@
 - [x] Replace heavy player menus with lightweight, bounded channel and settings views.
 - [x] Prevent failed streams from causing endless recovery loops or APK crashes.
 - [x] Support M3U channels that require Referer, Origin, or User-Agent headers.
-- [ ] Verify repeated controls, fullscreen, mobile layout, and stream-header forwarding.
+- [x] Verify repeated controls, fullscreen, mobile layout, and stream-header forwarding.
