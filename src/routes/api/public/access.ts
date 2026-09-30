@@ -20,14 +20,20 @@ export const Route = createFileRoute('/api/public/access')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { resolveAccess } = await import('@/lib/access.server');
-        const access = await resolveAccess(request);
-        return json({
-          signedIn: access.signedIn,
-          admin: access.admin,
-          sections: access.sections,
-          open: ['iptv'],
-        });
+        try {
+          const { resolveAccess } = await import('@/lib/access.server');
+          const access = await resolveAccess(request);
+          return json({
+            signedIn: access.signedIn,
+            admin: access.admin,
+            sections: access.sections,
+            open: ['iptv'],
+          });
+        } catch (err) {
+          // Backend unavailable: fall back to IPTV-only so the homepage still opens.
+          console.error('[access] lookup failed', err);
+          return json({ signedIn: false, admin: false, sections: [], open: ['iptv'], degraded: true });
+        }
       },
 
       POST: async ({ request }) => {
