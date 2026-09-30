@@ -49,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -119,6 +121,7 @@ fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(50))
             .background(if (selected) C.Text else C.Surface)
             .border(1.dp, if (selected) C.Text else C.Hair, RoundedCornerShape(50))
+            .tvFocus(RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     )
@@ -142,6 +145,7 @@ fun CategoryBar(categories: List<Category>, selected: String, onSelect: (String)
             .clip(RoundedCornerShape(14.dp))
             .background(C.Surface)
             .border(1.dp, C.Hair, RoundedCornerShape(14.dp))
+            .tvFocus(RoundedCornerShape(14.dp), 1.02f)
             .clickable { sheet = true }
             .padding(start = 14.dp, end = 10.dp, top = 11.dp, bottom = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -200,6 +204,7 @@ fun ChannelRow(num: Int, name: String, logo: String, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
+            .tvFocus(RoundedCornerShape(12.dp), 1.02f)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -233,9 +238,16 @@ fun Logo(url: String, name: String, sizeDp: Int) {
 
 @Composable
 fun PosterCard(title: String, poster: String, sub: String, rating: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick)) {
+    var focused by remember { mutableStateOf(false) }
+    Column(modifier.onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick)) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(C.Surface2),
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .graphicsLayer { val z = if (focused) 1.06f else 1f; scaleX = z; scaleY = z }
+                .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(10.dp))
+                .background(C.Surface2),
             contentAlignment = Alignment.Center,
         ) {
             Text(title.take(1).uppercase(), color = C.Faint, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -266,6 +278,7 @@ fun SourcePicker(options: List<Pair<String, String>>, selected: String, onPick: 
                 .clip(RoundedCornerShape(50))
                 .background(C.Surface)
                 .border(1.dp, C.Hair, RoundedCornerShape(50))
+                .tvFocus(RoundedCornerShape(50))
                 .clickable(enabled = options.size > 1) { open = true }
                 .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -307,7 +320,7 @@ fun LockCard(signedIn: Boolean, onUnlocked: () -> Unit, onSignIn: () -> Unit) {
             color = C.Muted, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
         )
         if (!signedIn) {
-            Button(onClick = onSignIn, colors = ButtonDefaults.buttonColors(containerColor = C.Ember), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp)) {
+            Button(onClick = onSignIn, colors = ButtonDefaults.buttonColors(containerColor = C.Ember), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f)) {
                 Text("Sign in")
             }
             return@Column
@@ -337,7 +350,7 @@ fun LockCard(signedIn: Boolean, onUnlocked: () -> Unit, onSignIn: () -> Unit) {
             enabled = !busy && code.isNotBlank(),
             colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) { Text(if (busy) "Checking…" else "Activate") }
         note?.let { (msg, ok) -> Text(msg, color = if (ok) Color(0xFF38E1C6) else C.Ember, modifier = Modifier.padding(top = 10.dp)) }
     }
@@ -350,7 +363,7 @@ fun SectionTitle(text: String, action: String? = null, onAction: (() -> Unit)? =
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        if (action != null && onAction != null) TextButton(onClick = onAction) { Text(action, color = C.Muted) }
+        if (action != null && onAction != null) TextButton(onClick = onAction, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(action, color = C.Muted) }
     }
 }
 

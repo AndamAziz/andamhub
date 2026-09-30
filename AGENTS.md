@@ -15,3 +15,4 @@
 - Live TV visual work in `public/andam.html` must remain presentation-only; preserve playback engines, relay/proxy calls, authentication, data sources, and routes.
 - M3U request headers stay inside encrypted playback tokens and are allowlisted server-side, because protected channels must work without exposing provider metadata.
 - Exception: `/api/public/iptv?action=play` also returns `direct` {url, headers} (every channel of a public playlist, and header-protected channels of any playlist) so the native Android app (`android-native/`) can request them itself; Xtream provider URLs and credentials are never exposed.
+- The native app (`android-native/`) has a TV layout (`ui/Tv.kt`, `LocalTv`): left menu, category pane, search button instead of a text field, focus rings via `tvFocus`; the player maps remote keys in `PlayerActivity.dispatchKeyEvent`. Keep new clickable UI focusable with a visible focus ring.

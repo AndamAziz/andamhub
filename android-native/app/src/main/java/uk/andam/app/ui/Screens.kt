@@ -187,9 +187,18 @@ private fun PosterGrid(
         state = try { Load.Ok(loadItems(cat)) } catch (e: Exception) { Load.Err(e.message ?: "Could not load.") }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SearchField(q, { q = it }, "Search titles", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-        if (cats.isNotEmpty()) CategoryBar(cats, cat, onSelect = { cat = it })
+    val tv = LocalTv.current
+    Row(Modifier.fillMaxSize()) {
+    if (tv && cats.isNotEmpty()) {
+        TvCategoryPane(cats, cat, onSelect = { cat = it })
+        Spacer(Modifier.width(16.dp))
+    }
+    Column(Modifier.weight(1f).fillMaxSize()) {
+        if (tv) TvSearchButton(q, { q = it }, "Search titles", Modifier.padding(bottom = 6.dp))
+        else {
+            SearchField(q, { q = it }, "Search titles", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            if (cats.isNotEmpty()) CategoryBar(cats, cat, onSelect = { cat = it })
+        }
         when (val s = state) {
             is Load.Busy -> Busy()
             is Load.Err -> ErrorBox(s.message) { Api.clearCache(); reload++ }
@@ -198,10 +207,10 @@ private fun PosterGrid(
                 if (shown.isEmpty()) ErrorBox("Nothing here yet.") else
                     LazyVerticalGrid(
                         // 3 posters per row on phones, more on tablets/TV — like pro streaming apps.
-                        columns = GridCells.Adaptive(96.dp),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        columns = GridCells.Adaptive(if (tv) 122.dp else 96.dp),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = if (tv) 14.dp else 8.dp, bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (tv) 18.dp else 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (tv) 20.dp else 14.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${shown.size} titles") }
@@ -212,6 +221,7 @@ private fun PosterGrid(
                     }
             }
         }
+    }
     }
 }
 
@@ -269,6 +279,7 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 4.dp)
+                                .tvFocus(RoundedCornerShape(14.dp), 1.02f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     val queue = active.episodes.map { e ->
@@ -348,11 +359,13 @@ fun HomeScreen(onTab: (Int) -> Unit) {
                             onClick = { onTab(if (access?.live == true) 1 else 4) },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
                             shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
                         ) { Text(if (access?.live == true) "Live TV" else "IPTV") }
                         if (access?.live == true) Button(
                             onClick = { onTab(2) },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Surface3, contentColor = C.Text),
                             shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
                         ) { Text("Movies") }
                     }
                 }
@@ -381,11 +394,12 @@ fun HomeScreen(onTab: (Int) -> Unit) {
 @Composable
 private fun ChannelStrip(list: List<PlayItem>, onPlay: (Int) -> Unit) {
     val first = remember(list) { list.take(24) }
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         itemsIndexed(first, key = { i, it -> it.id + "#" + i }) { i, ch ->
             Column(
                 Modifier
                     .width(112.dp)
+                    .tvFocus(RoundedCornerShape(16.dp), 1.07f)
                     .clip(RoundedCornerShape(16.dp))
                     .background(C.Surface)
                     .clickable { onPlay(i) }

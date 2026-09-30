@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,6 +50,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -102,6 +107,28 @@ private fun Main(onSignIn: () -> Unit) {
     }
     BackHandler(enabled = account || tab != 0) { if (account) account = false else tab = 0 }
 
+    val body: @Composable () -> Unit = {
+        if (!ready) {
+            Busy()
+        } else if (account) {
+            AccountScreen(onSignIn = onSignIn, onChanged = { refreshKey++ })
+        } else {
+            val live = Store.access?.live == true
+            when (tab) {
+                0 -> HomeScreen(onTab = { tab = it })
+                1 -> if (live) LiveScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
+                2 -> if (live) MoviesScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
+                3 -> if (live) SeriesScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
+                else -> IptvScreen()
+            }
+        }
+    }
+
+    if (LocalTv.current) {
+        TvShell(tab, account, onTab = { tab = it; account = false }, onAccount = { account = true }, body = body)
+        return
+    }
+
     Scaffold(
         containerColor = C.Bg,
         topBar = {
@@ -145,24 +172,93 @@ private fun Main(onSignIn: () -> Unit) {
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-          if (!account) UpdateBanner(onOpen = { account = true })
-          Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (!ready) {
-                Busy()
-            } else if (account) {
-                AccountScreen(onSignIn = onSignIn, onChanged = { refreshKey++ })
-            } else {
-                val live = Store.access?.live == true
-                when (tab) {
-                    0 -> HomeScreen(onTab = { tab = it })
-                    1 -> if (live) LiveScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
-                    2 -> if (live) MoviesScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
-                    3 -> if (live) SeriesScreen() else LockCard(Session.signedIn, { refreshKey++ }, onSignIn)
-                    else -> IptvScreen()
-                }
-            }
-          }
+            if (!account) UpdateBanner(onOpen = { account = true })
+            Box(Modifier.weight(1f).fillMaxWidth()) { body() }
         }
+    }
+}
+
+/**
+ * TV layout: a menu down the left side (driven by the remote's arrows), the page on the right,
+ * with an overscan-safe margin. Back from a page returns to the menu first.
+ */
+@Composable
+private fun TvShell(tab: Int, account: Boolean, onTab: (Int) -> Unit, onAccount: () -> Unit, body: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val menuFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    var menuHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(150); runCatching { menuFocus.requestFocus() } }
+    BackHandler(enabled = !menuHasFocus) { runCatching { menuFocus.requestFocus() } }
+
+    Row(Modifier.fillMaxSize().background(C.Bg)) {
+        Column(
+            Modifier
+                .width(220.dp)
+                .fillMaxHeight()
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Surface, C.Bg)))
+                .padding(start = 28.dp, end = 12.dp, top = 28.dp, bottom = 24.dp)
+                .onFocusChanged { menuHasFocus = it.hasFocus },
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, bottom = 22.dp)) {
+                BrandMark(40)
+                Text("Andam", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp))
+            }
+            tabs.forEachIndexed { i, t ->
+                TvMenuItem(
+                    t.icon, t.label, selected = !account && tab == i,
+                    modifier = if (!account && tab == i) Modifier.focusRequester(menuFocus) else Modifier,
+                ) { onTab(i) }
+            }
+            Spacer(Modifier.weight(1f))
+            TvMenuItem(
+                Icons.Filled.AccountCircle, "Account", selected = account,
+                modifier = if (account) Modifier.focusRequester(menuFocus) else Modifier,
+                onClick = onAccount,
+            )
+        }
+        Column(Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp, end = 32.dp, top = 24.dp, bottom = 16.dp)) {
+            if (!account) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(tabs[tab].label, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    when (tab) {
+                        1, 2, 3 -> SourcePicker(Store.providers.map { it.id to it.name }, Store.provider) { Store.pickProvider(context, it) }
+                        4 -> SourcePicker(Store.iptvSources.map { it.id to it.name }, Store.iptvSource) { Store.pickIptv(context, it) }
+                    }
+                }
+                UpdateBanner(onOpen = onAccount)
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) { body() }
+        }
+    }
+}
+
+@Composable
+private fun TvMenuItem(icon: ImageVector, label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                when {
+                    focused -> C.Text
+                    selected -> C.EmberDim
+                    else -> androidx.compose.ui.graphics.Color.Transparent
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = if (focused) C.Bg else if (selected) C.Ember else C.Muted)
+        Text(
+            label,
+            color = if (focused) C.Bg else if (selected) C.Text else C.Muted,
+            fontWeight = if (selected || focused) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Medium,
+            modifier = Modifier.padding(start = 14.dp),
+        )
     }
 }
 
@@ -193,7 +289,7 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
             Box(Modifier.fillMaxWidth().height(420.dp)) { LockCard(true, onChanged, onSignIn) }
         }
         if (user == null) {
-            Button(onClick = onSignIn, colors = ButtonDefaults.buttonColors(containerColor = C.Ember), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("Sign in") }
+            Button(onClick = onSignIn, colors = ButtonDefaults.buttonColors(containerColor = C.Ember), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f)) { Text("Sign in") }
         } else {
             OutlinedButton(
                 onClick = {
@@ -203,14 +299,14 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
                         onChanged()
                     }
                 },
-                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
             ) { Text("Sign out", color = C.Text) }
         }
         UpdateCard()
         DiagnosticsCard()
         OutlinedButton(
-            onClick = { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(Config.BASE_URL)) },
-            shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp),
+            onClick = { runCatching { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(Config.BASE_URL)) } },
+            shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) { Text("Open andam.uk", color = C.Muted) }
         Text("Andam ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = C.Faint, modifier = Modifier.padding(top = 8.dp).width(300.dp))
     }

@@ -2,6 +2,10 @@ package uk.andam.app.player
 
 import android.os.Bundle
 import android.view.KeyEvent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -110,6 +114,7 @@ class PlayerActivity : ComponentActivity() {
             return
         }
         ui.panelGroup = first.group
+        ui.tv = uk.andam.app.ui.isTvDevice(this)
         engine.play(first)
 
         setContent {
@@ -137,25 +142,47 @@ class PlayerActivity : ComponentActivity() {
         pick(next)
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val zapKeys = keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN ||
-            (!ui.controls && !ui.panel && (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN))
-        if (zapKeys && PlayQueue.current()?.isLive == true) {
-            zap(if (keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1)
-            return true
-        }
-        when (keyCode) {
+    /**
+     * Remote control. With nothing on screen the arrows act directly on playback (zap / seek) and
+     * OK opens the channel guide on live TV or pauses a film. With a panel or the controls open,
+     * the arrows move between buttons as usual. Media and channel keys work everywhere.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        val live = PlayQueue.current()?.isLive == true
+        val code = event.keyCode
+        when (code) {
+            KeyEvent.KEYCODE_CHANNEL_UP -> if (live) { zap(-1); return true }
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> if (live) { zap(1); return true }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
                 engine.togglePlay(); ui.poke(); return true
             }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> if (!ui.controls && !ui.panel) {
-                ui.poke(); return true
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (!live) { engine.seekBy(30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> if (!live) { engine.seekBy(-30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
+                ui.panel = false; ui.settings = !ui.settings; return true
             }
-            KeyEvent.KEYCODE_MENU -> {
-                ui.panel = !ui.panel; return true
+            KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_INPUT, KeyEvent.KEYCODE_INFO -> if (live && PlayQueue.items.size > 1) {
+                ui.settings = false; ui.panel = !ui.panel; return true
             }
         }
-        return super.onKeyDown(keyCode, event)
+        val overlay = ui.controls || ui.panel || ui.settings
+        if (!overlay) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (live && PlayQueue.items.size > 1) ui.panel = true
+                    else { engine.togglePlay(); ui.poke() }
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> { if (live) zap(-1) else ui.poke(); return true }
+                KeyEvent.KEYCODE_DPAD_DOWN -> { if (live) zap(1) else ui.poke(); return true }
+                KeyEvent.KEYCODE_DPAD_LEFT -> { if (!live) engine.seekBy(-10_000); ui.poke(); return true }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> { if (!live) engine.seekBy(10_000); ui.poke(); return true }
+            }
+        } else if (ui.controls) {
+            ui.keep()
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onStop() {
@@ -183,9 +210,16 @@ class PlayerUiState {
     var panelGroup by mutableStateOf("")
     var resize by mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT)
     var pokes by mutableIntStateOf(0)
+    /** Remote-control layout (Android TV, Fire TV, TV boxes). */
+    var tv = false
 
     fun poke() {
         controls = true
+        pokes++
+    }
+
+    /** Keep the controls up a little longer (a key was pressed inside them). */
+    fun keep() {
         pokes++
     }
 }
@@ -215,9 +249,14 @@ private fun PlayerScreen(
         }
     }
 
-    BackHandler(enabled = ui.panel || ui.settings) {
-        ui.panel = false
-        ui.settings = false
+    // On TV, Back first closes whatever is on screen (guide, settings, then the controls).
+    BackHandler(enabled = ui.panel || ui.settings || (ui.tv && ui.controls)) {
+        if (ui.panel || ui.settings) {
+            ui.panel = false
+            ui.settings = false
+        } else {
+            ui.controls = false
+        }
     }
 
     Box(
@@ -233,6 +272,9 @@ private fun PlayerScreen(
                     setKeepContentOnPlayerReset(true)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     resizeMode = ui.resize
+                    // The remote is handled by the activity and the Compose overlay, never the view.
+                    isFocusable = false
+                    descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 }
             },
             update = { it.resizeMode = ui.resize },
@@ -365,8 +407,12 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
         ) {
             if (zappable) RoundIcon(Icons.Filled.SkipPrevious, "Previous") { onZap(-1) }
             else if (!engine.live) RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
+            val playFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { if (ui.tv) { delay(60); runCatching { playFocus.requestFocus() } } }
             Box(
                 Modifier
+                    .focusRequester(playFocus)
+                    .tvRing(CircleShape)
                     .size(68.dp)
                     .clip(CircleShape)
                     .background(Color(0x8C0A0B0F))
@@ -422,7 +468,8 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
 private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -> Unit) {
     val groups = remember { listOf("" to "All") + PlayQueue.groups.map { it.id to it.name } }
     val items = PlayQueue.items
-    var showCats by remember { mutableStateOf(false) }
+    var showCats by remember { mutableStateOf(ui.tv) }
+    val currentFocus = remember { FocusRequester() }
     val shown = remember(ui.panelGroup) {
         items.indices.filter { ui.panelGroup.isEmpty() || items[it].group == ui.panelGroup }
     }
@@ -431,6 +478,8 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
         val at = shown.indexOf(PlayQueue.index)
         listState.scrollToItem(if (at > 1) at - 1 else 0)
     }
+    // Remote: land on the channel that is playing (or the first one of this category).
+    LaunchedEffect(Unit) { if (ui.tv) { delay(80); runCatching { currentFocus.requestFocus() } } }
     Box(
         Modifier
             .fillMaxSize()
@@ -467,6 +516,7 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 2.dp)
+                                        .tvRing(RoundedCornerShape(14.dp))
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(if (on) Color(0x3DFFFFFF) else Color.Transparent)
                                         .clickable { ui.panelGroup = g.first }
@@ -499,10 +549,13 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                     itemsIndexed(shown) { _, idx ->
                         val ch = items[idx]
                         val on = idx == PlayQueue.index
+                        val target = on || (shown.indexOf(PlayQueue.index) < 0 && idx == shown.first())
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 2.dp)
+                                .then(if (target) Modifier.focusRequester(currentFocus) else Modifier)
+                                .tvRing(RoundedCornerShape(14.dp))
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (on) Color(0x3DFFFFFF) else Color.Transparent)
                                 .clickable { onPick(idx) }
@@ -600,8 +653,12 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
         item { Section("Video quality") }
         item {
             val autoLabel = if (nowHeight > 0) "Auto (${nowHeight}p)" else "Auto"
+            val first = remember { FocusRequester() }
+            LaunchedEffect(Unit) { if (ui.tv) { delay(120); runCatching { first.requestFocus() } } }
+            Box(Modifier.focusRequester(first)) {
             Option(autoLabel, !manualQuality, hint = if (video.size > 1) "Best for your connection" else null) {
                 TrackMenu.auto(engine.player, VIDEO); manualQuality = false
+            }
             }
         }
         if (video.size > 1) {
@@ -675,6 +732,7 @@ private fun Option(label: String, selected: Boolean, hint: String? = null, onCli
         Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
+            .tvRing(RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) C.EmberDim else C.Surface2)
             .clickable(onClick = onClick)
@@ -698,7 +756,7 @@ private fun Option(label: String, selected: Boolean, hint: String? = null, onCli
 private fun RoundIcon(icon: ImageVector, label: String, big: Boolean = false, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(if (big) 56.dp else 46.dp).clip(CircleShape).background(Color(0x590A0B0F)),
+        modifier = Modifier.tvRing(CircleShape).size(if (big) 56.dp else 46.dp).clip(CircleShape).background(Color(0x590A0B0F)),
     ) {
         Icon(icon, contentDescription = label, tint = Color.White)
     }
@@ -729,4 +787,14 @@ private fun fmt(ms: Long): String {
     val m = (s % 3600) / 60
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+
+/** White focus ring + slight zoom for the remote control (invisible on touch screens). */
+private fun Modifier.tvRing(shape: androidx.compose.ui.graphics.Shape): Modifier = androidx.compose.ui.composed {
+    var focused by remember { mutableStateOf(false) }
+    this
+        .onFocusChanged { focused = it.isFocused || it.hasFocus }
+        .graphicsLayer { val z = if (focused) 1.06f else 1f; scaleX = z; scaleY = z }
+        .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, shape)
 }

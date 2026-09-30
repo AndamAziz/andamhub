@@ -2,7 +2,9 @@ package uk.andam.app.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,10 +43,22 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
     }
     LaunchedEffect(cat, q) { listState.scrollToItem(0) }
 
-    Column(Modifier.fillMaxSize()) {
-        SearchField(q, { q = it }, "Search channels", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-        if (categories.isNotEmpty()) CategoryBar(categories, cat, onSelect = { cat = it })
-        Spacer(Modifier.height(6.dp))
+    val tv = LocalTv.current
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+    if (tv && categories.isNotEmpty()) {
+        TvCategoryPane(categories, cat, onSelect = { cat = it })
+        Spacer(Modifier.width(16.dp))
+    }
+    Column(Modifier.weight(1f).fillMaxHeight()) {
+        if (tv) {
+            TvSearchButton(q, { q = it }, "Search channels", Modifier.padding(bottom = 10.dp))
+            CountLine("${shown.size} channels")
+            Spacer(Modifier.height(6.dp))
+        } else {
+            SearchField(q, { q = it }, "Search channels", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            if (categories.isNotEmpty()) CategoryBar(categories, cat, onSelect = { cat = it })
+            Spacer(Modifier.height(6.dp))
+        }
         if (shown.isEmpty()) {
             ErrorBox(if (list.isEmpty()) "No channels yet." else "No channels match.")
         } else {
@@ -59,6 +73,7 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
                 item { Spacer(Modifier.height(16.dp)) }
             }
         }
+    }
     }
 }
 

@@ -99,7 +99,7 @@ fun UpdateCard() {
             },
             colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) {
             Text(
                 when {
@@ -181,7 +181,7 @@ fun DiagnosticsCard() {
             },
             colors = ButtonDefaults.buttonColors(containerColor = C.Surface3, contentColor = C.Text),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) { Text(if (running) "Testing…" else "Run test") }
     }
 }

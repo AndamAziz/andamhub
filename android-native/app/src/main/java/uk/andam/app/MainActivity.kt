@@ -6,7 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import uk.andam.app.auth.Session
@@ -25,7 +27,10 @@ class MainActivity : ComponentActivity() {
         )
         handle(intent)
         setContent {
-            AndamTheme { AppRoot(authMessage.value) }
+            val tv = remember { uk.andam.app.ui.isTvDevice(this) }
+            AndamTheme {
+                CompositionLocalProvider(uk.andam.app.ui.LocalTv provides tv) { AppRoot(authMessage.value) }
+            }
         }
     }
 

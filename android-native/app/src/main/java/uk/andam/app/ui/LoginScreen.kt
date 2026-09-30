@@ -54,7 +54,7 @@ fun LoginScreen(message: String?, onDone: () -> Unit) {
         val tab = CustomTabsIntent.Builder()
             .setDefaultColorSchemeParams(CustomTabColorSchemeParams.Builder().setToolbarColor(C.Bg.toArgb()).build())
             .build()
-        tab.launchUrl(context, Uri.parse(Session.oauthUrl(provider)))
+        runCatching { tab.launchUrl(context, Uri.parse(Session.oauthUrl(provider))) }
     }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -62,6 +62,7 @@ fun LoginScreen(message: String?, onDone: () -> Unit) {
         focusedBorderColor = C.Ember, unfocusedBorderColor = C.Hair, cursorColor = C.Ember,
     )
 
+    val tv = LocalTv.current
     Column(
         Modifier
             .fillMaxSize()
@@ -69,7 +70,7 @@ fun LoginScreen(message: String?, onDone: () -> Unit) {
             .systemBarsPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(horizontal = if (tv) 250.dp else 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -79,14 +80,17 @@ fun LoginScreen(message: String?, onDone: () -> Unit) {
         Text("Welcome to Andam", style = MaterialTheme.typography.headlineSmall)
         Text("Live TV, movies and series", color = C.Muted, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp))
 
-        Button(
-            onClick = { openOAuth("google") },
-            colors = ButtonDefaults.buttonColors(containerColor = C.Text, contentColor = C.Bg),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text("Continue with Google") }
+        // TVs rarely have a browser for Google sign-in: use email there.
+        if (!tv) {
+            Button(
+                onClick = { openOAuth("google") },
+                colors = ButtonDefaults.buttonColors(containerColor = C.Text, contentColor = C.Bg),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
+            ) { Text("Continue with Google") }
 
-        Text("or", color = C.Faint, modifier = Modifier.padding(vertical = 16.dp))
+            Text("or", color = C.Faint, modifier = Modifier.padding(vertical = 16.dp))
+        }
 
         OutlinedTextField(
             value = email, onValueChange = { email = it }, singleLine = true,
@@ -120,18 +124,20 @@ fun LoginScreen(message: String?, onDone: () -> Unit) {
             enabled = !busy && email.isNotBlank() && password.isNotBlank(),
             colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) { Text(if (busy) "Signing in…" else "Sign in") }
 
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = { Session.continueAsGuest(); onDone() },
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
         ) { Text("Continue without an account (IPTV)", color = C.Muted) }
 
-        TextButton(onClick = {
-            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse("${uk.andam.app.Config.BASE_URL}/auth"))
+        if (tv) {
+            Text("Create an account or reset your password at ip.andam.uk", color = C.Faint, modifier = Modifier.padding(top = 12.dp))
+        } else TextButton(onClick = {
+            runCatching { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse("${uk.andam.app.Config.BASE_URL}/auth")) }
         }) { Text("Create an account or reset password", color = C.Faint) }
         Spacer(Modifier.height(24.dp))
     }
