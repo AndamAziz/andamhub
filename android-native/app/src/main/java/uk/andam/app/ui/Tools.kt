@@ -9,6 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -106,6 +113,14 @@ fun UpdateCard() {
     }
 }
 
+/** Real data per provider / playlist, filled in by "Run test". */
+private sealed interface Info {
+    data object Busy : Info
+    data class Provider(val v: uk.andam.app.net.ProviderInfo) : Info
+    data class Playlist(val channels: Int, val groups: Int, val ms: Long) : Info
+    data class Failed(val msg: String) : Info
+}
+
 @Composable
 fun DiagnosticsCard() {
     val scope = rememberCoroutineScope()
@@ -114,6 +129,8 @@ fun DiagnosticsCard() {
     var internet by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var stream by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var iptv by remember { mutableStateOf<Diagnostics.Result?>(null) }
+    val providerInfo = remember { androidx.compose.runtime.mutableStateMapOf<String, Info>() }
+    val playlistInfo = remember { androidx.compose.runtime.mutableStateMapOf<String, Info>() }
     val hevc = remember { Diagnostics.hevcSupported() }
 
     Card {
@@ -123,12 +140,39 @@ fun DiagnosticsCard() {
         ResultRow("Provider stream (relay)", stream, running && internet != null && stream == null)
         ResultRow("IPTV stream", iptv, running && stream != null && iptv == null)
         ResultRow("H.265 (HEVC) video", Diagnostics.Result(hevc, if (hevc) "Supported on this device" else "Not supported on this device"), false)
+
+        Store.providers.forEach { p ->
+            providerInfo[p.id]?.let { ProviderBlock(p.name, it) }
+        }
+        Store.iptvSources.forEach { s ->
+            playlistInfo[s.id]?.let { PlaylistBlock(s.name, it) }
+        }
+
         Button(
             enabled = !running,
             onClick = {
                 running = true; server = null; internet = null; stream = null; iptv = null
+                providerInfo.clear(); playlistInfo.clear()
                 scope.launch {
                     server = Diagnostics.server()
+                    // Content counts load in parallel with the speed tests.
+                    Store.providers.forEach { p ->
+                        providerInfo[p.id] = Info.Busy
+                        launch {
+                            providerInfo[p.id] = runCatching { Info.Provider(uk.andam.app.net.Api.info(p.id)) }
+                                .getOrElse { Info.Failed(it.message ?: "Could not read the provider") }
+                        }
+                    }
+                    Store.iptvSources.forEach { src ->
+                        playlistInfo[src.id] = Info.Busy
+                        launch {
+                            val t0 = System.nanoTime()
+                            playlistInfo[src.id] = runCatching {
+                                val l = uk.andam.app.net.Api.iptvChannels(src.id)
+                                Info.Playlist(l.channels.size, l.groups.size, (System.nanoTime() - t0) / 1_000_000)
+                            }.getOrElse { Info.Failed(it.message ?: "Could not read the playlist") }
+                        }
+                    }
                     internet = Diagnostics.internet()
                     stream = Diagnostics.providerRoute()
                     iptv = Diagnostics.iptvRoute()
@@ -141,6 +185,124 @@ fun DiagnosticsCard() {
         ) { Text(if (running) "Testing…" else "Run test") }
     }
 }
+
+@Composable
+private fun ProviderBlock(name: String, info: Info) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(C.Surface2, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(Icons.Filled.Dns, C.Ember)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(name, color = C.Text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                val sub = when (info) {
+                    is Info.Provider -> info.v.server.ifBlank { "Provider" } + " · answered in ${info.v.ms} ms"
+                    is Info.Busy -> "Reading provider…"
+                    is Info.Failed -> info.msg
+                    else -> ""
+                }
+                Text(sub, color = C.Muted, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            if (info is Info.Provider) {
+                val v = info.v
+                val active = v.reachable && (v.status.isBlank() || v.status.equals("Active", true))
+                StatusChip(if (!v.reachable) "Offline" else v.status.ifBlank { "Online" }, active)
+            }
+        }
+        when (info) {
+            is Info.Busy -> LinearProgressIndicator(color = C.Ember, trackColor = C.Surface3, modifier = Modifier.fillMaxWidth())
+            is Info.Provider -> {
+                val v = info.v
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile(Icons.Filled.LiveTv, "Live", v.live, v.liveCategories, Color(0xFFFF5A6B), Modifier.weight(1f))
+                    StatTile(Icons.Filled.Movie, "Movies", v.vod, v.vodCategories, Color(0xFFFFB547), Modifier.weight(1f))
+                    StatTile(Icons.Filled.Tv, "Series", v.series, v.seriesCategories, Color(0xFF5AA9FF), Modifier.weight(1f))
+                }
+                val facts = listOfNotNull(
+                    v.expires.takeIf { it.isNotBlank() }?.let { "Expires " + it.take(10) },
+                    if (v.maxConnections > 0) "Connections ${v.activeConnections}/${v.maxConnections}" else null,
+                    if (v.trial) "Trial" else null,
+                )
+                if (facts.isNotEmpty()) Text(facts.joinToString("  ·  "), color = C.Faint, fontSize = 12.sp)
+            }
+            else -> {}
+        }
+    }
+}
+
+@Composable
+private fun PlaylistBlock(name: String, info: Info) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(C.Surface2, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBadge(Icons.Filled.Wifi, Color(0xFF38E1C6))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, color = C.Text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(
+                when (info) {
+                    is Info.Playlist -> "IPTV playlist · ${info.groups} categories · ${info.ms} ms"
+                    is Info.Busy -> "Reading playlist…"
+                    is Info.Failed -> info.msg
+                    else -> ""
+                },
+                color = C.Muted, fontSize = 12.sp,
+            )
+        }
+        if (info is Info.Playlist) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(big(info.channels), color = C.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("channels", color = C.Faint, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, count: Int, cats: Int, tint: Color, modifier: Modifier) {
+    Column(
+        modifier
+            .background(C.Surface3, RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 12.dp),
+    ) {
+        androidx.compose.material3.Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(if (count >= 0) big(count) else "—", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 1)
+        Text(label, color = C.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        if (cats >= 0) Text("$cats categories", color = C.Faint, fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun IconBadge(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color) {
+    androidx.compose.foundation.layout.Box(
+        Modifier.size(36.dp).background(tint.copy(alpha = 0.16f), RoundedCornerShape(11.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun StatusChip(text: String, ok: Boolean) {
+    val c = if (ok) Color(0xFF38E1C6) else C.Ember
+    Text(
+        text,
+        color = c, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        modifier = Modifier.background(c.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+private fun big(n: Int): String = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(n)
 
 @Composable
 private fun ResultRow(label: String, result: Diagnostics.Result?, active: Boolean) {

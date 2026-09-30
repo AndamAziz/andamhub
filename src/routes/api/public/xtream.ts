@@ -164,6 +164,54 @@ export const Route = createFileRoute('/api/public/xtream')({
           const source = await loadSource(url.searchParams.get('source') ?? '', granted);
           if (!source) return json({ error: 'No provider configured' }, 404);
 
+          // Account summary for the app's "Server & speed test" card: real counts of
+          // live channels, movies and series plus the provider account status.
+          // The panel address is only shown to admins; credentials never leave.
+          if (action === 'info') {
+            const t0 = Date.now();
+            const safe = <T,>(p: Promise<T>) => p.catch(() => null);
+            const [acct, liveCats, vodCats, seriesCats, live, vod, series, curated] = await Promise.all([
+              safe(playerApi<Record<string, unknown>>(source, {})),
+              safe(playerApi<unknown[]>(source, { action: 'get_live_categories' })),
+              safe(playerApi<unknown[]>(source, { action: 'get_vod_categories' })),
+              safe(playerApi<unknown[]>(source, { action: 'get_series_categories' })),
+              safe(playerApi<unknown[]>(source, { action: 'get_live_streams' })),
+              safe(playerApi<unknown[]>(source, { action: 'get_vod_streams' })),
+              safe(playerApi<unknown[]>(source, { action: 'get_series' })),
+              curatedChannels(source.id),
+            ]);
+            const count = (v: unknown) => (Array.isArray(v) ? v.length : null);
+            const user = (acct?.user_info ?? {}) as Record<string, unknown>;
+            const server = (acct?.server_info ?? {}) as Record<string, unknown>;
+            const exp = num(user.exp_date, 0);
+            let host: string | null = null;
+            if (access.admin) {
+              try {
+                host = new URL(source.base_url).host;
+              } catch {
+                host = null;
+              }
+            }
+            return json({
+              provider: source.name,
+              server: host,
+              reachable: acct != null,
+              status: typeof user.status === 'string' ? user.status : '',
+              expires: exp > 0 ? new Date(exp * 1000).toISOString() : null,
+              trial: String(user.is_trial ?? '') === '1',
+              maxConnections: num(user.max_connections, 0),
+              activeConnections: num(user.active_cons, 0),
+              timezone: typeof server.timezone === 'string' ? server.timezone : '',
+              live: curated.length > 0 ? curated.length : count(live),
+              liveCategories: curated.length > 0 ? new Set(curated.map((c) => c.group)).size : count(liveCats),
+              vod: count(vod),
+              vodCategories: count(vodCats),
+              series: count(series),
+              seriesCategories: count(seriesCats),
+              ms: Date.now() - t0,
+            });
+          }
+
           if (action === 'categories') {
             const kind = (url.searchParams.get('type') ?? 'live') as XtreamKind;
 

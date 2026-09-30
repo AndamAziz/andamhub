@@ -18,7 +18,7 @@ object Diagnostics {
             Api.clearCache()
             Api.access()
             val ms = (System.nanoTime() - t0) / 1_000_000
-            Result(true, "Online · $ms ms")
+            Result(true, "${android.net.Uri.parse(Config.BASE_URL).host} · Online · $ms ms")
         } catch (e: Exception) {
             Result(false, "Unreachable (${e.message ?: "error"})")
         }

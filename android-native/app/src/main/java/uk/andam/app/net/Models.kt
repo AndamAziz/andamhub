@@ -69,3 +69,22 @@ data class IptvPlay(val token: String, val directUrl: String?, val headers: Map<
 data class PlayTokens(val play: String, val fallback: String?)
 
 class ApiException(val code: Int, message: String) : Exception(message)
+
+/** Provider account summary from `action=info` (real counts; server host only for admins). */
+data class ProviderInfo(
+    val name: String,
+    val server: String,
+    val reachable: Boolean,
+    val status: String,
+    val expires: String,
+    val trial: Boolean,
+    val maxConnections: Int,
+    val activeConnections: Int,
+    val live: Int,
+    val liveCategories: Int,
+    val vod: Int,
+    val vodCategories: Int,
+    val series: Int,
+    val seriesCategories: Int,
+    val ms: Long,
+)

@@ -164,6 +164,26 @@ object Api {
 
     // ---------------- IPTV (M3U playlists) ----------------
 
+    /** Live account summary for the diagnostics card (never cached: it is a test). */
+    suspend fun info(source: String): ProviderInfo {
+        val j = get(X, mapOf("action" to "info", "source" to source))
+        fun n(k: String) = if (j.isNull(k)) -1 else j.optInt(k, -1)
+        return ProviderInfo(
+            name = j.str("provider"),
+            server = j.str("server"),
+            reachable = j.optBoolean("reachable", false),
+            status = j.str("status"),
+            expires = j.str("expires"),
+            trial = j.optBoolean("trial", false),
+            maxConnections = j.optInt("maxConnections", 0),
+            activeConnections = j.optInt("activeConnections", 0),
+            live = n("live"), liveCategories = n("liveCategories"),
+            vod = n("vod"), vodCategories = n("vodCategories"),
+            series = n("series"), seriesCategories = n("seriesCategories"),
+            ms = j.optLong("ms", 0),
+        )
+    }
+
     private const val I = "/api/public/iptv"
 
     suspend fun iptvSources(): List<IptvSource> = cached("iptv:sources") {
