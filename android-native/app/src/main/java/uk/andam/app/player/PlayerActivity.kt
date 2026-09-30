@@ -116,6 +116,14 @@ class PlayerActivity : ComponentActivity() {
         }
         ui.panelGroup = first.group
         ui.tv = uk.andam.app.ui.isTvDevice(this)
+        // Series: when an episode ends, the next one starts by itself.
+        engine.onEnded = {
+            val cur = PlayQueue.current()
+            val nextIndex = PlayQueue.index + 1
+            if (cur?.kind == Kind.EPISODE && nextIndex < PlayQueue.items.size) {
+                pick(nextIndex)
+            }
+        }
         engine.play(first)
 
         setContent {

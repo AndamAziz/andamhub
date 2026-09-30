@@ -72,6 +72,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     val player: ExoPlayer
 
+    /** Called when a film / episode plays to the end (the activity moves on to the next episode). */
+    var onEnded: (() -> Unit)? = null
+
     private var item: PlayItem? = null
     private var attempts: List<Attempt> = emptyList()
     private var attemptIndex = 0
@@ -151,7 +154,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 }
                 if (state == Player.STATE_ENDED) {
                     // A live stream never really ends: the upstream closed the socket. Reopen it.
-                    if (live) reconnect("Reconnecting…", 500) else playing = false
+                    if (live) reconnect("Reconnecting…", 500) else {
+                        playing = false
+                        onEnded?.invoke()
+                    }
                 }
             }
 

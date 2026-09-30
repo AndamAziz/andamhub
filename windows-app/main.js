@@ -208,6 +208,7 @@ function onLine(line) {
   if (m.event === 'client-message' && Array.isArray(m.args)) {
     if (m.args[0] === 'andam-prev') notify({ type: 'prev' });
     if (m.args[0] === 'andam-next') notify({ type: 'next' });
+    if (m.args[0] === 'andam-ended') notify({ type: 'ended' });
   }
   if (m.event === 'end-file' && m.reason === 'error') notify({ type: 'error', message: m.file_error || '' });
 }
@@ -233,10 +234,23 @@ function connect(tries = 0) {
     if (sock === c) sock = null;
   });
 }
-function startPlayer(url, title) {
+// Loads a stream. Live channels and episodes get marker entries around them so the player's
+// own ⏮ ⏭ buttons work (see mpv/portable_config/scripts/andam.lua).
+function load(url, title, nav) {
+  send(['set_property', 'force-media-title', title]);
+  send(['loadfile', url, 'replace']);
+  if (nav) {
+    send(['loadfile', 'andam://prev', 'append']);
+    send(['loadfile', 'andam://next', 'append']);
+    send(['playlist-move', 1, 0]);
+  }
+  send(['set_property', 'pause', false]);
+}
+
+function startPlayer(url, title, nav) {
   sockBuf = '';
   pending = [];
-  mpv = spawn(MPV_EXE, [`--input-ipc-server=${PIPE}`, `--force-media-title=${title}`, '--', url], {
+  mpv = spawn(MPV_EXE, [`--input-ipc-server=${PIPE}`, '--idle=yes', `--force-media-title=${title}`], {
     cwd: MPV_DIR,
     stdio: 'ignore',
     windowsHide: false,
@@ -251,6 +265,7 @@ function startPlayer(url, title) {
     mpv = null;
     notify({ type: 'closed' });
   });
+  load(url, title, nav);
   setTimeout(() => connect(), 150);
 }
 
@@ -266,13 +281,9 @@ ipcMain.handle('player:play', (_e, o) => {
   if (!allowed) return { ok: false };
   const title = String((o && o.title) || 'Andam').replace(/[\r\n]/g, ' ').slice(0, 200);
   try {
-    if (mpv) {
-      send(['set_property', 'force-media-title', title]);
-      send(['loadfile', url, 'replace']);
-      send(['set_property', 'pause', false]);
-    } else {
-      startPlayer(url, title);
-    }
+    const nav = Boolean(o && o.nav);
+    if (mpv) load(url, title, nav);
+    else startPlayer(url, title, nav);
     return { ok: true };
   } catch {
     return { ok: false };
