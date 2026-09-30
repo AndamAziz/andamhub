@@ -13,6 +13,8 @@ import uk.andam.app.net.Provider
 object Store {
     var access by mutableStateOf<Access?>(null)
     var providers by mutableStateOf<List<Provider>>(emptyList())
+    /** A series picked on Home (hero) that the Series tab should open straight away. */
+    var pendingSeries by mutableStateOf<uk.andam.app.net.SeriesItem?>(null)
     var provider by mutableStateOf("")
     var iptvSources by mutableStateOf<List<IptvSource>>(emptyList())
     var iptvSource by mutableStateOf("")

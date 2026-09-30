@@ -25,6 +25,8 @@ data class VodItem(
     val genre: String,
     val categoryId: String,
     val ext: String,
+    /** Unix seconds the provider added it (0 when unknown). */
+    val added: Long = 0,
 )
 
 data class SeriesItem(
@@ -35,6 +37,8 @@ data class SeriesItem(
     val year: String,
     val genre: String,
     val categoryId: String,
+    /** Unix seconds of the last new episode (0 when unknown). */
+    val updated: Long = 0,
 )
 
 data class Episode(

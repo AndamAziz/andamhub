@@ -150,7 +150,7 @@ fun MoviesScreen() {
 @Composable
 fun SeriesScreen() {
     val source = Store.provider
-    var open by remember(source) { mutableStateOf<SeriesItem?>(null) }
+    var open by remember(source) { mutableStateOf<SeriesItem?>(Store.pendingSeries.also { Store.pendingSeries = null }) }
     val current = open
     if (current != null) {
         BackHandler { open = null }
@@ -323,50 +323,95 @@ fun HomeScreen(onTab: (Int) -> Unit) {
     var liveCats by remember(Store.provider) { mutableStateOf<List<Category>>(emptyList()) }
     var iptv by remember(Store.iptvSource) { mutableStateOf<List<PlayItem>>(emptyList()) }
     var iptvCats by remember(Store.iptvSource) { mutableStateOf<List<Category>>(emptyList()) }
-    LaunchedEffect(Store.provider) {
+    var movies by remember(Store.provider) { mutableStateOf<List<VodItem>>(emptyList()) }
+    var series by remember(Store.provider) { mutableStateOf<List<SeriesItem>>(emptyList()) }
+    var newLive by remember(Store.provider) { mutableStateOf<Set<String>>(emptySet()) }
+
+    // Provider content, refreshed every 10 minutes while Home is open so newly added
+    // channels, films and series appear on their own (they are marked NEW in the spotlight).
+    LaunchedEffect(Store.provider, access?.live) {
         val src = Store.provider
-        if (src.isNotEmpty()) runCatching {
-            val cats = runCatching { Api.categories(src, "live") }.getOrDefault(emptyList())
-            liveCats = cats
-            live = Api.live(src).map { ch ->
-                PlayItem(Kind.LIVE, src, ch.id, ch.name, subtitle = cats.firstOrNull { it.id == ch.categoryId }?.name.orEmpty(), logo = ch.logo, group = ch.categoryId)
+        if (src.isEmpty() || access?.live != true) return@LaunchedEffect
+        while (true) {
+            runCatching {
+                val cats = runCatching { Api.categories(src, "live") }.getOrDefault(emptyList())
+                liveCats = cats
+                val raw = Api.live(src)
+                newLive = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    HeroPicker.newLiveIds(context, "live:$src", raw.map { it.id })
+                }
+                live = raw.map { ch ->
+                    PlayItem(Kind.LIVE, src, ch.id, ch.name, subtitle = cats.firstOrNull { it.id == ch.categoryId }?.name.orEmpty(), logo = ch.logo, group = ch.categoryId)
+                }
             }
+            runCatching { movies = Api.vod(src, "") }
+            runCatching { series = Api.series(src, "") }
+            kotlinx.coroutines.delay(10 * 60_000L)
+            Api.forget("live:$src"); Api.forget("vod:$src:"); Api.forget("series:$src:")
         }
     }
     LaunchedEffect(Store.iptvSource) {
         val src = Store.iptvSource
-        if (src.isNotEmpty()) runCatching {
-            val l = Api.iptvChannels(src)
-            iptvCats = l.groups
-            iptv = l.channels.map { PlayItem(Kind.IPTV, src, it.id, it.name, subtitle = it.group, logo = it.logo, group = it.group) }
+        if (src.isEmpty()) return@LaunchedEffect
+        while (true) {
+            runCatching {
+                val l = Api.iptvChannels(src)
+                iptvCats = l.groups
+                iptv = l.channels.map { PlayItem(Kind.IPTV, src, it.id, it.name, subtitle = it.group, logo = it.logo, group = it.group) }
+            }
+            kotlinx.coroutines.delay(10 * 60_000L)
+            Api.forget("iptv:ch:$src")
         }
     }
+    // Sorting thousands of titles happens off the main thread.
+    var slides by remember { mutableStateOf<List<HeroSlide>>(emptyList()) }
+    LaunchedEffect(live, iptv, movies, series, newLive) {
+        val cats = liveCats
+        slides = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            HeroPicker.build(live, newLive, iptv, movies, series) { id -> cats.firstOrNull { it.id == id }?.name.orEmpty() }
+        }
+    }
+    val openSlide: (HeroSlide) -> Unit = { sl ->
+        when (sl.kind) {
+            "live" -> live.indexOfFirst { it.id == sl.live?.id }.takeIf { it >= 0 }?.let { PlayQueue.open(context, live, it, liveCats) }
+            "iptv" -> iptv.indexOfFirst { it.id == sl.live?.id }.takeIf { it >= 0 }?.let { PlayQueue.open(context, iptv, it, iptvCats) }
+            "movie" -> sl.movie?.let { v ->
+                PlayQueue.open(context, listOf(PlayItem(Kind.VOD, Store.provider, v.id, v.name, subtitle = v.year, logo = v.poster, ext = v.ext)), 0)
+            }
+            "series" -> sl.series?.let { Store.pendingSeries = it; onTab(3) }
+        }
+    }
+
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            Box(
-                Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF2A1218), C.Surface, C.Surface)))
-                    .padding(20.dp),
-            ) {
-                Column {
-                    Text("Watch now", color = C.Ember, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Live TV, movies and series in one place", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 6.dp, bottom = 16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = { onTab(if (access?.live == true) 1 else 4) },
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
-                        ) { Text(if (access?.live == true) "Live TV" else "IPTV") }
-                        if (access?.live == true) Button(
-                            onClick = { onTab(2) },
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Surface3, contentColor = C.Text),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
-                        ) { Text("Movies") }
+            if (slides.isNotEmpty()) {
+                HeroCarousel(slides, openSlide)
+            } else {
+                Box(
+                    Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF2A1218), C.Surface, C.Surface)))
+                        .padding(20.dp),
+                ) {
+                    Column {
+                        Text("Watch now", color = C.Ember, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Live TV, movies and series in one place", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 6.dp, bottom = 16.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = { onTab(if (access?.live == true) 1 else 4) },
+                                colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
+                            ) { Text(if (access?.live == true) "Live TV" else "IPTV") }
+                            if (access?.live == true) Button(
+                                onClick = { onTab(2) },
+                                colors = ButtonDefaults.buttonColors(containerColor = C.Surface3, contentColor = C.Text),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.tvFocus(RoundedCornerShape(12.dp)),
+                            ) { Text("Movies") }
+                        }
                     }
                 }
             }

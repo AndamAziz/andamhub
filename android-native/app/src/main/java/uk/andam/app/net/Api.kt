@@ -46,6 +46,11 @@ object Api {
 
     fun clearCache() = memo.clear()
 
+    /** Drop cached answers whose key starts with [prefix] so the next call fetches fresh data. */
+    fun forget(prefix: String) {
+        memo.keys.filter { it.startsWith(prefix) }.forEach { memo.remove(it) }
+    }
+
     private suspend fun get(path: String, params: Map<String, String>): JSONObject = withContext(Dispatchers.IO) {
         val b = Uri.parse(Config.BASE_URL + path).buildUpon()
         params.forEach { (k, v) -> if (v.isNotEmpty()) b.appendQueryParameter(k, v) }
@@ -135,13 +140,17 @@ object Api {
             VodItem(
                 it.str("id"), it.str("name"), it.str("poster"), it.str("rating"), it.str("year"),
                 it.str("genre"), it.str("categoryId"), it.str("ext").ifBlank { "mp4" },
+                it.str("added").toLongOrNull() ?: 0L,
             )
         }
     }
 
     suspend fun series(source: String, category: String): List<SeriesItem> = cached("series:$source:$category") {
         get(X, mapOf("action" to "series", "source" to source, "category_id" to category)).optJSONArray("items").mapObjects {
-            SeriesItem(it.str("id"), it.str("name"), it.str("poster"), it.str("rating"), it.str("year"), it.str("genre"), it.str("categoryId"))
+            SeriesItem(
+                it.str("id"), it.str("name"), it.str("poster"), it.str("rating"), it.str("year"), it.str("genre"), it.str("categoryId"),
+                it.str("lastModified").toLongOrNull() ?: 0L,
+            )
         }
     }
 
