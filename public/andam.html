@@ -1198,6 +1198,32 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
 /* v2.10 — scorpion emblem as the brand mark */
 .brand .mark{background:#0A0B0F url(/icon-192.png) center/cover no-repeat !important;color:transparent !important;font-size:0 !important;box-shadow:0 0 0 1px rgba(255,59,78,.35),0 4px 14px rgba(255,59,78,.25) !important}
+
+/* v2.13 — "Get the app" buttons + Windows app player card */
+.getapp{margin:34px 4% 24px;padding:22px 24px;border-radius:20px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+  background:radial-gradient(120% 140% at 0% 0%,rgba(255,59,78,.16),transparent 60%),#15161C;border:1px solid rgba(255,255,255,.07)}
+.getapp .gatext{display:flex;flex-direction:column;gap:4px;min-width:220px}
+.getapp .gatext b{font:700 18px Inter,sans-serif;color:#F4F5F7;letter-spacing:-.2px}
+.getapp .gatext span{font:500 13px Inter,sans-serif;color:#A3A6B0}
+.getapp .gabtns{display:flex;gap:10px;flex-wrap:wrap}
+.gabtn{display:inline-flex;align-items:center;gap:10px;padding:10px 16px 10px 12px;border-radius:14px;background:#0A0B0F;border:1px solid rgba(255,255,255,.12);color:#F4F5F7;text-decoration:none;transition:border-color .15s,transform .15s}
+.gabtn:hover,.gabtn:focus-visible{border-color:#FF3B4E;transform:translateY(-1px)}
+.gabtn svg{width:24px;height:24px;color:#FF3B4E}
+.gabtn span{display:flex;flex-direction:column;font:700 15px Inter,sans-serif;line-height:1.1}
+.gabtn small{font:500 10.5px Inter,sans-serif;color:#A3A6B0;letter-spacing:.02em}
+.menu a.mgetapp{font-size:16px;color:rgba(255,255,255,.72)}
+[data-getapp][hidden],.getapp[hidden]{display:none !important}
+.deskcard{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:20px;
+  background:radial-gradient(90% 90% at 50% 40%,rgba(255,59,78,.16),rgba(10,11,15,.96) 70%);color:#F4F5F7;font-family:Inter,sans-serif}
+.deskcard .deskicon{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#FF3B4E;font-size:22px;box-shadow:0 10px 30px rgba(255,59,78,.35);margin-bottom:6px}
+.deskcard b{font-size:18px;font-weight:700}
+.deskcard span{font-size:14px;color:#A3A6B0;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.deskcard .deskbtns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+.deskcard button{border:0;border-radius:12px;padding:10px 18px;font:600 14px Inter,sans-serif;cursor:pointer;background:#FF3B4E;color:#fff}
+.deskcard button.ghost{background:rgba(255,255,255,.08);color:#F4F5F7;border:1px solid rgba(255,255,255,.14)}
+.deskcard small{margin-top:8px;font-size:12px;color:#6E717B;max-width:420px}
+.deskpill{position:absolute;top:12px;right:12px;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(10,11,15,.72);color:#F4F5F7;border-radius:999px;padding:7px 14px;font:600 12px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
+.deskpill:hover{border-color:#FF3B4E}
 </style>
 
 </head>
@@ -1230,6 +1256,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   <a id="mSearch" href="#">Search</a>
   <a id="mAdmin" href="/admin" target="_top" hidden>Admin</a>
   <a id="mAccount" href="/auth" target="_top">Sign in</a>
+  <a class="mgetapp" data-getapp="windows" href="/api/public/download?app=windows" target="_top">Download for Windows</a>
+  <a class="mgetapp" data-getapp="android" href="/api/public/download?app=android" target="_top">Download for Android</a>
   <button type="button" id="appVer" style="margin-top:auto;align-self:flex-start;background:none;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.55);font:500 12px Inter,sans-serif;padding:6px 12px;border-radius:999px;cursor:pointer;min-height:32px">v1.2 · 29 Sep</button>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Sections"><a href="#" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="m8 2.5 4 3.5 4-3.5"/><circle cx="17.5" cy="10" r="1.2" fill="currentColor" stroke="none"/></svg><span>Live TV</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4M3 12h18"/></svg><span>Movies</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="m10.5 8 4 2-4 2z" fill="currentColor"/></svg><span>Shows</span></a><a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0"/><circle cx="12" cy="18.5" r="1.4" fill="currentColor" stroke="none"/><path d="M2 9.5a14.5 14.5 0 0 1 20 0"/></svg><span>IPTV</span></a></nav>
@@ -1299,6 +1327,22 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   <section class="row hide" id="rowIptv">
     <div class="rowhead"><h2>Your IPTV channels</h2><a href="#" data-goto="iptv">See all</a></div>
     <div class="strip"></div>
+  </section>
+  <section class="getapp" id="rowGetApp" aria-label="Get the Andam app">
+    <div class="gatext">
+      <b>Get the Andam app</b>
+      <span>Watch on your computer, phone, Android TV and Fire TV.</span>
+    </div>
+    <div class="gabtns">
+      <a class="gabtn" data-getapp="windows" href="/api/public/download?app=windows" target="_top">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z" fill="currentColor"/></svg>
+        <span><small>Download for</small>Windows</span>
+      </a>
+      <a class="gabtn" data-getapp="android" href="/api/public/download?app=android" target="_top">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h10v8a1 1 0 0 1-1 1h-1v3h-2v-3h-2v3H9v-3H8a1 1 0 0 1-1-1zM4.5 9.5a1.2 1.2 0 0 1 2.4 0v5a1.2 1.2 0 0 1-2.4 0zM17.1 9.5a1.2 1.2 0 0 1 2.4 0v5a1.2 1.2 0 0 1-2.4 0zM7.2 8a4.9 4.9 0 0 1 9.6 0zM9.3 4.2 8.4 2.7M14.7 4.2l.9-1.5" fill="currentColor" stroke="currentColor" stroke-width=".6"/></svg>
+        <span><small>Download for</small>Android &amp; TV</span>
+      </a>
+    </div>
   </section>
 </main>
 
@@ -1826,6 +1870,18 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   catMore.addEventListener('click',function(){ if(cat.page<cat.totalPages){ cat.page++; fetchCatalog(false); } });
   catForm.addEventListener('submit',function(e){ e.preventDefault(); cat.q=catSearch.value.trim(); fetchCatalog(true); });
+
+  /* "Get the app": hide the Windows button inside the Windows app, and both inside the Android app. */
+  (function(){
+    var inDesk=false; try{ inDesk=!!(window.andamDesktop||(window.top&&window.top.andamDesktop)) }catch(_){}
+    var inAndroid=/; wv\)|AndamApp|Capacitor/i.test(navigator.userAgent);
+    [].forEach.call(document.querySelectorAll('[data-getapp]'),function(a){
+      var k=a.getAttribute('data-getapp');
+      if((k==='windows'&&inDesk)||inAndroid) a.hidden=true;
+    });
+    var row=document.getElementById('rowGetApp');
+    if(row&&!row.querySelector('[data-getapp]:not([hidden])')) row.hidden=true;
+  })();
 
   var menu=document.getElementById('menu'), burger=document.getElementById('burger'),
       menuClose=document.getElementById('menuClose');
@@ -3001,12 +3057,89 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     });
   }
 
+  /* ---- Windows app: play through the built-in Andam Player (mpv) ----------
+     mpv decodes every sound format (AC3, E-AC3, DTS) and every stream type
+     directly, so on Windows the page becomes the guide and the player window
+     plays. "Play here instead" switches back to the in-page player. */
+  var deskBypass=false, deskKind=null, deskHooked=false;
+  function deskApi(){
+    try{ var w=window, d=w.andamDesktop||(w.parent&&w.parent.andamDesktop)||(w.top&&w.top.andamDesktop); return d&&d.player?d:null }catch(_){ return null }
+  }
+  function deskOn(){ if(!deskApi()) return false; try{ return localStorage.getItem('andam.deskPlayer')!=='0' }catch(_){ return true } }
+  function deskPref(on){ try{ localStorage.setItem('andam.deskPlayer',on?'1':'0') }catch(_){} }
+  function deskReplayHere(s){
+    deskBypass=true;
+    try{ if(s.last) lvPlay(s.kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,s.last.alt) }finally{ deskBypass=false }
+  }
+  function deskCard(s,on){
+    var c=s.stage.querySelector('.deskcard');
+    if(!on){ if(c) c.remove(); return }
+    if(!c){
+      c=document.createElement('div'); c.className='deskcard'; s.stage.appendChild(c);
+      c.addEventListener('click',function(e){
+        e.stopPropagation();
+        var b=e.target.closest('[data-desk]'); if(!b) return;
+        var a=b.getAttribute('data-desk'), d=deskApi();
+        if(a==='front'&&d) d.focus();
+        if(a==='here'){ deskPref(false); if(d) d.stop(); deskCard(s,false); deskReplayHere(s) }
+      });
+    }
+    c.innerHTML='<div class="deskicon">▶</div><b>Playing in Andam Player</b><span>'+esc((s.last&&s.last.title)||'')+'</span>'+
+      '<div class="deskbtns"><button type="button" data-desk="front">Show player</button><button type="button" class="ghost" data-desk="here">Play here instead</button></div>'+
+      '<small>Pick another channel here and the player switches at once. In the player: ▲ ▼ change channel, F full screen, A audio track, S subtitles.</small>';
+  }
+  function deskPill(s){
+    var p=s.stage.querySelector('.deskpill');
+    if(!deskApi()||deskOn()){ if(p) p.remove(); return }
+    if(p) return;
+    p=document.createElement('button'); p.type='button'; p.className='deskpill'; p.textContent='▶ Open in Andam Player';
+    p.addEventListener('click',function(e){
+      e.stopPropagation(); deskPref(true); p.remove();
+      if(s.last) deskPlay(s.kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,s.last.alt);
+    });
+    s.stage.appendChild(p);
+  }
+  function deskListen(){
+    var d=deskApi(); if(!d||deskHooked||typeof d.onEvent!=='function') return;
+    deskHooked=true;
+    d.onEvent(function(ev){
+      var s=deskKind&&SURF[deskKind]; if(!s||!ev) return;
+      var live=!!(s.last&&/live/i.test(s.last.sub||''));
+      if(ev.type==='closed'){ deskCard(s,false); if(!s.video.currentSrc) s.idle.classList.remove('hide') }
+      else if(ev.type==='prev'||ev.type==='next'){
+        if(live) stepChannel(s,ev.type==='next'?1:-1);
+        else if(d.command) d.command(['seek',ev.type==='next'?-60:60]);
+      }
+      else if(ev.type==='error'&&s.last&&s.last.alt){
+        var a=s.last.alt; deskPlay(s.kind,a,s.last.title,s.last.sub,true,null);
+      }
+    });
+  }
+  function deskPlay(kind,token,title,sub,isHls,alt){
+    var d=deskApi(); if(!d) return false;
+    var s=surf(kind);
+    lvStop(kind);
+    s.idle.classList.add('hide'); setNow(s,title,sub,nowLogoOf(kind)); clearFail(s); busy(s,false);
+    s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:false};
+    var pill=s.stage.querySelector('.deskpill'); if(pill) pill.remove();
+    deskKind=kind; deskCard(s,true); deskListen();
+    var url=new URL('/api/public/xtream-play?t='+encodeURIComponent(token),location.href).href;
+    var back=function(){ deskCard(s,false); deskReplayHere(s) };
+    Promise.resolve(d.play({url:url,title:title||'Andam',live:/live/i.test(sub||'')}))
+      .then(function(r){ if(!r||!r.ok) back() }, back);
+    return true;
+  }
+
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
+    if(!tc&&!deskBypass&&deskApi()){
+      if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
+    }
     var s=surf(kind),
         src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':'');
     var repeated=!!(s.last&&s.last.token===token);
     s.repairCount=repeated?(s.repairCount||0)+1:0;
     lvStop(kind);
+    deskCard(s,false); deskPill(s);
     var mine=++s.session, alive=function(){ return mine===s.session };
     s.idle.classList.add('hide');
     setNow(s,title,sub,nowLogoOf(kind));

@@ -1,8 +1,10 @@
 // Andam for Windows — a dedicated desktop window for ip.andam.uk.
 // Auto-updates from the "windows-latest" GitHub release built by .github/workflows/windows.yml.
-const { app, BrowserWindow, shell, dialog, Menu, session } = require('electron');
+const { app, BrowserWindow, shell, dialog, Menu, session, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const net = require('net');
+const { spawn } = require('child_process');
 
 const HOME = 'https://ip.andam.uk/';
 // Pages that may open inside the app (the site itself and its sign-in steps).
@@ -76,6 +78,7 @@ function createWindow() {
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--andam-player=${hasPlayer() ? 1 : 0}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -169,6 +172,134 @@ function setupUpdates() {
   check();
   setInterval(check, 6 * 60 * 60 * 1000);
 }
+
+// ---------------------------------------------------------------------------
+// Andam Player: a bundled mpv (resources/mpv/AndamPlayer.exe) that plays every
+// stream and sound format (AC3, E-AC3, DTS...) natively. The website asks for it
+// through window.andamDesktop.play(); we drive mpv over its JSON IPC pipe so the
+// same player window switches channels instantly.
+// ---------------------------------------------------------------------------
+const MPV_DIR = app.isPackaged ? path.join(process.resourcesPath, 'mpv') : path.join(__dirname, 'mpv');
+const MPV_EXE = path.join(MPV_DIR, 'AndamPlayer.exe');
+const PIPE = `\\\\.\\pipe\\andam-player-${process.pid}`;
+let mpv = null;
+let sock = null;
+let sockBuf = '';
+let pending = [];
+
+function hasPlayer() {
+  return process.platform === 'win32' && fs.existsSync(MPV_EXE);
+}
+function notify(ev) {
+  if (win && !win.isDestroyed()) win.webContents.send('player:event', ev);
+}
+function send(command) {
+  const line = JSON.stringify({ command }) + '\n';
+  if (sock && !sock.destroyed) sock.write(line);
+  else pending.push(line);
+}
+function onLine(line) {
+  let m;
+  try {
+    m = JSON.parse(line);
+  } catch {
+    return;
+  }
+  if (m.event === 'client-message' && Array.isArray(m.args)) {
+    if (m.args[0] === 'andam-prev') notify({ type: 'prev' });
+    if (m.args[0] === 'andam-next') notify({ type: 'next' });
+  }
+  if (m.event === 'end-file' && m.reason === 'error') notify({ type: 'error', message: m.file_error || '' });
+}
+function connect(tries = 0) {
+  const c = net.connect(PIPE);
+  c.on('connect', () => {
+    sock = c;
+    pending.splice(0).forEach((l) => c.write(l));
+  });
+  c.on('data', (d) => {
+    sockBuf += d.toString();
+    let i;
+    while ((i = sockBuf.indexOf('\n')) >= 0) {
+      const line = sockBuf.slice(0, i);
+      sockBuf = sockBuf.slice(i + 1);
+      onLine(line);
+    }
+  });
+  c.on('error', () => {
+    if (!sock && mpv && tries < 60) setTimeout(() => connect(tries + 1), 100);
+  });
+  c.on('close', () => {
+    if (sock === c) sock = null;
+  });
+}
+function startPlayer(url, title) {
+  sockBuf = '';
+  pending = [];
+  mpv = spawn(MPV_EXE, [`--input-ipc-server=${PIPE}`, `--force-media-title=${title}`, '--', url], {
+    cwd: MPV_DIR,
+    stdio: 'ignore',
+    windowsHide: false,
+  });
+  mpv.on('exit', () => {
+    mpv = null;
+    sock = null;
+    pending = [];
+    notify({ type: 'closed' });
+  });
+  mpv.on('error', () => {
+    mpv = null;
+    notify({ type: 'closed' });
+  });
+  setTimeout(() => connect(), 150);
+}
+
+ipcMain.handle('player:play', (_e, o) => {
+  if (!hasPlayer()) return { ok: false };
+  const url = String((o && o.url) || '');
+  // Only streams from the Andam API may be opened.
+  if (!/^https:\/\/ip\.andam\.uk\/api\/public\//.test(url)) return { ok: false };
+  const title = String((o && o.title) || 'Andam').replace(/[\r\n]/g, ' ').slice(0, 200);
+  try {
+    if (mpv) {
+      send(['set_property', 'force-media-title', title]);
+      send(['loadfile', url, 'replace']);
+      send(['set_property', 'pause', false]);
+    } else {
+      startPlayer(url, title);
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+});
+ipcMain.handle('player:stop', () => {
+  if (!mpv) return;
+  send(['quit']);
+  const p = mpv;
+  setTimeout(() => {
+    try {
+      if (p && p.exitCode === null) p.kill();
+    } catch {
+      /* already gone */
+    }
+  }, 800);
+});
+ipcMain.handle('player:focus', () => {
+  if (!mpv) return;
+  send(['set_property', 'ontop', true]);
+  setTimeout(() => send(['set_property', 'ontop', false]), 400);
+});
+ipcMain.handle('player:command', (_e, args) => {
+  if (mpv && Array.isArray(args) && args[0] === 'seek') send(['seek', Number(args[1]) || 0]);
+});
+app.on('before-quit', () => {
+  try {
+    if (mpv) mpv.kill();
+  } catch {
+    /* ignore */
+  }
+});
 
 app.on('second-instance', () => {
   if (!win) return;

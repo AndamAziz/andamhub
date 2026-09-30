@@ -37,6 +37,14 @@ jobs:
         shell: bash
         run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version --allow-same-version
 
+      - name: Bundle Andam Player (mpv)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/get-player.js
+          ls -la mpv || true
+
       - name: Build installer (Andam-Setup.exe)
         shell: bash
         env:

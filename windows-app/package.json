@@ -9,23 +9,40 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis --x64 --publish never"
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "player": "node scripts/get-player.js"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "rcedit": "^4.0.1"
   },
   "build": {
     "appId": "uk.andam.desktop",
     "productName": "Andam",
     "copyright": "Andam",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "preload.js", "offline.html", "build/icon.png"],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "offline.html",
+      "build/icon.png"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico",
       "artifactName": "Andam-Setup.${ext}"
     },
@@ -43,6 +60,15 @@
       {
         "provider": "generic",
         "url": "https://github.com/AndamAziz/andamhub/releases/download/windows-latest"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "mpv",
+        "to": "mpv",
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   }

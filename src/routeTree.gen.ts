@@ -26,6 +26,7 @@ import { Route as AuthenticatedAdminSubmissionsRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as ApiPublicAccessRouteImport } from './routes/api/public/access'
 import { Route as ApiPublicIptvRouteImport } from './routes/api/public/iptv'
+import { Route as ApiPublicDownloadRouteImport } from './routes/api/public/download'
 import { Route as ApiPublicTmdbDiscoverRouteImport } from './routes/api/public/tmdb-discover'
 import { Route as ApiPublicWatchProgressRouteImport } from './routes/api/public/watch-progress'
 import { Route as ApiPublicXtreamRouteImport } from './routes/api/public/xtream'
@@ -120,6 +121,11 @@ const ApiPublicIptvRoute = ApiPublicIptvRouteImport.update({
   path: '/api/public/iptv',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDownloadRoute = ApiPublicDownloadRouteImport.update({
+  id: '/api/public/download',
+  path: '/api/public/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTmdbDiscoverRoute = ApiPublicTmdbDiscoverRouteImport.update({
   id: '/api/public/tmdb-discover',
   path: '/api/public/tmdb-discover',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/public/access'
     | '/api/public/iptv'
+    | '/api/public/download'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/public/access'
     | '/api/public/iptv'
+    | '/api/public/download'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/api/public/access'
     | '/api/public/iptv'
+    | '/api/public/download'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -285,6 +297,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicAccessRoute: typeof ApiPublicAccessRoute
   ApiPublicIptvRoute: typeof ApiPublicIptvRoute
+  ApiPublicDownloadRoute: typeof ApiPublicDownloadRoute
   ApiPublicTmdbDiscoverRoute: typeof ApiPublicTmdbDiscoverRoute
   ApiPublicWatchProgressRoute: typeof ApiPublicWatchProgressRoute
   ApiPublicXtreamRoute: typeof ApiPublicXtreamRoute
@@ -412,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIptvRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/download': {
+      id: '/api/public/download'
+      path: '/api/public/download'
+      fullPath: '/api/public/download'
+      preLoaderRoute: typeof ApiPublicDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/tmdb-discover': {
       id: '/api/public/tmdb-discover'
       path: '/api/public/tmdb-discover'
@@ -492,6 +512,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicAccessRoute: ApiPublicAccessRoute,
   ApiPublicIptvRoute: ApiPublicIptvRoute,
+  ApiPublicDownloadRoute: ApiPublicDownloadRoute,
   ApiPublicTmdbDiscoverRoute: ApiPublicTmdbDiscoverRoute,
   ApiPublicWatchProgressRoute: ApiPublicWatchProgressRoute,
   ApiPublicXtreamRoute: ApiPublicXtreamRoute,

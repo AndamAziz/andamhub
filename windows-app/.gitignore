@@ -1,2 +1,5 @@
 node_modules/
 dist/
+mpv/*.exe
+mpv/*.dll
+mpv/*.com
