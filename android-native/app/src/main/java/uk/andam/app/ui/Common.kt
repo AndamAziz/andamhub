@@ -356,15 +356,16 @@ fun SectionTitle(text: String, action: String? = null, onAction: (() -> Unit)? =
 
 @Composable
 fun BrandMark(size: Int = 32) {
-    Box(
-        Modifier
+    // Scorpion emblem (same artwork as the launcher icon and the website).
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(uk.andam.app.R.drawable.andam_emblem),
+        contentDescription = "Andam",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
             .size(size.dp)
             .clip(RoundedCornerShape((size * 0.28f).dp))
-            .background(Brush.linearGradient(listOf(Color(0xFFFF5A6A), C.Ember, Color(0xFFB81D31)))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("A", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = (size * 0.5f).sp)
-    }
+            .background(Brush.radialGradient(listOf(Color(0xFF400D16), C.Bg))),
+    )
 }
 
 @Composable
