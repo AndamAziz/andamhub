@@ -132,8 +132,9 @@ async function curatedChannels(sourceId: string) {
 /**
  * Providers whose streams the native apps may open straight from the viewer's device.
  * Used when a provider refuses the relay's IP (e.g. MYSTREEM after 2026-10-01): the apps
- * try the relay first and fall back to this link. Only returned to the Android / Windows
- * apps (`device=1`), never to the website, and only for these hosts.
+ * play this link from the viewer's own connection (the website opens it in the browser's own
+ * player in a new tab, since an https page cannot load http provider streams). Returned only
+ * when the caller asks (`device=1`) and only for these hosts.
  */
 const DEVICE_DIRECT_HOSTS = ['myrestreamer.com'];
 
@@ -397,7 +398,9 @@ export const Route = createFileRoute('/api/public/xtream')({
               return json({
                 play: await sealUrl(tagRelay(liveStreamUrl(source, id, 'ts'), source)),
                 fallback: await sealUrl(tagRelay(liveStreamUrl(source, id, 'm3u8'), source)),
-                ...(device ? { direct: liveStreamUrl(source, id, 'ts') } : {}),
+                ...(device
+                  ? { direct: liveStreamUrl(source, id, 'ts'), directHls: liveStreamUrl(source, id, 'm3u8') }
+                  : {}),
               });
             }
             if (kind === 'vod')

@@ -1225,6 +1225,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 .deskpill{position:absolute;top:12px;right:12px;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(10,11,15,.72);color:#F4F5F7;border-radius:999px;padding:7px 14px;font:600 12px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
 .deskpill:hover{border-color:#FF3B4E}
 .epirow.on{border-color:#FF3B4E !important;background:rgba(255,59,78,.12) !important}
+.deskcard a.webdirect{display:inline-block;border-radius:12px;padding:12px 26px;font:700 15px Inter,sans-serif;background:#FF3B4E;color:#fff;text-decoration:none;box-shadow:0 10px 30px rgba(255,59,78,.3)}
+.deskcard a.webdirect:hover{filter:brightness(1.08)}
 </style>
 
 </head>
@@ -3168,10 +3170,33 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     return true;
   }
 
+  /* Browser (not the Windows app): providers that refuse the relay play from the viewer's own
+     connection. An https page may not load their http stream, so it opens in the browser's own
+     player in a new tab — exactly like pasting the provider link into Chrome. */
+  function webDirectCard(kind,token,title,sub,link){
+    var s=surf(kind);
+    lvStop(kind);
+    s.idle.classList.add('hide'); setNow(s,title,sub,nowLogoOf(kind)); clearFail(s); busy(s,false);
+    s.last={token:token,title:title,sub:sub,isHls:false,alt:null,tc:false};
+    var c=s.stage.querySelector('.deskcard');
+    if(!c){ c=document.createElement('div'); c.className='deskcard'; s.stage.appendChild(c) }
+    c.innerHTML='<div class="deskicon">▶</div><b>'+esc(title||'Andam')+'</b>'+
+      '<span>This provider plays in your browser\'s own player</span>'+
+      '<div class="deskbtns"><a class="webdirect" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">▶ Watch now</a></div>'+
+      '<small>Opens in a new tab and starts straight away. Close the tab to come back here.</small>';
+    c.onclick=function(e){ e.stopPropagation() };
+    var a=c.querySelector('.webdirect'); if(a) try{ a.focus() }catch(_){}
+  }
+
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
+    if(!tc&&!deskBypass&&!deskApi()&&deskNextDirect&&deskNextDirect.link){
+      var wd=deskNextDirect; deskNextDirect=null;
+      webDirectCard(kind,token,title,sub,wd.hls||wd.link); return;
+    }
     if(!tc&&!deskBypass&&deskApi()){
       if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
     }
+    deskNextDirect=null; // playing in the page: never carry a provider link over to the next stream
     var s=surf(kind),
         src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':'');
     var repeated=!!(s.last&&s.last.token===token);
@@ -3489,9 +3514,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
     s.now.textContent=title||'Andam'; s.sub.textContent='Preparing…';
     var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
-    if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
+    q.device='1'; // providers that refuse the relay also send their own link (played from this device)
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){ deskNextDirect={link:d.direct||null,hls:d.directHls||null,src:ltv.prov}; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 
@@ -3768,7 +3793,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   function openSeries(id,title){
     ltvBody.innerHTML=skelRows(6); ltvSet('');
-    var sq={action:'series_info',source:ltv.prov,series_id:id}; if(deskApi()) sq.device='1';
+    var sq={action:'series_info',source:ltv.prov,series_id:id,device:'1'};
     api(sq)
       .then(function(d){
         ltv.series=d;
