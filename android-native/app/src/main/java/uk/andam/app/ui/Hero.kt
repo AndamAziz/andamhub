@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,21 +163,26 @@ object HeroPicker {
 fun HeroCarousel(slides: List<HeroSlide>, onOpen: (HeroSlide) -> Unit) {
     if (slides.isEmpty()) return
     val tv = LocalTv.current
-    val pager = rememberPagerState(pageCount = { slides.size })
-    // Advance every 6 s; a swipe restarts the timer.
-    LaunchedEffect(pager.currentPage, slides.size, pager.isScrollInProgress) {
-        if (pager.isScrollInProgress || slides.size < 2) return@LaunchedEffect
+    val n = slides.size
+    // A long virtual strip so the spotlight always moves forward (no rewind from last to first).
+    val loops = if (n > 1) 2000 else 1
+    val pager = rememberPagerState(initialPage = if (n > 1) (loops / 2) * n else 0, pageCount = { n * loops })
+    val dragged by pager.interactionSource.collectIsDraggedAsState()
+    // Advance every 6 s. Keyed on the settled page (not on "scrolling"), so the effect never
+    // cancels its own animation; a finger on the spotlight pauses it.
+    LaunchedEffect(pager.settledPage, n, dragged) {
+        if (n < 2 || dragged) return@LaunchedEffect
         delay(6000)
-        pager.animateScrollToPage((pager.currentPage + 1) % slides.size)
+        pager.animateScrollToPage(pager.settledPage + 1)
     }
     Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
         HorizontalPager(
             state = pager,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
             pageSpacing = 10.dp,
-            key = { slides[it].key },
         ) { page ->
-            HeroCard(slides[page], height = if (tv) 300 else 236) { onOpen(slides[page]) }
+            val slide = slides[page % n]
+            HeroCard(slide, height = if (tv) 300 else 236) { onOpen(slide) }
         }
         Row(
             Modifier.fillMaxWidth().padding(top = 10.dp),
@@ -184,7 +190,7 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (HeroSlide) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             slides.indices.forEach { i ->
-                val on = i == pager.currentPage
+                val on = i == pager.currentPage % n
                 val w by animateDpAsState(if (on) 20.dp else 6.dp, label = "dot")
                 val c by animateColorAsState(if (on) C.Ember else Color(0x40FFFFFF), label = "dotc")
                 Box(Modifier.padding(horizontal = 3.dp).size(width = w, height = 6.dp).clip(CircleShape).background(c))
