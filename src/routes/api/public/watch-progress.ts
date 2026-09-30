@@ -34,7 +34,11 @@ export const Route = createFileRoute('/api/public/watch-progress')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const userId = await callerId(request);
+        // A backend outage must never break the homepage: show no history instead.
+        const userId = await callerId(request).catch((err) => {
+          console.error('[watch-progress] caller lookup failed', err);
+          return null;
+        });
         if (!userId) return json({ items: [] });
         const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
         const { data, error } = await supabaseAdmin
