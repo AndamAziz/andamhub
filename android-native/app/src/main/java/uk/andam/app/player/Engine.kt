@@ -280,14 +280,15 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     return@launch
                 }
                 val relayRoutes = tokens.mapIndexed { i, t -> Attempt(Api.streamUrl(t), hls = i > 0, fix = false) }
-                val direct = providerDirect?.let { Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true) }
-                when {
-                    direct == null -> list.addAll(relayRoutes)
-                    // The relay was refused recently for this provider: go straight to the device route.
-                    DirectRoute.preferred(next.source) -> { list.add(direct); list.addAll(relayRoutes) }
-                    // Otherwise the relay first (keeps the provider hidden), the device route right after.
-                    else -> { relayRoutes.firstOrNull()?.let { list.add(it) }; list.add(direct); list.addAll(relayRoutes.drop(1)) }
+                // Ask the provider like a normal player app would (some panels refuse unknown agents).
+                val direct = providerDirect?.let {
+                    Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true,
+                        headers = mapOf("User-Agent" to "VLC/3.0.20 LibVLC/3.0.20"))
                 }
+                // Providers that refuse the relay (the server only sends `direct` for those) play
+                // straight from this device at once — no waiting on the relay first.
+                if (direct != null) list.add(direct)
+                list.addAll(relayRoutes)
                 if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
                 attempts = list
                 start(0)
@@ -431,7 +432,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             }
 
             else -> {
-                val limit = if (live) 5 else 3
+                // A device route that fails twice hands over to the relay route instead of waiting.
+                val limit = if (current.direct) 1 else if (live) 5 else 3
                 if (retries < limit) {
                     retries++
                     val wait = (1000L shl (retries - 1)).coerceAtMost(8000)
