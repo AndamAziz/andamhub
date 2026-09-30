@@ -15,13 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -57,6 +60,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import uk.andam.app.BuildConfig
 import uk.andam.app.Config
@@ -304,10 +308,53 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
         }
         UpdateCard()
         DiagnosticsCard()
-        OutlinedButton(
-            onClick = { runCatching { CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(Config.BASE_URL)) } },
-            shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
-        ) { Text("Open andam.uk", color = C.Muted) }
+        ContactCard()
         Text("Andam ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = C.Faint, modifier = Modifier.padding(top = 8.dp).width(300.dp))
+    }
+}
+
+/** Contact details (replaces the old "Open andam.uk" button). */
+@Composable
+private fun ContactCard() {
+    val context = LocalContext.current
+    fun open(intent: android.content.Intent) {
+        runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+    Column(
+        Modifier.fillMaxWidth().background(C.Surface, RoundedCornerShape(18.dp)).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Contact", color = C.Faint, style = MaterialTheme.typography.labelMedium)
+        ContactRow(
+            icon = Icons.AutoMirrored.Filled.Send, tint = androidx.compose.ui.graphics.Color(0xFF2AABEE),
+            label = "Telegram", value = "@AndamAziz",
+        ) { open(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://t.me/AndamAziz"))) }
+        ContactRow(
+            icon = Icons.Filled.Email, tint = C.Ember,
+            label = "Email", value = "info@andam.uk",
+        ) { open(android.content.Intent(android.content.Intent.ACTION_SENDTO, Uri.parse("mailto:info@andam.uk"))) }
+    }
+}
+
+@Composable
+private fun ContactRow(icon: ImageVector, tint: androidx.compose.ui.graphics.Color, label: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .tvFocus(RoundedCornerShape(14.dp), 1.02f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(C.Surface2)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp)) }
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(label, color = C.Muted, fontSize = 12.sp)
+            Text(value, color = C.Text, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        }
     }
 }
