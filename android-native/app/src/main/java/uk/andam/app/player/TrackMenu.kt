@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import java.util.Locale
 
 /** Audio / subtitle / quality choices read from ExoPlayer's current tracks. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object TrackMenu {
     data class Option(val label: String, val selected: Boolean, val group: TrackGroup, val index: Int, val type: Int)
 
@@ -30,10 +31,50 @@ object TrackMenu {
             Locale(it).getDisplayLanguage(Locale.ENGLISH).ifBlank { it }
         }
         return when (type) {
-            C.TRACK_TYPE_VIDEO -> if (f.height > 0) "${f.height}p" else "Track $n"
+            C.TRACK_TYPE_VIDEO -> listOfNotNull(if (f.height > 0) "${f.height}p" else "Track $n", mbps(f.bitrate)).joinToString(" · ")
             C.TRACK_TYPE_AUDIO -> listOfNotNull(f.label ?: lang ?: "Track $n", channels(f.channelCount)).joinToString(" · ")
             else -> f.label ?: lang ?: "Subtitle $n"
         }
+    }
+
+    fun mbps(b: Int): String? = if (b > 0) "%.1f Mbps".format(Locale.US, b / 1_000_000f) else null
+
+    fun codec(mime: String?): String? = when (mime) {
+        null -> null
+        "video/avc" -> "H.264"
+        "video/hevc" -> "HEVC (H.265)"
+        "video/mpeg2" -> "MPEG-2"
+        "video/av01" -> "AV1"
+        "video/x-vnd.on2.vp9" -> "VP9"
+        "audio/mp4a-latm" -> "AAC"
+        "audio/ac3" -> "Dolby AC-3"
+        "audio/eac3", "audio/eac3-joc" -> "Dolby E-AC-3"
+        "audio/mpeg", "audio/mpeg-L2" -> "MPEG audio"
+        "audio/vnd.dts", "audio/vnd.dts.hd" -> "DTS"
+        "audio/opus" -> "Opus"
+        else -> mime.substringAfter('/').uppercase()
+    }
+
+    /** One-line description of what is playing right now, e.g. "1920×1080 · H.264 · 25 fps". */
+    fun currentHeight(player: ExoPlayer): Int = player.videoFormat?.height ?: 0
+
+    fun videoInfo(player: ExoPlayer): String? {
+        val f = player.videoFormat ?: return null
+        return listOfNotNull(
+            if (f.width > 0 && f.height > 0) "${f.width}×${f.height}" else null,
+            codec(f.sampleMimeType),
+            if (f.frameRate > 0) "${f.frameRate.toInt()} fps" else null,
+            mbps(f.bitrate),
+        ).joinToString(" · ").ifBlank { null }
+    }
+
+    fun audioInfo(player: ExoPlayer): String? {
+        val f = player.audioFormat ?: return null
+        return listOfNotNull(
+            codec(f.sampleMimeType),
+            channels(f.channelCount),
+            if (f.sampleRate > 0) "${f.sampleRate / 1000} kHz" else null,
+        ).joinToString(" · ").ifBlank { null }
     }
 
     private fun channels(c: Int): String? = when {

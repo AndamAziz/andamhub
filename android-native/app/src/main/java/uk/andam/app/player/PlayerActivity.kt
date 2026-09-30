@@ -41,7 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -358,11 +358,6 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
             if (PlayQueue.items.size > 1 && engine.live) {
                 RoundIcon(Icons.AutoMirrored.Filled.FormatListBulleted, "Channels") { ui.panel = true }
             }
-            RoundIcon(Icons.Filled.AspectRatio, "Aspect ratio") {
-                val i = resizeModes.indexOfFirst { it.first == ui.resize }
-                ui.resize = resizeModes[(i + 1) % resizeModes.size].first
-                ui.poke()
-            }
             RoundIcon(Icons.Filled.Tune, "Settings") { ui.settings = true }
         }
 
@@ -452,7 +447,7 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                     enter = expandHorizontally() + fadeIn(),
                     exit = shrinkHorizontally() + fadeOut(),
                 ) {
-                    Column(Modifier.width(250.dp).fillMaxHeight()) {
+                    Column(Modifier.width(230.dp).fillMaxHeight()) {
                         GuideHeader("CATEGORIES", Alignment.Start)
                         LazyColumn(Modifier.fillMaxHeight()) {
                             itemsIndexed(groups) { _, g ->
@@ -460,18 +455,18 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                                 Text(
                                     g.second,
                                     color = Color.White.copy(alpha = if (on) 1f else 0.88f),
-                                    fontSize = 18.sp,
-                                    fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
-                                    lineHeight = 23.sp,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                                    lineHeight = 20.sp,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 3.dp)
-                                        .clip(RoundedCornerShape(20.dp))
+                                        .padding(vertical = 2.dp)
+                                        .clip(RoundedCornerShape(14.dp))
                                         .background(if (on) Color(0x3DFFFFFF) else Color.Transparent)
                                         .clickable { ui.panelGroup = g.first }
-                                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
                                 )
                             }
                         }
@@ -480,9 +475,9 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                 Box(
                     Modifier
                         .padding(horizontal = 14.dp)
-                        .size(50.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color(0x40FFFFFF))
+                        .background(Color(0x33FFFFFF))
                         .clickable { showCats = !showCats },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -490,11 +485,11 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                         if (showCats) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = if (showCats) "Hide categories" else "Show categories",
                         tint = Color.White,
-                        modifier = Modifier.size(30.dp),
+                        modifier = Modifier.size(26.dp),
                     )
                 }
             }
-            Column(Modifier.width(430.dp).fillMaxHeight()) {
+            Column(Modifier.width(400.dp).fillMaxHeight()) {
                 GuideHeader("TV CHANNELS", Alignment.CenterHorizontally)
                 LazyColumn(state = listState, modifier = Modifier.fillMaxHeight()) {
                     itemsIndexed(shown) { _, idx ->
@@ -503,33 +498,43 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 3.dp)
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(if (on) Color(0x47FFFFFF) else Color.Transparent)
+                                .padding(vertical = 2.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (on) Color(0x3DFFFFFF) else Color.Transparent)
                                 .clickable { onPick(idx) }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Text(
+                                "${idx + 1}", color = Color(0x99FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                                modifier = Modifier.width(34.dp),
+                            )
+                            // Small, neat logo tile: the whole logo fits inside, never cropped.
                             Box(
-                                Modifier.size(60.dp).clip(RoundedCornerShape(6.dp)).background(Color(0x33FFFFFF)),
+                                Modifier
+                                    .size(width = 52.dp, height = 36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0x1FFFFFFF))
+                                    .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text(ch.title.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                                 if (ch.logo.isNotBlank()) {
                                     AsyncImage(
                                         model = ch.logo, contentDescription = null,
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 4.dp),
                                     )
+                                } else {
+                                    Text(ch.title.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
                             }
                             Text(
-                                ch.title, color = Color.White, fontSize = 19.sp,
-                                fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                                ch.title, color = Color.White.copy(alpha = if (on) 1f else 0.9f), fontSize = 15.sp,
+                                fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 16.dp).weight(1f),
+                                modifier = Modifier.padding(horizontal = 14.dp).weight(1f),
                             )
-                            Text("${idx + 1}", color = Color(0xD9FFFFFF), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                            if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(C.Ember))
                         }
                     }
                 }
@@ -544,8 +549,8 @@ private fun GuideHeader(text: String, align: Alignment.Horizontal) {
         Text(
             text,
             color = Color(0xE6FFFFFF),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
             letterSpacing = 3.sp,
             modifier = Modifier.padding(top = 14.dp, bottom = 12.dp, start = 18.dp),
         )
@@ -554,12 +559,28 @@ private fun GuideHeader(text: String, align: Alignment.Horizontal) {
 
 @Composable
 private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
+    val VIDEO = androidx.media3.common.C.TRACK_TYPE_VIDEO
+    val AUDIO = androidx.media3.common.C.TRACK_TYPE_AUDIO
+    val TEXT = androidx.media3.common.C.TRACK_TYPE_TEXT
     // Re-read tracks whenever ExoPlayer reports a change.
     val version = engine.tracksVersion
-    val audio = remember(version) { TrackMenu.options(engine.player, androidx.media3.common.C.TRACK_TYPE_AUDIO) }
-    val text = remember(version) { TrackMenu.options(engine.player, androidx.media3.common.C.TRACK_TYPE_TEXT) }
-    val video = remember(version) { TrackMenu.options(engine.player, androidx.media3.common.C.TRACK_TYPE_VIDEO) }
+    val audio = remember(version) { TrackMenu.options(engine.player, AUDIO) }
+    val text = remember(version) { TrackMenu.options(engine.player, TEXT) }
+    val video = remember(version) { TrackMenu.options(engine.player, VIDEO) }
     var speed by remember { mutableFloatStateOf(engine.player.playbackParameters.speed) }
+    var manualQuality by remember(version) { mutableStateOf(TrackMenu.hasOverride(engine.player, VIDEO)) }
+    var subsOff by remember(version) { mutableStateOf(text.none { it.selected }) }
+    // Live stream info (resolution, codec, bitrate) refreshed every 2 s while the panel is open.
+    var vInfo by remember { mutableStateOf(TrackMenu.videoInfo(engine.player)) }
+    var aInfo by remember { mutableStateOf(TrackMenu.audioInfo(engine.player)) }
+    LaunchedEffect(version) {
+        while (true) {
+            vInfo = TrackMenu.videoInfo(engine.player)
+            aInfo = TrackMenu.audioInfo(engine.player)
+            delay(2000)
+        }
+    }
+    val nowHeight = remember(version, vInfo) { TrackMenu.currentHeight(engine.player) }
 
     LazyColumn(
         Modifier
@@ -569,27 +590,73 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
             .safeDrawingPadding()
             .padding(16.dp),
     ) {
-        item { Text("Player settings", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp)) }
-        if (audio.size > 1) {
+        item { Text("Player settings", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 4.dp)) }
+
+        // Quality: always shown. Auto adapts to the connection; a fixed choice locks that resolution.
+        item { Section("Video quality") }
+        item {
+            val autoLabel = if (nowHeight > 0) "Auto (${nowHeight}p)" else "Auto"
+            Option(autoLabel, !manualQuality, hint = if (video.size > 1) "Best for your connection" else null) {
+                TrackMenu.auto(engine.player, VIDEO); manualQuality = false
+            }
+        }
+        if (video.size > 1) {
+            itemsIndexed(video) { _, o ->
+                Option(o.label, manualQuality && o.selected) { TrackMenu.select(engine.player, o); manualQuality = true }
+            }
+        } else {
+            item {
+                Text(
+                    if (video.size == 1) "This channel sends a single quality (${video[0].label})." else "Quality options appear when the stream offers them.",
+                    color = C.Faint, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                )
+            }
+        }
+
+        if (audio.isNotEmpty()) {
             item { Section("Audio") }
             itemsIndexed(audio) { _, o -> Option(o.label, o.selected) { TrackMenu.select(engine.player, o) } }
         }
-        item { Section("Subtitles") }
-        item { Option("Off", text.none { it.selected }) { TrackMenu.disable(engine.player, androidx.media3.common.C.TRACK_TYPE_TEXT) } }
-        itemsIndexed(text) { _, o -> Option(o.label, o.selected) { TrackMenu.select(engine.player, o) } }
-        if (video.size > 1) {
-            item { Section("Quality") }
-            item { Option("Auto", !TrackMenu.hasOverride(engine.player, androidx.media3.common.C.TRACK_TYPE_VIDEO)) { TrackMenu.auto(engine.player, androidx.media3.common.C.TRACK_TYPE_VIDEO) } }
-            itemsIndexed(video) { _, o -> Option(o.label, false) { TrackMenu.select(engine.player, o) } }
+
+        if (text.isNotEmpty()) {
+            item { Section("Subtitles") }
+            item { Option("Off", subsOff) { TrackMenu.disable(engine.player, TEXT); subsOff = true } }
+            itemsIndexed(text) { _, o -> Option(o.label, !subsOff && o.selected) { TrackMenu.select(engine.player, o); subsOff = false } }
         }
+
         item { Section("Picture") }
         itemsIndexed(resizeModes) { _, m -> Option(m.second, ui.resize == m.first) { ui.resize = m.first } }
+
         if (!engine.live) {
             item { Section("Speed") }
-            itemsIndexed(listOf(0.75f, 1f, 1.25f, 1.5f)) { _, s ->
-                Option("${s}×", speed == s) { engine.player.setPlaybackSpeed(s); speed = s }
+            itemsIndexed(listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)) { _, s ->
+                Option(if (s == 1f) "Normal" else "${s}×", speed == s) { engine.player.setPlaybackSpeed(s); speed = s }
             }
         }
+
+        item { Section("Stream info") }
+        item {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(C.Surface2)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            ) {
+                InfoLine("Video", vInfo ?: "—")
+                InfoLine("Audio", aInfo ?: "—")
+                InfoLine("Type", if (engine.live) "Live" else "On demand")
+            }
+        }
+        item { Spacer(Modifier.height(12.dp)) }
+    }
+}
+
+@Composable
+private fun InfoLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(label, color = C.Faint, fontSize = 12.sp, modifier = Modifier.width(56.dp))
+        Text(value, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -599,20 +666,28 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun Option(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        label,
-        color = if (selected) Color.White else C.Text,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-        fontSize = 14.sp,
-        modifier = Modifier
+private fun Option(label: String, selected: Boolean, hint: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) C.EmberDim else C.Surface2)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-    )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                color = if (selected) Color.White else C.Text,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 14.sp,
+            )
+            if (hint != null) Text(hint, color = C.Faint, fontSize = 11.sp)
+        }
+        if (selected) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
+    }
 }
 
 @Composable

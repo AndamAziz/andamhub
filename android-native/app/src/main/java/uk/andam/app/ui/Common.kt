@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -16,9 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -44,7 +41,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -129,35 +125,38 @@ fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * Category bar: a scrollable chip row plus a button that opens the full list.
+ * Category selector: one clean full-width button showing the current category.
+ * Tapping it opens a searchable sheet with every category (single style, no duplicate chip row).
  * Selection is applied instantly by the caller (filtering happens on the device).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryBar(categories: List<Category>, selected: String, onSelect: (String) -> Unit, allLabel: String = "All") {
     var sheet by remember { mutableStateOf(false) }
-    val rowState = rememberLazyListState()
     val all = remember(categories) { listOf(Category("", allLabel)) + categories }
-    LaunchedEffect(selected, all) {
-        val i = all.indexOfFirst { it.id == selected }
-        if (i > 0) rowState.animateScrollToItem(i)
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        LazyRow(
-            state = rowState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            itemsIndexed(all, key = { i, c -> "$i:${c.id}" }) { _, c ->
-                Chip(c.name, c.id == selected) { onSelect(c.id) }
-            }
+    val current = all.firstOrNull { it.id == selected } ?: all.first()
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 6.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(C.Surface)
+            .border(1.dp, C.Hair, RoundedCornerShape(14.dp))
+            .clickable { sheet = true }
+            .padding(start = 14.dp, end = 10.dp, top = 11.dp, bottom = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Tune, null, tint = C.Ember, modifier = Modifier.size(20.dp))
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text("CATEGORY", color = C.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+            Text(
+                if (current.id.isEmpty()) "$allLabel categories" else current.name,
+                color = C.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
-        if (categories.size > 4) {
-            IconButton(onClick = { sheet = true }, modifier = Modifier.padding(end = 8.dp)) {
-                Icon(Icons.Filled.Tune, "All categories", tint = C.Text)
-            }
-        }
+        Text("${categories.size}", color = C.Faint, fontSize = 12.sp, modifier = Modifier.padding(end = 4.dp))
+        Icon(Icons.Filled.ExpandMore, "Choose category", tint = C.Muted)
     }
     if (sheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -166,7 +165,7 @@ fun CategoryBar(categories: List<Category>, selected: String, onSelect: (String)
         ModalBottomSheet(onDismissRequest = { sheet = false }, sheetState = state, containerColor = C.Surface) {
             Column(Modifier.padding(horizontal = 16.dp)) {
                 Text("Categories", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 10.dp))
-                if (all.size > 12) SearchField(q, { q = it }, "Search categories", Modifier.padding(bottom = 8.dp))
+                if (all.size > 8) SearchField(q, { q = it }, "Search categories", Modifier.padding(bottom = 8.dp))
                 val shown = all.filter { q.isBlank() || it.name.contains(q, ignoreCase = true) }
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().height(460.dp)) {
                     itemsIndexed(shown, key = { i, c -> "$i:${c.id}" }) { _, c ->
