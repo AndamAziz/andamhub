@@ -156,10 +156,10 @@ object Api {
 
     suspend fun seriesInfo(source: String, id: String): SeriesInfo {
         // Episode play tokens are minted per request, so this one is not memoised for long.
-        val j = get(X, mapOf("action" to "series_info", "source" to source, "series_id" to id))
+        val j = get(X, mapOf("action" to "series_info", "source" to source, "series_id" to id, "device" to "1"))
         val seasons = j.optJSONArray("seasons").mapObjects { s ->
             Season(s.optInt("season"), s.optJSONArray("episodes").mapObjects { e ->
-                Episode(e.str("id"), e.optInt("episode"), e.str("title"), e.str("image"), e.str("plot"), e.str("duration"), e.str("play"))
+                Episode(e.str("id"), e.optInt("episode"), e.str("title"), e.str("image"), e.str("plot"), e.str("duration"), e.str("play"), e.str("direct").ifBlank { null })
             })
         }
         return SeriesInfo(j.str("title"), j.str("cover"), j.str("plot"), j.str("genre"), j.str("rating"), seasons)
@@ -167,8 +167,8 @@ object Api {
 
     /** type = live | vod | series */
     suspend fun play(source: String, type: String, id: String, ext: String = ""): PlayTokens {
-        val j = get(X, mapOf("action" to "play", "source" to source, "type" to type, "id" to id, "ext" to ext))
-        return PlayTokens(j.str("play"), j.str("fallback").ifBlank { null })
+        val j = get(X, mapOf("action" to "play", "source" to source, "type" to type, "id" to id, "ext" to ext, "device" to "1"))
+        return PlayTokens(j.str("play"), j.str("fallback").ifBlank { null }, j.str("direct").ifBlank { null })
     }
 
     // ---------------- IPTV (M3U playlists) ----------------

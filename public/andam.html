@@ -3061,7 +3061,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
      mpv decodes every sound format (AC3, E-AC3, DTS) and every stream type
      directly, so on Windows the page becomes the guide and the player window
      plays. "Play here instead" switches back to the in-page player. */
-  var deskBypass=false, deskKind=null, deskHooked=false;
+  var deskBypass=false, deskKind=null, deskHooked=false, deskNextDirect=null, deskDirectPref={};
   function deskApi(){
     try{ var w=window, d=w.andamDesktop||(w.parent&&w.parent.andamDesktop)||(w.top&&w.top.andamDesktop); return d&&d.player?d:null }catch(_){ return null }
   }
@@ -3110,6 +3110,11 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         if(live) stepChannel(s,ev.type==='next'?1:-1);
         else if(d.command) d.command(['seek',ev.type==='next'?-60:60]);
       }
+      else if(ev.type==='error'&&s.last&&s.last.direct&&!s.last.directTried){
+        /* Relay refused: play the provider's own link from this PC (and remember it for 30 min). */
+        s.last.directTried=true; if(s.last.src) deskDirectPref[s.last.src]=Date.now();
+        d.play({url:s.last.direct,title:s.last.title||'Andam',live:live});
+      }
       else if(ev.type==='error'&&s.last&&s.last.alt){
         var a=s.last.alt; deskPlay(s.kind,a,s.last.title,s.last.sub,true,null);
       }
@@ -3120,10 +3125,13 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var s=surf(kind);
     lvStop(kind);
     s.idle.classList.add('hide'); setNow(s,title,sub,nowLogoOf(kind)); clearFail(s); busy(s,false);
-    s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:false};
+    var nd=deskNextDirect; deskNextDirect=null;
+    s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:false,direct:nd&&nd.link,src:nd&&nd.src,directTried:false};
     var pill=s.stage.querySelector('.deskpill'); if(pill) pill.remove();
     deskKind=kind; deskCard(s,true); deskListen();
     var url=new URL('/api/public/xtream-play?t='+encodeURIComponent(token),location.href).href;
+    /* This provider refused the relay recently: open its own link from this PC straight away. */
+    if(s.last.direct&&s.last.src&&Date.now()-(deskDirectPref[s.last.src]||0)<30*60000){ url=s.last.direct; s.last.directTried=true }
     var back=function(){ deskCard(s,false); deskReplayHere(s) };
     Promise.resolve(d.play({url:url,title:title||'Andam',live:/live/i.test(sub||'')}))
       .then(function(r){ if(!r||!r.ok) back() }, back);
@@ -3450,8 +3458,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var k=kind||activeKind(), s=surf(k);
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
     s.now.textContent=title||'Andam'; s.sub.textContent='Preparing…';
-    api({action:'play',source:ltv.prov,type:type,id:id,ext:ext||''})
-      .then(function(d){ lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+    var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
+    if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
+    api(q)
+      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 

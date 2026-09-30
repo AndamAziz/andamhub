@@ -19,6 +19,8 @@ data class PlayItem(
     val group: String = "",
     /** Pre-minted token (series episodes arrive with one). */
     val token: String? = null,
+    /** Provider link to try straight from the device (series episodes arrive with one). */
+    val direct: String? = null,
 ) {
     val isLive: Boolean get() = kind == Kind.LIVE || kind == Kind.IPTV
     val resumeKey: String get() = "${kind.name}:$source:$id"

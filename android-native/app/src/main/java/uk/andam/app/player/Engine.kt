@@ -157,6 +157,13 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
+                if (isPlaying) {
+                    val cur = attempts.getOrNull(attemptIndex)
+                    val src = item?.takeIf { it.kind != Kind.IPTV }?.source
+                    if (cur != null && src != null && attempts.any { it.direct }) {
+                        if (cur.direct) DirectRoute.relayRefused(src) else if (!cur.fix) DirectRoute.relayWorks(src)
+                    }
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -241,10 +248,17 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         resolveJob = scope.launch {
             try {
                 val list = ArrayList<Attempt>()
+                // Provider link to try from this device when the relay is refused (see DirectRoute).
+                var providerDirect: String? = null
                 val tokens: List<String> = when (next.kind) {
-                    Kind.LIVE -> Api.play(next.source, "live", next.id).let { listOfNotNull(it.play, it.fallback) }
-                    Kind.VOD -> listOf(Api.play(next.source, "vod", next.id, next.ext).play)
-                    Kind.EPISODE -> listOf(next.token ?: Api.play(next.source, "series", next.id, next.ext).play)
+                    Kind.LIVE -> Api.play(next.source, "live", next.id).let { providerDirect = it.direct; listOfNotNull(it.play, it.fallback) }
+                    Kind.VOD -> Api.play(next.source, "vod", next.id, next.ext).let { providerDirect = it.direct; listOf(it.play) }
+                    Kind.EPISODE -> if (next.token != null) {
+                        providerDirect = next.direct
+                        listOf(next.token)
+                    } else {
+                        Api.play(next.source, "series", next.id, next.ext).let { providerDirect = it.direct; listOf(it.play) }
+                    }
                     Kind.IPTV -> Api.iptvPlay(next.source, next.id).let { p ->
                         // Referer-protected channel: the phone asks for it directly with the
                         // playlist's headers first (like VLC); the relay routes stay as fallbacks.
@@ -255,11 +269,19 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     }
                 }.filter { it.isNotBlank() }
                 if (mine != session) return@launch
-                if (tokens.isEmpty() && list.isEmpty()) {
+                if (tokens.isEmpty() && list.isEmpty() && providerDirect == null) {
                     fail("This stream is not available right now.")
                     return@launch
                 }
-                tokens.forEachIndexed { i, t -> list.add(Attempt(Api.streamUrl(t), hls = i > 0, fix = false)) }
+                val relayRoutes = tokens.mapIndexed { i, t -> Attempt(Api.streamUrl(t), hls = i > 0, fix = false) }
+                val direct = providerDirect?.let { Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true) }
+                when {
+                    direct == null -> list.addAll(relayRoutes)
+                    // The relay was refused recently for this provider: go straight to the device route.
+                    DirectRoute.preferred(next.source) -> { list.add(direct); list.addAll(relayRoutes) }
+                    // Otherwise the relay first (keeps the provider hidden), the device route right after.
+                    else -> { relayRoutes.firstOrNull()?.let { list.add(it) }; list.add(direct); list.addAll(relayRoutes.drop(1)) }
+                }
                 if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
                 attempts = list
                 start(0)
@@ -398,7 +420,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
                 // A direct link refused us: move on to the relay route.
                 // From our own server: the token or channel is gone — re-mint once, then move on.
-                if (current.direct) nextAttempt() else if (remints++ < 1) retry() else nextAttempt()
+                // When a device route exists, a refused relay moves on at once (no re-mint round trip).
+                if (current.direct || attempts.any { it.direct }) nextAttempt() else if (remints++ < 1) retry() else nextAttempt()
             }
 
             else -> {
@@ -426,5 +449,33 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             MimeTypes.AUDIO_AC3, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC,
             MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_TRUEHD,
         )
+    }
+}
+
+
+/**
+ * Remembers providers whose relay route was refused (their stream played from the device instead),
+ * so the next channel starts on the device route straight away. Re-checked every 30 minutes, so
+ * once the provider unblocks the relay the apps go back to it by themselves.
+ */
+object DirectRoute {
+    private val refusedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private const val RECHECK_MS = 30 * 60_000L
+
+    fun preferred(source: String): Boolean {
+        val at = refusedAt[source] ?: return false
+        if (System.currentTimeMillis() - at > RECHECK_MS) {
+            refusedAt.remove(source)
+            return false
+        }
+        return true
+    }
+
+    fun relayRefused(source: String) {
+        refusedAt.putIfAbsent(source, System.currentTimeMillis())
+    }
+
+    fun relayWorks(source: String) {
+        refusedAt.remove(source)
     }
 }

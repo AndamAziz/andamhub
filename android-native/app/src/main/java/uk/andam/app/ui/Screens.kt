@@ -286,7 +286,7 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                                         PlayItem(
                                             Kind.EPISODE, source, e.id,
                                             title = "${series.name} · S${active.season} E${e.episode}",
-                                            subtitle = e.title, logo = series.poster, token = e.play,
+                                            subtitle = e.title, logo = series.poster, token = e.play, direct = e.direct,
                                         )
                                     }
                                     PlayQueue.open(context, queue, i)

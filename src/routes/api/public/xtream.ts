@@ -129,6 +129,23 @@ async function curatedChannels(sourceId: string) {
   }
 }
 
+/**
+ * Providers whose streams the native apps may open straight from the viewer's device.
+ * Used when a provider refuses the relay's IP (e.g. MYSTREEM after 2026-10-01): the apps
+ * try the relay first and fall back to this link. Only returned to the Android / Windows
+ * apps (`device=1`), never to the website, and only for these hosts.
+ */
+const DEVICE_DIRECT_HOSTS = ['myrestreamer.com'];
+
+function deviceDirectAllowed(source: Source): boolean {
+  try {
+    const host = new URL(source.base_url).hostname.toLowerCase();
+    return DEVICE_DIRECT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 const num = (v: unknown, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -348,6 +365,7 @@ export const Route = createFileRoute('/api/public/xtream')({
 
           if (action === 'play') {
             const kind = url.searchParams.get('type') ?? 'live';
+            const device = url.searchParams.get('device') === '1' && deviceDirectAllowed(source);
             const id = url.searchParams.get('id') ?? '';
             const ext = (url.searchParams.get('ext') || '').replace(/[^a-z0-9]/gi, '');
             // Curated channel keys are not numeric, so live ids allow the wider set.
@@ -364,7 +382,10 @@ export const Route = createFileRoute('/api/public/xtream')({
               })();
               if (channel) {
                 // Imported/curated channels carry their own absolute stream URL.
-                return json({ play: await sealUrl(tagRelay(channel.url, source)) });
+                return json({
+                  play: await sealUrl(tagRelay(channel.url, source)),
+                  ...(device && /^https?:\/\//i.test(channel.url) ? { direct: channel.url } : {}),
+                });
               }
               if (!/^\d+$/.test(id)) return json({ error: 'Unknown channel' }, 404);
               // Progressive MPEG-TS first: several providers hand out HLS
@@ -376,15 +397,18 @@ export const Route = createFileRoute('/api/public/xtream')({
               return json({
                 play: await sealUrl(tagRelay(liveStreamUrl(source, id, 'ts'), source)),
                 fallback: await sealUrl(tagRelay(liveStreamUrl(source, id, 'm3u8'), source)),
+                ...(device ? { direct: liveStreamUrl(source, id, 'ts') } : {}),
               });
             }
             if (kind === 'vod')
               return json({
                 play: await sealUrl(tagRelay(vodStreamUrl(source, id, ext || 'mp4'), source)),
+                ...(device ? { direct: vodStreamUrl(source, id, ext || 'mp4') } : {}),
               });
             if (kind === 'series')
               return json({
                 play: await sealUrl(tagRelay(seriesStreamUrl(source, id, ext || 'mp4'), source)),
+                ...(device ? { direct: seriesStreamUrl(source, id, ext || 'mp4') } : {}),
               });
             return json({ error: 'Unknown play type' }, 400);
           }
@@ -393,6 +417,7 @@ export const Route = createFileRoute('/api/public/xtream')({
           if (action === 'series_info') {
             const seriesId = url.searchParams.get('series_id') ?? '';
             if (!seriesId) return json({ error: 'series_id is required' }, 400);
+            const device = url.searchParams.get('device') === '1' && deviceDirectAllowed(source);
             const info = await playerApi<SeriesInfo>(source, {
               action: 'get_series_info',
               series_id: seriesId,
@@ -417,6 +442,9 @@ export const Route = createFileRoute('/api/public/xtream')({
                         source,
                       ),
                     ),
+                    ...(device
+                      ? { direct: seriesStreamUrl(source, ep.id, ep.container_extension || 'mp4') }
+                      : {}),
                   })),
                 ),
               })),

@@ -49,6 +49,7 @@ data class Episode(
     val plot: String,
     val duration: String,
     val play: String,
+    val direct: String? = null,
 )
 
 data class Season(val season: Int, val episodes: List<Episode>)
@@ -70,7 +71,12 @@ data class IptvList(val groups: List<Category>, val channels: List<IptvChannel>)
 data class IptvPlay(val token: String, val directUrl: String?, val headers: Map<String, String>)
 
 /** Opaque playback tokens: the app never sees provider URLs or credentials. */
-data class PlayTokens(val play: String, val fallback: String?)
+data class PlayTokens(
+    val play: String,
+    val fallback: String?,
+    /** Provider link for playing straight from this device (only for providers that block the relay). */
+    val direct: String? = null,
+)
 
 class ApiException(val code: Int, message: String) : Exception(message)
 
