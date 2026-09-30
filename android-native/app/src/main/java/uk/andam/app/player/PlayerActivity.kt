@@ -70,6 +70,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -791,7 +792,7 @@ private fun fmt(ms: Long): String {
 
 
 /** White focus ring + slight zoom for the remote control (invisible on touch screens). */
-private fun Modifier.tvRing(shape: androidx.compose.ui.graphics.Shape): Modifier = androidx.compose.ui.composed {
+private fun Modifier.tvRing(shape: androidx.compose.ui.graphics.Shape): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
     this
         .onFocusChanged { focused = it.isFocused || it.hasFocus }
