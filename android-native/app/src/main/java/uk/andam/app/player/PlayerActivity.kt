@@ -355,10 +355,6 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 if (engine.subtitle.isNotBlank()) Text(engine.subtitle, color = C.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (engine.live) LiveBadge()
-            if (PlayQueue.items.size > 1 && engine.live) {
-                RoundIcon(Icons.AutoMirrored.Filled.FormatListBulleted, "Channels") { ui.panel = true }
-            }
-            RoundIcon(Icons.Filled.Tune, "Settings") { ui.settings = true }
         }
 
         // Centre: previous / play-pause / next.
@@ -387,15 +383,15 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
             else if (!engine.live) RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
         }
 
-        // Bottom: timeline for movies and episodes only.
-        if (!engine.live && engine.duration > 0) {
-            var dragging by remember { mutableStateOf(false) }
-            var dragValue by remember { mutableFloatStateOf(0f) }
-            val progress = if (dragging) dragValue else (engine.position.toFloat() / engine.duration).coerceIn(0f, 1f)
-            Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        // Bottom bar: timeline (movies/episodes) and, in the bottom-right corner, channels + settings.
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (!engine.live && engine.duration > 0) {
+                var dragging by remember { mutableStateOf(false) }
+                var dragValue by remember { mutableFloatStateOf(0f) }
+                val progress = if (dragging) dragValue else (engine.position.toFloat() / engine.duration).coerceIn(0f, 1f)
                 Text(fmt(if (dragging) (dragValue * engine.duration).toLong() else engine.position), color = Color.White, fontSize = 12.sp)
                 Slider(
                     value = progress,
@@ -404,7 +400,15 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                     colors = SliderDefaults.colors(thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF)),
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                 )
-                Text(fmt(engine.duration), color = Color.White, fontSize = 12.sp)
+                Text(fmt(engine.duration), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (PlayQueue.items.size > 1 && engine.live) {
+                    RoundIcon(Icons.AutoMirrored.Filled.FormatListBulleted, "Channels") { ui.panel = true }
+                }
+                RoundIcon(Icons.Filled.Tune, "Settings") { ui.settings = true }
             }
         }
     }
