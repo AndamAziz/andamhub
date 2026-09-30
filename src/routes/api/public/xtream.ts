@@ -181,9 +181,9 @@ export const Route = createFileRoute('/api/public/xtream')({
               curatedChannels(source.id),
             ]);
             const count = (v: unknown) => (Array.isArray(v) ? v.length : null);
-            const user = (acct?.user_info ?? {}) as Record<string, unknown>;
-            const server = (acct?.server_info ?? {}) as Record<string, unknown>;
-            const exp = num(user.exp_date, 0);
+            const user = (acct?.['user_info'] ?? {}) as Record<string, unknown>;
+            const server = (acct?.['server_info'] ?? {}) as Record<string, unknown>;
+            const exp = num(user['exp_date'], 0);
             let host: string | null = null;
             if (access.admin) {
               try {
@@ -196,12 +196,12 @@ export const Route = createFileRoute('/api/public/xtream')({
               provider: source.name,
               server: host,
               reachable: acct != null,
-              status: typeof user.status === 'string' ? user.status : '',
+              status: typeof user['status'] === 'string' ? user['status'] : '',
               expires: exp > 0 ? new Date(exp * 1000).toISOString() : null,
-              trial: String(user.is_trial ?? '') === '1',
-              maxConnections: num(user.max_connections, 0),
-              activeConnections: num(user.active_cons, 0),
-              timezone: typeof server.timezone === 'string' ? server.timezone : '',
+              trial: String(user['is_trial'] ?? '') === '1',
+              maxConnections: num(user['max_connections'], 0),
+              activeConnections: num(user['active_cons'], 0),
+              timezone: typeof server['timezone'] === 'string' ? server['timezone'] : '',
               live: curated.length > 0 ? curated.length : count(live),
               liveCategories: curated.length > 0 ? new Set(curated.map((c) => c.group)).size : count(liveCats),
               vod: count(vod),
