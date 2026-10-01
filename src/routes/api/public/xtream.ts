@@ -118,6 +118,16 @@ async function loadSource(slugOrId: string, allowed: string[] | 'all'): Promise<
 
 
 /** Curated Live TV channels for a provider; empty when none were imported. */
+/**
+ * Categories always come exactly as the provider lists them: every one is shown, however many
+ * there are. Admin rules may still renumber a category, but never hide it.
+ */
+async function categoryRules(sourceId: string) {
+  const rules = await loadOverrides(sourceId, 'category');
+  for (const rule of rules.values()) rule.hidden = false;
+  return rules;
+}
+
 async function curatedChannels(sourceId: string) {
   const { listLiveChannels } = await import('@/lib/live-channels.server');
   try {
@@ -236,7 +246,7 @@ export const Route = createFileRoute('/api/public/xtream')({
                 return json({
                   categories: applyOverrides(
                     groups.map((g) => ({ id: g, name: g })),
-                    await loadOverrides(source.id, 'category'),
+                    await categoryRules(source.id),
                   ),
                 });
               }
@@ -253,7 +263,7 @@ export const Route = createFileRoute('/api/public/xtream')({
               name: c.category_name,
             }));
             return json({
-              categories: applyOverrides(categories, await loadOverrides(source.id, 'category')),
+              categories: applyOverrides(categories, await categoryRules(source.id)),
             });
           }
 

@@ -160,10 +160,11 @@ function ContentPage() {
                 <ItemRow
                   key={item.id}
                   item={item}
-                  hidden={Boolean(rule?.hidden)}
+                  hidden={kind !== 'category' && Boolean(rule?.hidden)}
                   order={rule?.sort_order ?? item.num ?? null}
                   logo={rule?.logo_url ?? ''}
                   showLogo={kind === 'live'}
+                  canHide={kind !== 'category'}
                   onSave={(patch) => save.mutate({ itemId: item.id, label: item.name, ...patch })}
                   onReset={() => reset.mutate(item.id)}
                 />
@@ -272,6 +273,7 @@ function ItemRow({
   order,
   logo,
   showLogo,
+  canHide = true,
   onSave,
   onReset,
 }: {
@@ -280,6 +282,8 @@ function ItemRow({
   order: number | null;
   logo: string;
   showLogo: boolean;
+  /** Categories always follow the provider: they can be renumbered but not hidden. */
+  canHide?: boolean;
   onSave: (patch: { hidden?: boolean; sortOrder?: number | null; logoUrl?: string | null }) => void;
   onReset: () => void;
 }) {
@@ -318,9 +322,11 @@ function ItemRow({
       >
         Save
       </Button>
-      <Button size="sm" variant={hidden ? 'default' : 'secondary'} className="min-h-11" onClick={() => onSave({ hidden: !hidden })}>
-        {hidden ? 'Show' : 'Hide'}
-      </Button>
+      {canHide && (
+        <Button size="sm" variant={hidden ? 'default' : 'secondary'} className="min-h-11" onClick={() => onSave({ hidden: !hidden })}>
+          {hidden ? 'Show' : 'Hide'}
+        </Button>
+      )}
       <Button size="sm" variant="ghost" className="min-h-11" onClick={onReset}>
         Reset
       </Button>

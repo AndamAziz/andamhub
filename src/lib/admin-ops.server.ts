@@ -482,7 +482,7 @@ export async function listProviderItems(
       cover?: string;
     }>
   >(source, { action, ...(categoryId ? { category_id: categoryId } : {}) });
-  return (Array.isArray(raw) ? raw : []).slice(0, 1500).map((s, i) => ({
+  return (Array.isArray(raw) ? raw : []).map((s, i) => ({
     id: String(s.stream_id ?? s.series_id ?? i),
     name: s.name,
     num: Number(s.num ?? i + 1),
