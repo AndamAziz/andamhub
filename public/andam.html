@@ -1227,6 +1227,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 .epirow.on{border-color:#FF3B4E !important;background:rgba(255,59,78,.12) !important}
 .deskcard a.webdirect{display:inline-block;border-radius:12px;padding:12px 26px;font:700 15px Inter,sans-serif;background:#FF3B4E;color:#fff;text-decoration:none;box-shadow:0 10px 30px rgba(255,59,78,.3)}
 .deskcard a.webdirect:hover{filter:brightness(1.08)}
+/* the "Andam Player" / "Watch now" card sits above the player controls */
+.deskcard{z-index:30 !important}
+[id$="Stage"]:has(.deskcard) .lvcontrols{display:none !important}
 </style>
 
 </head>
@@ -3065,7 +3068,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
      mpv decodes every sound format (AC3, E-AC3, DTS) and every stream type
      directly, so on Windows the page becomes the guide and the player window
      plays. "Play here instead" switches back to the in-page player. */
-  var deskBypass=false, deskKind=null, deskHooked=false, deskNextDirect=null, deskDirectPref={};
+  var deskBypass=false, deskKind=null, deskHooked=false, deskNextDirect=null, deskDirectPref={}, webDirectProv=(function(){ try{ return JSON.parse(localStorage.getItem('andam.webDirectProv')||'{}')||{} }catch(_){ return {} } })();
+  /* Opens the provider link in a new tab. Called inside the click itself (pre-opened tab), so the
+     browser does not treat it as a pop-up. */
+  function webOpenTab(){ try{ var w=window.open('','_blank'); if(w) w.opener=null; return w }catch(_){ return null } }
 
   /* Series: when an episode finishes, go on to the next one (and on into the next season). */
   function nextEpisode(s){ return stepEpisode(s,1) }
@@ -3173,7 +3179,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* Browser (not the Windows app): providers that refuse the relay play from the viewer's own
      connection. An https page may not load their http stream, so it opens in the browser's own
      player in a new tab — exactly like pasting the provider link into Chrome. */
-  function webDirectCard(kind,token,title,sub,link){
+  function webDirectCard(kind,token,title,sub,link,opened){
     var s=surf(kind);
     lvStop(kind);
     s.idle.classList.add('hide'); setNow(s,title,sub,nowLogoOf(kind)); clearFail(s); busy(s,false);
@@ -3183,7 +3189,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     c.innerHTML='<div class="deskicon">▶</div><b>'+esc(title||'Andam')+'</b>'+
       '<span>This provider plays in your browser\'s own player</span>'+
       '<div class="deskbtns"><a class="webdirect" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">▶ Watch now</a></div>'+
-      '<small>Opens in a new tab and starts straight away. Close the tab to come back here.</small>';
+      '<small>'+(opened?'Now playing in a new tab. If it did not open, press Watch now.':'Opens in a new tab and starts straight away. Close the tab to come back here.')+'</small>';
     c.onclick=function(e){ e.stopPropagation() };
     var a=c.querySelector('.webdirect'); if(a) try{ a.focus() }catch(_){}
   }
@@ -3191,7 +3197,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
     if(!tc&&!deskBypass&&!deskApi()&&deskNextDirect&&deskNextDirect.link){
       var wd=deskNextDirect; deskNextDirect=null;
-      webDirectCard(kind,token,title,sub,wd.hls||wd.link); return;
+      webDirectCard(kind,token,title,sub,wd.hls||wd.link,wd.opened); return;
     }
     if(!tc&&!deskBypass&&deskApi()){
       if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
@@ -3515,8 +3521,16 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.now.textContent=title||'Andam'; s.sub.textContent='Preparing…';
     var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
     q.device='1'; // providers that refuse the relay also send their own link (played from this device)
+    // A provider already known to play from the viewer's connection: open its tab right now (in the click).
+    var tab=(!deskApi()&&webDirectProv[ltv.prov])?webOpenTab():null, prov=ltv.prov;
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,hls:d.directHls||null,src:ltv.prov}; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){
+        if(d.direct&&!webDirectProv[prov]){ webDirectProv[prov]=true; try{ localStorage.setItem('andam.webDirectProv',JSON.stringify(webDirectProv)) }catch(_){} }
+        if(!d.direct&&webDirectProv[prov]){ delete webDirectProv[prov]; try{ localStorage.setItem('andam.webDirectProv',JSON.stringify(webDirectProv)) }catch(_){} }
+        if(tab){ if(d.direct){ try{ tab.location.href=d.directHls||d.direct }catch(_){} } else { try{ tab.close() }catch(_){} } }
+        deskNextDirect={link:d.direct||null,hls:d.directHls||null,src:prov,opened:!!(tab&&d.direct)};
+        lvPlay(k,d.play,title,sub,isHls,d.fallback||null);
+      })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 
@@ -3777,7 +3791,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var ep=e.target.closest('[data-play]');
     if(ep){
       [].forEach.call(document.querySelectorAll('#srEps .epirow.on'),function(x){x.classList.remove('on')}); ep.classList.add('on');
-      deskNextDirect={link:ep.getAttribute('data-direct')||null,src:ltv.prov};
+      var epLink=ep.getAttribute('data-direct')||null, epTab=false;
+      if(epLink&&!deskApi()){ try{ window.open(epLink,'_blank','noopener'); epTab=true }catch(_){} }
+      deskNextDirect={link:epLink,src:ltv.prov,opened:epTab};
       playToken(ep.getAttribute('data-play'),ep.getAttribute('data-title'),'Episode · provider series',false); return
     }
     var back=e.target.closest('#srBack');
