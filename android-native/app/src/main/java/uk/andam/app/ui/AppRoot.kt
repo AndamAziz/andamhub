@@ -17,19 +17,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -41,6 +46,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +65,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -272,90 +279,116 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
     val user by Session.user.collectAsState()
     val scope = rememberCoroutineScope()
     val access = Store.access
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    var confirmOut by remember { mutableStateOf(false) }
+    fun open(intent: android.content.Intent) {
+        runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.fillMaxWidth().background(C.Surface, RoundedCornerShape(18.dp)).padding(18.dp),
+            Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Text(if (user != null) "Signed in" else "Guest", color = C.Faint, style = MaterialTheme.typography.labelMedium)
-            Text(user?.email?.ifBlank { "Andam account" } ?: "Not signed in", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 4.dp))
-            val sections = when {
-                access == null -> "—"
-                access.admin -> "Everything (admin)"
-                access.live -> "Live TV, Movies, Series, IPTV"
-                else -> "IPTV"
+            // Profile
+            SettingsGroup(null) {
+                ProfileHeader(user?.email, access)
+                if (user == null) {
+                    SettingsRow(
+                        Icons.AutoMirrored.Filled.Login, C.Ember, "Sign in",
+                        subtitle = "Unlock Live TV, Movies and Series",
+                        trailing = { SettingsPill("Sign in", C.Ember, filled = true) },
+                        onClick = onSignIn,
+                    )
+                } else {
+                    SettingsRow(
+                        Icons.AutoMirrored.Filled.Logout, C.Ember, "Sign out",
+                        titleColor = C.Ember, chevron = false,
+                        onClick = { confirmOut = true },
+                    )
+                }
             }
-            Text("Access: $sections", color = C.Muted, modifier = Modifier.padding(top = 8.dp))
+            if (user != null && access?.live != true) {
+                Box(Modifier.fillMaxWidth().height(420.dp)) { LockCard(true, onChanged, onSignIn) }
+            }
+
+            PlaybackSettings()
+            UpdateSettings()
+            DiagnosticsSettings()
+
+            SettingsGroup("Help & contact") {
+                SettingsRow(
+                    Icons.AutoMirrored.Filled.Send, androidx.compose.ui.graphics.Color(0xFF2AABEE), "Telegram", "@AndamAziz",
+                ) { open(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://t.me/AndamAziz"))) }
+                SettingsRow(Icons.Filled.Email, C.Ember, "Email", "info@andam.uk") {
+                    open(android.content.Intent(android.content.Intent.ACTION_SENDTO, Uri.parse("mailto:info@andam.uk")))
+                }
+            }
+
+            Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                BrandMark(34)
+                Text("Andam", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                Text("Version ${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}", color = C.Faint, fontSize = 12.sp)
+            }
         }
-        if (user != null && access?.live != true) {
-            Box(Modifier.fillMaxWidth().height(420.dp)) { LockCard(true, onChanged, onSignIn) }
-        }
-        if (user == null) {
-            Button(onClick = onSignIn, colors = ButtonDefaults.buttonColors(containerColor = C.Ember), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f)) { Text("Sign in") }
-        } else {
-            OutlinedButton(
-                onClick = {
+    }
+
+    if (confirmOut) {
+        AlertDialog(
+            onDismissRequest = { confirmOut = false },
+            containerColor = C.Surface,
+            title = { Text("Sign out?") },
+            text = { Text("You can sign in again any time.", color = C.Muted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmOut = false
                     scope.launch {
                         Session.signOut()
                         Api.clearCache()
                         onChanged()
                     }
-                },
-                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
-            ) { Text("Sign out", color = C.Text) }
-        }
-        PlayerSettingsCard()
-        UpdateCard()
-        DiagnosticsCard()
-        ContactCard()
-        Text("Andam ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = C.Faint, modifier = Modifier.padding(top = 8.dp).width(300.dp))
+                }) { Text("Sign out", color = C.Ember, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { confirmOut = false }) { Text("Cancel", color = C.Muted) } },
+        )
     }
 }
 
-/** Contact details (replaces the old "Open andam.uk" button). */
+/** Avatar with the account's initial, the e-mail and what this account can watch. */
 @Composable
-private fun ContactCard() {
-    val context = LocalContext.current
-    fun open(intent: android.content.Intent) {
-        runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+private fun ProfileHeader(email: String?, access: uk.andam.app.net.Access?) {
+    val name = email?.ifBlank { null }
+    val (badge, color) = when {
+        name == null -> "Guest" to C.Muted
+        access == null -> "Signed in" to C.Muted
+        access.admin -> "Admin · full access" to C.Gold
+        access.live -> "Full access" to Teal
+        else -> "IPTV only" to Amber
     }
-    Column(
-        Modifier.fillMaxWidth().background(C.Surface, RoundedCornerShape(18.dp)).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Contact", color = C.Faint, style = MaterialTheme.typography.labelMedium)
-        ContactRow(
-            icon = Icons.AutoMirrored.Filled.Send, tint = androidx.compose.ui.graphics.Color(0xFF2AABEE),
-            label = "Telegram", value = "@AndamAziz",
-        ) { open(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://t.me/AndamAziz"))) }
-        ContactRow(
-            icon = Icons.Filled.Email, tint = C.Ember,
-            label = "Email", value = "info@andam.uk",
-        ) { open(android.content.Intent(android.content.Intent.ACTION_SENDTO, Uri.parse("mailto:info@andam.uk"))) }
-    }
-}
-
-@Composable
-private fun ContactRow(icon: ImageVector, tint: androidx.compose.ui.graphics.Color, label: String, value: String, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .tvFocus(RoundedCornerShape(14.dp), 1.02f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(C.Surface2)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(listOf(C.EmberDim, C.Surface, C.Surface)),
+            )
+            .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.16f)),
+            Modifier
+                .size(56.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(C.Ember, androidx.compose.ui.graphics.Color(0xFF8E1F2C)))),
             contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp)) }
-        Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(label, color = C.Muted, fontSize = 12.sp)
-            Text(value, color = C.Text, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        ) {
+            if (name != null) Text(name.first().uppercase(), color = androidx.compose.ui.graphics.Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            else Icon(Icons.Filled.Person, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(30.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(
+                name ?: "Guest", color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Row(Modifier.padding(top = 6.dp)) { SettingsPill(badge, color) }
         }
     }
 }

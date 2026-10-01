@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.LiveTv
@@ -46,69 +49,63 @@ object UpdateState {
 }
 
 @Composable
-private fun Card(content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().background(C.Surface, RoundedCornerShape(18.dp)).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) { content() }
-}
-
-@Composable
-fun UpdateCard() {
+fun UpdateSettings() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
+    var upToDate by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Float?>(null) }
     val release = UpdateState.available
 
-    Card {
-        Text("App update", color = C.Faint, style = MaterialTheme.typography.labelMedium)
-        Text("Installed: ${BuildConfig.VERSION_NAME} (build ${Updater.currentBuild})", style = MaterialTheme.typography.titleMedium)
-        if (release != null) {
-            Text("New version available: build ${release.build}", color = Color(0xFF38E1C6), fontWeight = FontWeight.SemiBold)
+    fun run() {
+        if (busy) return
+        busy = true; note = null
+        scope.launch {
+            try {
+                val r = release ?: Updater.check()
+                UpdateState.available = r
+                upToDate = r == null
+                if (r != null && release != null) {
+                    progress = 0f
+                    val apk = Updater.download(context, r) { p -> progress = p }
+                    progress = null
+                    note = "Downloaded. Tap Install on the next screen."
+                    Updater.install(context, apk)
+                }
+            } catch (e: Exception) {
+                progress = null
+                note = "Couldn't check: ${e.message ?: "network error"}"
+            }
+            busy = false
         }
-        note?.let { Text(it, color = C.Muted) }
-        progress?.let {
-            LinearProgressIndicator(progress = { it }, color = C.Ember, trackColor = C.Surface3, modifier = Modifier.fillMaxWidth())
-            Text("Downloading… ${(it * 100).toInt()}%", color = C.Muted, fontSize = 12.sp)
-        }
-        Button(
-            enabled = !busy,
-            onClick = {
-                busy = true; note = null
-                scope.launch {
-                    try {
-                        val r = release ?: Updater.check()
-                        UpdateState.available = r
-                        if (r == null) {
-                            note = "You have the latest version."
-                        } else if (release != null) {
-                            progress = 0f
-                            val apk = Updater.download(context, r) { p -> progress = p }
-                            progress = null
-                            note = "Downloaded. Tap Install on the next screen."
-                            Updater.install(context, apk)
-                        }
-                    } catch (e: Exception) {
-                        progress = null
-                        note = "Update check failed: ${e.message ?: "network error"}"
-                    }
-                    busy = false
+    }
+
+    SettingsGroup("App") {
+        SettingsRow(
+            Icons.Filled.SystemUpdate, if (release != null) C.Ember else Teal,
+            title = if (release != null) "Update available" else "App version",
+            subtitle = note ?: when {
+                busy && progress != null -> "Downloading build ${release?.build}…"
+                busy -> "Checking for updates…"
+                release != null -> "Build ${release.build} is ready to install"
+                upToDate -> "You have the latest version"
+                else -> "${BuildConfig.VERSION_NAME} · build ${Updater.currentBuild}"
+            },
+            trailing = {
+                when {
+                    busy -> SettingsPill(if (progress != null) "${((progress ?: 0f) * 100).toInt()}%" else "…", C.Muted)
+                    release != null -> SettingsPill("Install", C.Ember, filled = true)
+                    upToDate -> SettingsPill("Up to date", Teal)
+                    else -> SettingsPill("Check", C.Text)
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = C.Ember),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
-        ) {
-            Text(
-                when {
-                    busy && progress != null -> "Downloading…"
-                    busy -> "Checking…"
-                    release != null -> "Download & install build ${release.build}"
-                    else -> "Check for updates"
-                },
-            )
+            onClick = { run() },
+        )
+        progress?.let {
+            SettingsBlock {
+                LinearProgressIndicator(progress = { it }, color = C.Ember, trackColor = C.Surface3, modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }
@@ -122,9 +119,10 @@ private sealed interface Info {
 }
 
 @Composable
-fun DiagnosticsCard() {
+fun DiagnosticsSettings() {
     val scope = rememberCoroutineScope()
     var running by remember { mutableStateOf(false) }
+    var started by remember { mutableStateOf(false) }
     var server by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var internet by remember { mutableStateOf<Diagnostics.Result?>(null) }
     var stream by remember { mutableStateOf<Diagnostics.Result?>(null) }
@@ -133,56 +131,73 @@ fun DiagnosticsCard() {
     val playlistInfo = remember { androidx.compose.runtime.mutableStateMapOf<String, Info>() }
     val hevc = remember { Diagnostics.hevcSupported() }
 
-    Card {
-        Text("Server & speed test", color = C.Faint, style = MaterialTheme.typography.labelMedium)
-        ResultRow("Andam server", server, running && server == null)
-        ResultRow("Internet speed", internet, running && server != null && internet == null)
-        ResultRow("Provider stream (relay)", stream, running && internet != null && stream == null)
-        ResultRow("IPTV stream", iptv, running && stream != null && iptv == null)
-        ResultRow("H.265 (HEVC) video", Diagnostics.Result(hevc, if (hevc) "Supported on this device" else "Not supported on this device"), false)
-
-        Store.providers.forEach { p ->
-            providerInfo[p.id]?.let { ProviderBlock(p.name, it) }
+    fun run() {
+        if (running) return
+        running = true; started = true
+        server = null; internet = null; stream = null; iptv = null
+        providerInfo.clear(); playlistInfo.clear()
+        scope.launch {
+            server = Diagnostics.server()
+            // Content counts load in parallel with the speed tests.
+            Store.providers.forEach { p ->
+                providerInfo[p.id] = Info.Busy
+                launch {
+                    providerInfo[p.id] = runCatching { Info.Provider(uk.andam.app.net.Api.info(p.id)) }
+                        .getOrElse { Info.Failed(it.message ?: "Could not read the provider") }
+                }
+            }
+            Store.iptvSources.forEach { src ->
+                playlistInfo[src.id] = Info.Busy
+                launch {
+                    val t0 = System.nanoTime()
+                    playlistInfo[src.id] = runCatching {
+                        val l = uk.andam.app.net.Api.iptvChannels(src.id)
+                        Info.Playlist(l.channels.size, l.groups.size, (System.nanoTime() - t0) / 1_000_000)
+                    }.getOrElse { Info.Failed(it.message ?: "Could not read the playlist") }
+                }
+            }
+            internet = Diagnostics.internet()
+            stream = Diagnostics.providerRoute()
+            iptv = Diagnostics.iptvRoute()
+            running = false
         }
-        Store.iptvSources.forEach { s ->
-            playlistInfo[s.id]?.let { PlaylistBlock(s.name, it) }
-        }
+    }
 
-        Button(
-            enabled = !running,
-            onClick = {
-                running = true; server = null; internet = null; stream = null; iptv = null
-                providerInfo.clear(); playlistInfo.clear()
-                scope.launch {
-                    server = Diagnostics.server()
-                    // Content counts load in parallel with the speed tests.
-                    Store.providers.forEach { p ->
-                        providerInfo[p.id] = Info.Busy
-                        launch {
-                            providerInfo[p.id] = runCatching { Info.Provider(uk.andam.app.net.Api.info(p.id)) }
-                                .getOrElse { Info.Failed(it.message ?: "Could not read the provider") }
-                        }
-                    }
-                    Store.iptvSources.forEach { src ->
-                        playlistInfo[src.id] = Info.Busy
-                        launch {
-                            val t0 = System.nanoTime()
-                            playlistInfo[src.id] = runCatching {
-                                val l = uk.andam.app.net.Api.iptvChannels(src.id)
-                                Info.Playlist(l.channels.size, l.groups.size, (System.nanoTime() - t0) / 1_000_000)
-                            }.getOrElse { Info.Failed(it.message ?: "Could not read the playlist") }
-                        }
-                    }
-                    internet = Diagnostics.internet()
-                    stream = Diagnostics.providerRoute()
-                    iptv = Diagnostics.iptvRoute()
-                    running = false
+    val results = listOfNotNull(server, internet, stream, iptv)
+    val failed = results.count { !it.ok }
+    SettingsGroup("Connection") {
+        SettingsRow(
+            Icons.Filled.Speed, Sky, "Server & speed test",
+            subtitle = when {
+                running -> "Testing… this takes a few seconds"
+                !started -> "Check the server, your internet and providers"
+                failed == 0 -> "Everything is working"
+                else -> "$failed check${if (failed > 1) "s" else ""} need attention"
+            },
+            trailing = {
+                when {
+                    running -> SettingsPill("Testing…", C.Muted)
+                    !started -> SettingsPill("Run test", Sky, filled = true)
+                    failed == 0 -> SettingsPill("All good", Teal)
+                    else -> SettingsPill("Run again", C.Ember)
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = C.Surface3, contentColor = C.Text),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
-        ) { Text(if (running) "Testing…" else "Run test") }
+            onClick = { run() },
+        )
+        if (started) {
+            SettingsBlock {
+                ResultRow("Andam server", server, running && server == null)
+                ResultRow("Internet speed", internet, running && server != null && internet == null)
+                ResultRow("Provider stream", stream, running && internet != null && stream == null)
+                ResultRow("IPTV stream", iptv, running && stream != null && iptv == null)
+                ResultRow("H.265 (HEVC) video", Diagnostics.Result(hevc, if (hevc) "Supported" else "Not supported"), false)
+            }
+            val blocks = Store.providers.filter { providerInfo[it.id] != null } + Store.iptvSources.filter { playlistInfo[it.id] != null }
+            if (blocks.isNotEmpty()) SettingsBlock {
+                Store.providers.forEach { p -> providerInfo[p.id]?.let { ProviderBlock(p.name, it) } }
+                Store.iptvSources.forEach { s -> playlistInfo[s.id]?.let { PlaylistBlock(s.name, it) } }
+            }
+        }
     }
 }
 
@@ -306,22 +321,21 @@ private fun big(n: Int): String = java.text.NumberFormat.getIntegerInstance(java
 
 @Composable
 private fun ResultRow(label: String, result: Diagnostics.Result?, active: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Dot(
             when {
                 result == null -> if (active) C.Gold else C.Faint
-                result.ok -> Color(0xFF38E1C6)
+                result.ok -> Teal
                 else -> C.Ember
             },
         )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(
-                result?.value ?: if (active) "Testing…" else "—",
-                color = C.Muted, fontSize = 12.sp,
-            )
-        }
+        Text(label, color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp).weight(1f))
+        Text(
+            result?.value ?: if (active) "Testing…" else "Waiting",
+            color = if (result != null && !result.ok) C.Ember else C.Muted, fontSize = 13.sp,
+            maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.padding(start = 12.dp).widthIn(max = 220.dp),
+        )
     }
 }
 
