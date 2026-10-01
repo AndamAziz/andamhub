@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
@@ -105,6 +107,8 @@ private fun Main(onSignIn: () -> Unit) {
     val user by Session.user.collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var account by rememberSaveable { mutableStateOf(false) }
+    // CEO admin panel (admins only): "" = closed, "overview" or "create" (opens a new code).
+    var admin by rememberSaveable { mutableStateOf("") }
     var ready by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
 
@@ -121,8 +125,10 @@ private fun Main(onSignIn: () -> Unit) {
     val body: @Composable () -> Unit = {
         if (!ready) {
             Busy()
+        } else if (account && admin.isNotEmpty() && Store.access?.admin == true) {
+            AdminScreen(startOnCodes = admin == "create", openCreate = admin == "create", onBack = { admin = "" })
         } else if (account) {
-            AccountScreen(onSignIn = onSignIn, onChanged = { refreshKey++ })
+            AccountScreen(onSignIn = onSignIn, onChanged = { refreshKey++ }, onAdmin = { admin = it })
         } else {
             val live = Store.access?.live == true
             when (tab) {
@@ -136,7 +142,7 @@ private fun Main(onSignIn: () -> Unit) {
     }
 
     if (LocalTv.current) {
-        TvShell(tab, account, onTab = { tab = it; account = false }, onAccount = { account = true }, body = body)
+        TvShell(tab, account, onTab = { tab = it; account = false; admin = "" }, onAccount = { account = true; admin = "" }, body = body)
         return
     }
 
@@ -148,8 +154,8 @@ private fun Main(onSignIn: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (account) {
-                    IconButton(onClick = { account = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                    Text("Account", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = { if (admin.isNotEmpty()) admin = "" else account = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    Text(if (admin.isNotEmpty()) "Admin" else "Account", style = MaterialTheme.typography.titleLarge)
                 } else {
                     BrandMark(30)
                     Text("Andam", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 10.dp))
@@ -274,7 +280,7 @@ private fun TvMenuItem(icon: ImageVector, label: String, selected: Boolean, modi
 }
 
 @Composable
-private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
+private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit, onAdmin: (String) -> Unit) {
     val context = LocalContext.current
     val user by Session.user.collectAsState()
     val scope = rememberCoroutineScope()
@@ -309,6 +315,18 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
             }
             if (user != null && access?.live != true) {
                 Box(Modifier.fillMaxWidth().height(420.dp)) { LockCard(true, onChanged, onSignIn) }
+            }
+
+            if (access?.admin == true) {
+                SettingsGroup("Admin") {
+                    SettingsRow(
+                        Icons.Filled.Key, C.Gold, "Create activation code", "Unlock Live TV, Movies or Series for a viewer",
+                        trailing = { SettingsPill("New", C.Ember, filled = true) },
+                    ) { onAdmin("create") }
+                    SettingsRow(
+                        Icons.Filled.AdminPanelSettings, C.Ember, "CEO admin panel", "Codes, users, providers and errors",
+                    ) { onAdmin("overview") }
+                }
             }
 
             PlaybackSettings()

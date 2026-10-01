@@ -1,6 +1,7 @@
 /** Server-only activation-code administration (admin role already verified). */
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { SECTIONS, type Section } from '@/lib/access.server';
+import { allRows, chunks } from '@/lib/paged.server';
 
 export type CodeStatus = 'active' | 'used' | 'expired' | 'revoked';
 
@@ -40,22 +41,36 @@ function statusOf(row: {
 }
 
 export async function listCodes(): Promise<AdminCode[]> {
-  const [{ data: codes }, { data: sources }, { data: redemptions }] = await Promise.all([
-    supabaseAdmin
-      .from('activation_codes')
-      .select('id, code, source_id, sections, note, expires_at, max_uses, uses, revoked, created_at')
-      .order('created_at', { ascending: false })
-      .limit(200),
+  // Every code and every redemption, page by page (no cap on how many are listed).
+  const [codes, { data: sources }, redemptions] = await Promise.all([
+    allRows((a, b) =>
+      supabaseAdmin
+        .from('activation_codes')
+        .select('id, code, source_id, sections, note, expires_at, max_uses, uses, revoked, created_at')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(a, b),
+    ),
     supabaseAdmin.from('sources').select('id, name'),
-    supabaseAdmin
-      .from('activation_code_redemptions')
-      .select('code_id, email, created_at')
-      .order('created_at', { ascending: false }),
+    allRows((a, b) =>
+      supabaseAdmin
+        .from('activation_code_redemptions')
+        .select('code_id, email, created_at')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
   ]);
+
+  const byCode = new Map<string, Array<{ email: string; at: string }>>();
+  for (const r of redemptions) {
+    const list = byCode.get(r.code_id) ?? [];
+    list.push({ email: r.email ?? 'unknown', at: r.created_at });
+    byCode.set(r.code_id, list);
+  }
 
   const names = new Map((sources ?? []).map((s) => [s.id, s.name]));
 
-  return (codes ?? []).map((row) => ({
+  return codes.map((row) => ({
     id: row.id,
     code: row.code,
     sourceId: row.source_id,
@@ -67,9 +82,7 @@ export async function listCodes(): Promise<AdminCode[]> {
     uses: row.uses,
     status: statusOf(row),
     createdAt: row.created_at,
-    redeemedBy: (redemptions ?? [])
-      .filter((r) => r.code_id === row.id)
-      .map((r) => ({ email: r.email ?? 'unknown', at: r.created_at })),
+    redeemedBy: byCode.get(row.id) ?? [],
   }));
 }
 
@@ -90,7 +103,7 @@ export async function createCode(input: {
     source_id: input.sourceId,
     sections,
     note: input.note.slice(0, 200) || null,
-    max_uses: Math.min(Math.max(1, Math.round(input.maxUses)), 1000),
+    max_uses: Math.min(Math.max(1, Math.round(input.maxUses)), 1_000_000),
     expires_at: input.expiresAt,
     created_by: input.createdBy,
   });
@@ -153,7 +166,7 @@ export async function renewCode(input: {
 
   const expiresAt =
     input.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const extra = Math.min(Math.max(0, Math.round(input.extraUses ?? 0)), 1000);
+  const extra = Math.min(Math.max(0, Math.round(input.extraUses ?? 0)), 1_000_000);
   const maxUses = Math.max(row.max_uses + extra, row.uses + 1);
 
   const { error } = await supabaseAdmin
@@ -186,12 +199,21 @@ export async function listEntitlements(
   userIds: string[],
 ): Promise<Record<string, Section[]>> {
   if (!userIds.length) return {};
-  const { data } = await supabaseAdmin
-    .from('user_entitlements')
-    .select('user_id, section')
-    .in('user_id', userIds);
+  const data: Array<{ user_id: string; section: string }> = [];
+  for (const ids of chunks(userIds)) {
+    data.push(
+      ...(await allRows((a, b) =>
+        supabaseAdmin
+          .from('user_entitlements')
+          .select('user_id, section')
+          .in('user_id', ids)
+          .order('user_id', { ascending: true })
+          .range(a, b),
+      )),
+    );
+  }
   const out: Record<string, Section[]> = {};
-  for (const row of data ?? []) {
+  for (const row of data) {
     const section = row.section as Section;
     if (!SECTIONS.includes(section)) continue;
     (out[row.user_id] ??= []).push(section);

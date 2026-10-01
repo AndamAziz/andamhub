@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin.server';
 import { playerApi, type Source } from '@/lib/xtream';
 import type { OverrideKind } from '@/lib/overrides.server';
+import { allRows } from '@/lib/paged.server';
 
 export type SourceType = 'xtream' | 'm3u';
 
@@ -263,18 +264,32 @@ export type AdminUser = {
 };
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const [{ data: profiles, error }, { data: roles }, { data: access }] = await Promise.all([
-    supabaseAdmin
-      .from('profiles')
-      .select('id, email, display_name, is_suspended, last_login_at, created_at')
-      .order('created_at', { ascending: false }),
-    supabaseAdmin.from('user_roles').select('user_id, role'),
-    supabaseAdmin.from('user_source_access').select('user_id, source_id'),
+  // Every account, page by page — no cap on how many users are listed.
+  const [profiles, roles, access] = await Promise.all([
+    allRows((a, b) =>
+      supabaseAdmin
+        .from('profiles')
+        .select('id, email, display_name, is_suspended, last_login_at, created_at')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(a, b),
+    ),
+    allRows((a, b) =>
+      supabaseAdmin.from('user_roles').select('user_id, role').order('user_id').range(a, b),
+    ),
+    allRows((a, b) =>
+      supabaseAdmin
+        .from('user_source_access')
+        .select('user_id, source_id')
+        .order('user_id')
+        .range(a, b),
+    ),
   ]);
-  if (error) throw new Error(error.message);
 
-  const adminIds = new Set((roles ?? []).filter((r) => r.role === 'admin').map((r) => r.user_id));
-  return (profiles ?? []).map((p) => ({
+  const accessBy = new Map<string, string[]>();
+  for (const a of access) accessBy.set(a.user_id, [...(accessBy.get(a.user_id) ?? []), a.source_id]);
+  const adminIds = new Set(roles.filter((r) => r.role === 'admin').map((r) => r.user_id));
+  return profiles.map((p) => ({
     id: p.id,
     email: p.email ?? '',
     displayName: p.display_name ?? '',
@@ -282,7 +297,7 @@ export async function listUsers(): Promise<AdminUser[]> {
     suspended: Boolean(p.is_suspended),
     createdAt: p.created_at,
     lastLoginAt: p.last_login_at,
-    sourceIds: (access ?? []).filter((a) => a.user_id === p.id).map((a) => a.source_id),
+    sourceIds: accessBy.get(p.id) ?? [],
   }));
 }
 
