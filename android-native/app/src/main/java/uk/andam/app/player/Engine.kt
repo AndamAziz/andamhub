@@ -85,6 +85,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     private var playingSince = 0L
     private var audioChecked = false
     private var videoChecked = false
+    /** Route (attempt index) that has already played this item: never abandoned for a hiccup. */
+    private var provenIndex = -1
 
     /** Headers for the attempt being played; read on ExoPlayer's loader threads. */
     @Volatile
@@ -168,6 +170,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
                 if (isPlaying) {
+                    provenIndex = attemptIndex
                     val cur = attempts.getOrNull(attemptIndex)
                     val src = item?.takeIf { it.kind != Kind.IPTV }?.source
                     if (cur != null && src != null && attempts.any { it.direct }) {
@@ -212,7 +215,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     if (stallSeconds >= (if (live) 20 else 12)) {
                         stallSeconds = 0
                         stallReloads++
-                        if (stallReloads >= 3) nextAttempt() else reconnect("Reconnecting…", 0)
+                        // A route that already played keeps being reloaded (slow source, not a dead
+                        // one); only a route that never played moves on to the next one.
+                        if (stallReloads >= 3 && attemptIndex != provenIndex) nextAttempt() else reconnect("Reconnecting…", 0)
                     }
                 } else {
                     stallSeconds = 0
@@ -255,6 +260,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         if (next !== item) remints = 0
         item = next
         session++
+        provenIndex = -1
         val mine = session
         title = next.title
         subtitle = next.subtitle
@@ -488,6 +494,13 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             }
 
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+                // A route that already played: a refused request mid-film is usually momentary.
+                // Retry the same route (from the same position) a few times before giving it up.
+                if (attemptIndex == provenIndex && retries < 3) {
+                    retries++
+                    reconnect("Reconnecting…", (1000L shl (retries - 1)).coerceAtMost(4000))
+                    return
+                }
                 // A direct link refused us: move on to the relay route.
                 // From our own server: the token or channel is gone — re-mint once, then move on.
                 // When a device route exists, a refused relay moves on at once (no re-mint round trip).
@@ -497,7 +510,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
             else -> {
                 // A device route that fails twice hands over to the relay route instead of waiting.
-                val limit = if (current.direct) 1 else if (live) 5 else 3
+                // A route that already played is kept: network drops are retried on it with
+                // back-off (resuming where it stopped) instead of jumping to another route.
+                val limit = if (attemptIndex == provenIndex) 8 else if (current.direct) 1 else if (live) 5 else 3
                 if (retries < limit) {
                     retries++
                     val wait = (1000L shl (retries - 1)).coerceAtMost(8000)
