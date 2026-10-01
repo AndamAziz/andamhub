@@ -3629,7 +3629,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   var paintSeq=0;
 
   function renderDirect(items){
-    var list=filtered(items,'name').slice(0,600);
+    var list=filtered(items,'name');
     ltv.channels=list;
     if(SURF.live&&isStageFullscreen(SURF.live)) renderFsNav('live');
     if(!list.length){ ltvBody.innerHTML=''; ltvSet('No channels here.'); return }
@@ -3659,10 +3659,14 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
 
   function renderGrid(items,kind){
-    var list=filtered(items,'name').slice(0,300);
+    /* Every title the provider has, painted in slices so the page stays responsive. */
+    var list=filtered(items,'name');
     if(!list.length){ ltvBody.innerHTML=''; ltvSet('Nothing here yet.'); return }
     ltvSet('');
-    ltvBody.innerHTML='<div class="vodgrid">'+list.map(function(i){ return vodCard(i,kind) }).join('')+'</div>';
+    ltvBody.innerHTML='<div class="vodgrid" id="ltvGrid"></div>';
+    var host=document.getElementById('ltvGrid');
+    list.__id=++paintSeq; host.dataset['paint']=String(list.__id);
+    paintChunks(host,list,function(i){ return vodCard(i,kind) });
   }
 
   function renderReplay(){

@@ -17,17 +17,26 @@ export type OverrideRule = {
 export type OverrideMap = Map<string, OverrideRule>;
 
 export async function loadOverrides(sourceId: string, kind: OverrideKind): Promise<OverrideMap> {
-  const { data, error } = await supabaseAdmin
-    .from('content_overrides')
-    .select('item_id, hidden, sort_order, logo_url')
-    .eq('source_id', sourceId)
-    .eq('kind', kind);
-  if (error) {
-    console.error('[overrides]', error.message);
-    return new Map();
+  // Paged: the database answers at most 1000 rows per request.
+  const PAGE = 1000;
+  const data: Array<{ item_id: unknown; hidden: unknown; sort_order: number | null; logo_url: string | null }> = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data: rows, error } = await supabaseAdmin
+      .from('content_overrides')
+      .select('item_id, hidden, sort_order, logo_url')
+      .eq('source_id', sourceId)
+      .eq('kind', kind)
+      .order('item_id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error('[overrides]', error.message);
+      return new Map();
+    }
+    data.push(...((rows ?? []) as typeof data));
+    if (!rows || rows.length < PAGE) break;
   }
   const map: OverrideMap = new Map();
-  for (const row of data ?? []) {
+  for (const row of data) {
     map.set(String(row.item_id), {
       hidden: Boolean(row.hidden),
       sort_order: row.sort_order,

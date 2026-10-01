@@ -45,13 +45,24 @@ const toChannel = (r: Row): LiveChannel => ({
 
 /** Every curated channel for a provider, ordered the way viewers see them. */
 export async function listLiveChannels(sourceId: string): Promise<LiveChannel[]> {
-  const { data, error } = await supabaseAdmin
-    .from('iptv_channels')
-    .select('channel_key, num, name, logo, group_title, url, media_kind')
-    .eq('source_id', sourceId)
-    .order('num', { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => toChannel(r as Row));
+  // Read page by page: the database answers at most 1000 rows per request, and a
+  // provider can have tens of thousands of channels. Every one of them is returned.
+  const PAGE = 1000;
+  const all: LiveChannel[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from('iptv_channels')
+      .select('channel_key, num, name, logo, group_title, url, media_kind')
+      .eq('source_id', sourceId)
+      .order('num', { ascending: true })
+      .order('channel_key', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    for (const r of rows) all.push(toChannel(r as Row));
+    if (rows.length < PAGE) break;
+  }
+  return all;
 }
 
 /** One curated channel, used when minting a playback token. */

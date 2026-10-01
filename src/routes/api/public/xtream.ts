@@ -210,8 +210,10 @@ export const Route = createFileRoute('/api/public/xtream')({
               maxConnections: num(user['max_connections'], 0),
               activeConnections: num(user['active_cons'], 0),
               timezone: typeof server['timezone'] === 'string' ? server['timezone'] : '',
-              live: curated.length > 0 ? curated.length : count(live),
-              liveCategories: curated.length > 0 ? new Set(curated.map((c) => c.group)).size : count(liveCats),
+              // The provider's own numbers, exactly as it reports them; the stored channel
+              // list is only used when the provider does not answer.
+              live: count(live) ?? (curated.length > 0 ? curated.length : null),
+              liveCategories: count(liveCats) ?? (curated.length > 0 ? new Set(curated.map((c) => c.group)).size : null),
               vod: count(vod),
               vodCategories: count(vodCats),
               series: count(series),

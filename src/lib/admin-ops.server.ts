@@ -393,12 +393,21 @@ export type OverrideRow = {
 };
 
 export async function listOverrides(sourceId: string): Promise<OverrideRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from('content_overrides')
-    .select('id, kind, item_id, label, hidden, sort_order, logo_url')
-    .eq('source_id', sourceId);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as OverrideRow[];
+  // Paged: the database answers at most 1000 rows per request.
+  const PAGE = 1000;
+  const all: OverrideRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from('content_overrides')
+      .select('id, kind, item_id, label, hidden, sort_order, logo_url')
+      .eq('source_id', sourceId)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    all.push(...((data ?? []) as OverrideRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
 }
 
 export async function saveOverride(input: {
