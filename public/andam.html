@@ -3845,6 +3845,20 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       .then(function(v){ if(v&&v.error) throw new Error(v.error); ipCache[qs]={t:Date.now(),v:v}; return v });
   }
 
+  /* Play a playlist channel. The Windows app asks for the channel's own link too
+     (device=1) and opens it straight from the PC, like any IPTV player; the relay
+     stays as its fallback. Links that need special headers keep using the relay. */
+  function ipPlay(src,id){
+    var q={action:'play',source:src,id:id}; if(deskApi()) q.device='1';
+    return ipApi(q).then(function(d){
+      if(deskApi()){
+        var dr=d&&d.direct, h=(dr&&dr.headers)||{};
+        deskNextDirect={link:(dr&&/^https?:/i.test(dr.url||'')&&!h.referer&&!h.origin&&!h.userAgent)?dr.url:null,src:'iptv:'+src};
+      }
+      return d;
+    });
+  }
+
   function renderIpSources(){
     ipSrcSel.innerHTML=ip.sources.map(function(s){
       return '<option value="'+esc(s.id)+'"'+(ip.src===s.id?' selected':'')+'>'+esc(s.name)+'</option>';
@@ -3949,7 +3963,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var name=ch.getAttribute('data-name'), s=surf('iptv');
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
     s.now.textContent=name; s.sub.textContent='Preparing…';
-    ipApi({action:'play',source:ip.src,id:ch.getAttribute('data-ipch')})
+    ipPlay(ip.src,ch.getAttribute('data-ipch'))
       .then(function(d){ lvPlay('iptv',d.token,name,'LIVE · IPTV playlist',true) })
       .catch(function(){ fail(s,'Could not start this channel') });
   });
@@ -3958,7 +3972,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(cat){ ip.group=cat.getAttribute('data-fscat')||''; renderIpGroups(); renderIpChannels(); showFsNav(surf('iptv'),true); return }
     var ch=e.target.closest('[data-fsch]'); if(!ch) return;
     var name=ch.getAttribute('data-name'), s=surf('iptv');
-    ipApi({action:'play',source:ip.src,id:ch.getAttribute('data-fsch')})
+    ipPlay(ip.src,ch.getAttribute('data-fsch'))
       .then(function(d){ lvPlay('iptv',d.token,name,'LIVE · IPTV playlist',true); renderFsNav('iptv'); showFsNav(surf('iptv'),false) })
       .catch(function(){ fail(s,'Could not start this channel') });
   });
@@ -4048,7 +4062,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       showView('iptv');
       var s=surf('iptv'); s.idle.classList.add('hide'); clearFail(s); busy(s,true);
       s.now.textContent=it.name; s.sub.textContent='Preparing…';
-      ipApi({action:'play',source:homeIp,id:it.id})
+      ipPlay(homeIp,it.id)
         .then(function(d){ lvPlay('iptv',d.token,it.name,'LIVE · IPTV playlist',true) })
         .catch(function(){ fail(s,'Could not start this channel') });
       return;
@@ -4203,7 +4217,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       showView('iptv');
       var s=surf('iptv'); s.idle.classList.add('hide'); clearFail(s); busy(s,true);
       s.now.textContent=name; s.sub.textContent='Preparing…';
-      ipApi({action:'play',source:homeIp,id:card.getAttribute('data-ipch')})
+      ipPlay(homeIp,card.getAttribute('data-ipch'))
         .then(function(d){ lvPlay('iptv',d.token,name,'LIVE · IPTV playlist',true) })
         .catch(function(){ fail(s,'Could not start this channel') });
     }

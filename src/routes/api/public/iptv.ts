@@ -111,12 +111,14 @@ export const Route = createFileRoute('/api/public/iptv')({
               name: channel.name,
               logo: channel.logo,
               token: await sealUrl(tagStreamHeaders(channel.url, channel.headers)),
-              // The native app plays these straight from the source (faster start, and the
-              // Referer/Origin/User-Agent a channel needs are sent by the phone itself).
-              // Public playlists only for plain links — a private playlist may carry account
-              // credentials in its URLs; header-protected channels are always included.
+              // The apps (device=1: Android, Windows) play the channel straight from its
+              // source, like any IPTV player — no relay hop, so live TV starts fast and never
+              // stalls on the relay. The relay token stays as their fallback. The website does
+              // not ask, so it keeps using the relay only. Without device=1: public playlists
+              // and header-protected channels, as before.
               ...(/^https?:\/\//i.test(channel.url) &&
-              (source.is_public !== false ||
+              (url.searchParams.get('device') === '1' ||
+                source.is_public !== false ||
                 (channel.headers && Object.keys(channel.headers).length))
                 ? { direct: { url: channel.url, headers: channel.headers ?? {} } }
                 : {}),

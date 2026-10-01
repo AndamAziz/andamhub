@@ -213,7 +213,7 @@ object Api {
     }
 
     suspend fun iptvPlay(source: String, id: String): IptvPlay {
-        val j = get(I, mapOf("action" to "play", "source" to source, "id" to id))
+        val j = get(I, mapOf("action" to "play", "source" to source, "id" to id, "device" to "1"))
         val d = j.optJSONObject("direct")
         val h = d?.optJSONObject("headers")
         val headers = LinkedHashMap<String, String>()
