@@ -2984,6 +2984,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     clearTimeout(s.ctrlTimer); clearTimeout(s.fsTimer); clearTimeout(s.restartTimer);
     if(s.progressHandler){ s.video.removeEventListener('timeupdate',s.progressHandler); s.progressHandler=null }
     if(s.audioHandler){ s.video.removeEventListener('timeupdate',s.audioHandler); s.audioHandler=null }
+    if(s.videoHandler){ s.video.removeEventListener('timeupdate',s.videoHandler); s.videoHandler=null }
     if(s.hls){ var dead=s.hls; s.hls=null; setTimeout(function(){ try{dead.destroy()}catch(_){} },0) }
     if(s.mts){ var deadM=s.mts; s.mts=null; setTimeout(function(){ try{deadM.destroy()}catch(_){} },0) }
     try{ s.video.pause() }catch(_){}
@@ -3226,6 +3227,23 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       };
       s.audioHandler=audioCheck;
       s.video.addEventListener('timeupdate',audioCheck);
+    }
+
+    /* Missing-picture repair (any provider): sound plays but the browser shows no picture —
+       usually H.265 inside the progressive stream. Retry once through the channel's playlist
+       route (hls.js), which carries the picture in a form more browsers can show. */
+    if(alt){
+      var altTok=alt;
+      var videoCheck=function(){
+        if(!alive()){ s.video.removeEventListener('timeupdate',videoCheck); return }
+        var v=s.video; if(v.currentTime<4) return;
+        v.removeEventListener('timeupdate',videoCheck); s.videoHandler=null;
+        var frames=typeof v.webkitDecodedFrameCount==='number'?v.webkitDecodedFrameCount:
+          (v.getVideoPlaybackQuality?v.getVideoPlaybackQuality().totalVideoFrames:-1);
+        if(v.videoWidth===0||frames===0){ console.warn('[player] no picture decoded — trying the playlist route'); lvPlay(kind,altTok,title,sub,true,null,tc) }
+      };
+      s.videoHandler=videoCheck;
+      s.video.addEventListener('timeupdate',videoCheck);
     }
 
     /* ---- self-healing -------------------------------------------------

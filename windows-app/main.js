@@ -273,11 +273,8 @@ ipcMain.handle('player:play', (_e, o) => {
   if (!hasPlayer()) return { ok: false };
   const url = String((o && o.url) || '');
   // Only streams from the Andam API may be opened.
-  // Andam API streams, plus the device route of providers that refuse the relay (see
-  // DEVICE_DIRECT_HOSTS in src/routes/api/public/xtream.ts).
-  const allowed =
-    /^https:\/\/ip\.andam\.uk\/api\/public\//.test(url) ||
-    /^https?:\/\/([a-z0-9-]+\.)*myrestreamer\.com(:\d+)?\//i.test(url);
+  // Andam API streams and the providers' own links (device route, any provider).
+  const allowed = /^https?:\/\/[^\s]+$/i.test(url);
   if (!allowed) return { ok: false };
   const title = String((o && o.title) || 'Andam').replace(/[\r\n]/g, ' ').slice(0, 200);
   try {

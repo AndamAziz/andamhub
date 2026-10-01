@@ -130,21 +130,12 @@ async function curatedChannels(sourceId: string) {
 }
 
 /**
- * Providers whose streams the native apps may open straight from the viewer's device.
- * Used when a provider refuses the relay's IP (e.g. MYSTREEM after 2026-10-01): the apps
- * try the relay first and fall back to this link. Only returned to the Android / Windows
- * apps (`device=1`), never to the website, and only for these hosts.
+ * Every provider: the native apps (Android, Windows) play the provider's own link straight from
+ * the viewer's device, like any IPTV player app, and keep the relay as the fallback. This keeps
+ * working when a provider refuses the relay's IP. Returned only when the app asks (`device=1`);
+ * the website keeps using the relay.
  */
-const DEVICE_DIRECT_HOSTS = ['myrestreamer.com'];
-
-function deviceDirectAllowed(source: Source): boolean {
-  try {
-    const host = new URL(source.base_url).hostname.toLowerCase();
-    return DEVICE_DIRECT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
-  } catch {
-    return false;
-  }
-}
+const wantsDeviceRoute = (url: URL) => url.searchParams.get('device') === '1';
 
 const num = (v: unknown, fallback = 0) => {
   const n = Number(v);
@@ -365,7 +356,7 @@ export const Route = createFileRoute('/api/public/xtream')({
 
           if (action === 'play') {
             const kind = url.searchParams.get('type') ?? 'live';
-            const device = url.searchParams.get('device') === '1' && deviceDirectAllowed(source);
+            const device = wantsDeviceRoute(url);
             const id = url.searchParams.get('id') ?? '';
             const ext = (url.searchParams.get('ext') || '').replace(/[^a-z0-9]/gi, '');
             // Curated channel keys are not numeric, so live ids allow the wider set.
@@ -417,7 +408,7 @@ export const Route = createFileRoute('/api/public/xtream')({
           if (action === 'series_info') {
             const seriesId = url.searchParams.get('series_id') ?? '';
             if (!seriesId) return json({ error: 'series_id is required' }, 400);
-            const device = url.searchParams.get('device') === '1' && deviceDirectAllowed(source);
+            const device = wantsDeviceRoute(url);
             const info = await playerApi<SeriesInfo>(source, {
               action: 'get_series_info',
               series_id: seriesId,
