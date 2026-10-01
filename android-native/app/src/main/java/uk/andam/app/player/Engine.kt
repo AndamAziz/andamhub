@@ -84,6 +84,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     private var stallReloads = 0
     private var playingSince = 0L
     private var audioChecked = false
+    private var videoChecked = false
 
     /** Headers for the attempt being played; read on ExoPlayer's loader threads. */
     @Volatile
@@ -183,7 +184,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     Log.w(TAG, "audio track not decodable, switching to audio fix")
                     jumpToFix()
                 } else if (tracks.containsType(C.TRACK_TYPE_VIDEO) && !tracks.isTypeSupported(C.TRACK_TYPE_VIDEO)) {
-                    status = "This device cannot decode the picture of this stream (H.265/HEVC)."
+                    // Picture format this device cannot show: another route of the same channel
+                    // (e.g. its playlist version) may carry a different one; otherwise say which.
+                    if (!tryOtherPictureRoute()) {
+                        val mime = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO }?.getTrackFormat(0)?.sampleMimeType
+                        status = "This device cannot show the picture of this channel (${TrackMenu.codec(mime) ?: "unknown format"})."
+                    }
                 }
             }
 
@@ -218,6 +224,18 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     if (cur != null && !cur.fix && hasAudio && (counters == null || counters.renderedOutputBufferCount == 0)) {
                         Log.w(TAG, "no audio decoded, switching to audio fix")
                         jumpToFix()
+                    }
+                }
+                // Sound plays but not a single picture frame after 8 s (only checked while the
+                // picture is on screen — not in the background, where no frames are drawn).
+                if (!videoChecked && player.isPlaying && playingSince > 0 && System.currentTimeMillis() - playingSince > 8_000) {
+                    videoChecked = true
+                    val onScreen = player.surfaceSize.width > 0 && player.surfaceSize.height > 0
+                    val hasVideo = player.currentTracks.containsType(C.TRACK_TYPE_VIDEO)
+                    val frames = player.videoDecoderCounters?.renderedOutputBufferCount ?: 0
+                    if (onScreen && hasVideo && frames == 0) {
+                        Log.w(TAG, "sound but no picture, trying another route")
+                        if (!tryOtherPictureRoute()) status = "This channel is sending sound only right now."
                     }
                 }
                 if (player.isPlaying && playingSince > 0 && System.currentTimeMillis() - playingSince > 15_000) {
@@ -358,6 +376,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         stallSeconds = 0
         playingSince = 0
         audioChecked = false
+        videoChecked = false
         requestHeaders = a.headers
         val builder = MediaItem.Builder().setUri(a.url)
             // Title + logo for the lock screen, notification and Bluetooth displays.
@@ -399,6 +418,16 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             status = "Trying another route…"
             start(next)
         }
+    }
+
+    /** Moves to the next route of the same channel (not the sound fixer). False when none is left. */
+    private fun tryOtherPictureRoute(): Boolean {
+        val cur = attempts.getOrNull(attemptIndex) ?: return false
+        val next = (attemptIndex + 1 until attempts.size).firstOrNull { !attempts[it].fix && attempts[it].url != cur.url }
+            ?: return false
+        status = "Trying another route…"
+        start(next)
+        return true
     }
 
     private fun jumpToFix() {

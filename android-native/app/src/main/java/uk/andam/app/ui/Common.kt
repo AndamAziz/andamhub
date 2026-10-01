@@ -226,11 +226,15 @@ fun Logo(url: String, name: String, sizeDp: Int) {
         Modifier.size(sizeDp.dp).clip(RoundedCornerShape(10.dp)).background(C.Surface2),
         contentAlignment = Alignment.Center,
     ) {
-        Text(name.trim().take(1).uppercase(), color = C.Muted, fontWeight = FontWeight.Bold, fontSize = (sizeDp / 2.6).sp)
+        // The first letter stays until the logo has really loaded (a broken logo link no longer
+        // leaves an empty tile).
+        var loaded by remember(url) { mutableStateOf(false) }
+        if (!loaded) Text(name.trim().take(1).uppercase(), color = C.Muted, fontWeight = FontWeight.Bold, fontSize = (sizeDp / 2.6).sp)
         if (url.isNotBlank()) {
             AsyncImage(
                 model = url, contentDescription = null, contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().background(C.Surface2).padding(4.dp),
+                onState = { loaded = it is coil.compose.AsyncImagePainter.State.Success },
+                modifier = Modifier.fillMaxSize().padding(4.dp),
             )
         }
     }

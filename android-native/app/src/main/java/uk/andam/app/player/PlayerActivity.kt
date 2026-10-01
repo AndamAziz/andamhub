@@ -674,14 +674,15 @@ private fun ChannelPanel(ui: PlayerUiState, onPick: (Int) -> Unit, onClose: () -
                                     .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center,
                             ) {
+                                var logoOk by remember(ch.logo) { mutableStateOf(false) }
+                                if (!logoOk) Text(ch.title.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 if (ch.logo.isNotBlank()) {
                                     AsyncImage(
                                         model = ch.logo, contentDescription = null,
                                         contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                        onState = { logoOk = it is coil.compose.AsyncImagePainter.State.Success },
                                         modifier = Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 4.dp),
                                     )
-                                } else {
-                                    Text(ch.title.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
                             }
                             Text(
