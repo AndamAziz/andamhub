@@ -107,7 +107,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             .setEnableDecoderFallback(true)
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 50_000, 1_000, 2_500)
+            // Up to 2 minutes ahead: absorbs the jumps badly interleaved films need.
+            .setBufferDurationsMs(15_000, 120_000, 1_500, 3_000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -280,10 +281,16 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     return@launch
                 }
                 val relayRoutes = tokens.mapIndexed { i, t -> Attempt(Api.streamUrl(t), hls = i > 0, fix = false) }
+                // Films / episodes: follow the provider's redirect once and keep the final link
+                // (with its token) for the whole session. Otherwise every jump inside the file —
+                // frequent with badly interleaved MP4s — went back through the redirect and could
+                // land on a different, cold edge server: picture and sound stuttered.
+                if (providerDirect != null && !next.isLive) providerDirect = resolveRedirects(providerDirect!!)
+                if (mine != session) return@launch
                 // Ask the provider like a normal player app would (some panels refuse unknown agents).
                 val direct = providerDirect?.let {
                     Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true,
-                        headers = mapOf("User-Agent" to "VLC/3.0.20 LibVLC/3.0.20"))
+                        headers = mapOf("User-Agent" to PLAYER_AGENT))
                 }
                 // Providers that refuse the relay (the server only sends `direct` for those) play
                 // straight from this device at once — no waiting on the relay first.
@@ -428,7 +435,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 // A direct link refused us: move on to the relay route.
                 // From our own server: the token or channel is gone — re-mint once, then move on.
                 // When a device route exists, a refused relay moves on at once (no re-mint round trip).
-                if (current.direct || attempts.any { it.direct }) nextAttempt() else if (remints++ < 1) retry() else nextAttempt()
+                if (current.direct && !live && remints++ < 1) retry() // token may have expired: fresh link
+                else if (current.direct || attempts.any { it.direct }) nextAttempt() else if (remints++ < 1) retry() else nextAttempt()
             }
 
             else -> {
@@ -486,4 +494,27 @@ object DirectRoute {
     fun relayWorks(source: String) {
         refusedAt.remove(source)
     }
+}
+
+
+private const val PLAYER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+
+/** Follows a provider link's redirects (without downloading the file) and returns the final URL. */
+private suspend fun resolveRedirects(url: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    runCatching {
+        val client = uk.andam.app.net.Api.media.newBuilder().followRedirects(false).followSslRedirects(false).build()
+        var current = url
+        for (hop in 0 until 4) {
+            val req = okhttp3.Request.Builder().url(current)
+                .header("User-Agent", PLAYER_AGENT)
+                .header("Range", "bytes=0-0")
+                .build()
+            val next: String? = client.newCall(req).execute().use { res ->
+                if (res.isRedirect) res.header("Location")?.let { res.request.url.resolve(it)?.toString() } else null
+            }
+            if (next == null) break
+            current = next
+        }
+        current
+    }.getOrDefault(url)
 }
