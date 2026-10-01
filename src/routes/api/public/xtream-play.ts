@@ -259,23 +259,6 @@ async function fetchUpstream(
     await new Promise((r) => setTimeout(r, 350));
     res = await fetchRelay(upstream, request, relay, streamHeaders);
   }
-  // The relay's IP can be refused by a provider (MYSTREEM blocks it since 2026-10-01).
-  // Last resort for the website: fetch the provider straight from this server, which has a
-  // different IP. Browsers cannot do it themselves (http provider links on an https page).
-  if (!res.ok && !protectedStream) {
-    const direct = await fetchDirectSegment(upstream, request, streamHeaders);
-    if (direct) {
-      try {
-        await res.body?.cancel();
-      } catch {
-        /* nothing to drain */
-      }
-      // Manifests resolve their relative segment paths against the final (redirected) URL.
-      const headers = new Headers(direct.headers);
-      if (direct.url) headers.set('x-final-url', direct.url);
-      return new Response(direct.body, { status: direct.status, statusText: direct.statusText, headers });
-    }
-  }
   return res;
 }
 
