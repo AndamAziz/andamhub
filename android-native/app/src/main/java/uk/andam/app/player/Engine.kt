@@ -207,7 +207,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 val stalled = player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && item != null && error == null
                 if (stalled) {
                     stallSeconds++
-                    if (stallSeconds >= (if (live) 8 else 12)) {
+                    // Live gets longer: a slow segment usually arrives on its own, and a
+                    // reload throws away what is already buffered.
+                    if (stallSeconds >= (if (live) 20 else 12)) {
                         stallSeconds = 0
                         stallReloads++
                         if (stallReloads >= 3) nextAttempt() else reconnect("Reconnecting…", 0)
@@ -397,9 +399,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     .build(),
             )
         if (a.hls) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
-        if (live) builder.setLiveConfiguration(
-            MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(8_000).build(),
-        )
+        // Live: no forced distance from the live edge. The player uses the stream's own
+        // (3 segments, or the server's HOLD-BACK) like every IPTV player. A fixed 8 s sat
+        // inside the newest segment of 10-second-segment channels: nothing in hand, the
+        // picture waited for every new segment and the stall guard reloaded the channel.
         error = null
         player.setMediaItem(builder.build())
         player.prepare()
