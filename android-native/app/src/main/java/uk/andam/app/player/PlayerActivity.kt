@@ -1,5 +1,6 @@
 package uk.andam.app.player
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.compose.ui.focus.FocusRequester
@@ -90,6 +91,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import uk.andam.app.ui.AndamTheme
 import uk.andam.app.ui.C
 
@@ -124,12 +126,35 @@ class PlayerActivity : ComponentActivity() {
                 pick(nextIndex)
             }
         }
+        ui.subSize = PlayerPrefs.subSize(this)
+        ui.background = PlayerPrefs.backgroundAudio(this)
         engine.play(first)
+
+        ui.onSleep = { min -> setSleep(min) }
+
+        // Lock screen / notification / Bluetooth controls, and sound with the screen off.
+        PlayerHolder.player = engine.player
+        if (ui.background) runCatching { startService(Intent(this, PlaybackService::class.java)) }
 
         setContent {
             AndamTheme {
                 PlayerScreen(engine, ui, onBack = { finish() }, onZap = { zap(it) }, onPick = { pick(it) })
             }
+        }
+    }
+
+    private var sleepJob: kotlinx.coroutines.Job? = null
+
+    /** Sleep timer: pause and close the player after [minutes] (works with the screen off too). */
+    private fun setSleep(minutes: Int) {
+        sleepJob?.cancel()
+        ui.sleepMinutes = minutes
+        ui.sleepAt = if (minutes > 0) System.currentTimeMillis() + minutes * 60_000L else 0L
+        if (minutes <= 0) return
+        sleepJob = lifecycleScope.launch {
+            kotlinx.coroutines.delay(minutes * 60_000L)
+            engine.player.pause()
+            finish()
         }
     }
 
@@ -197,7 +222,36 @@ class PlayerActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         engine.saveResume()
-        engine.player.pause()
+        // "Background audio": the sound keeps going with the screen locked or another app open.
+        val keepPlaying = PlayerPrefs.backgroundAudio(this) && !isFinishing
+        if (!keepPlaying) engine.player.pause()
+    }
+
+    /** Home button while watching: shrink to a floating window (phones/tablets). */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (ui.tv || !PlayerPrefs.pip(this) || android.os.Build.VERSION.SDK_INT < 26) return
+        if (!engine.player.isPlaying) return
+        val f = engine.player.videoFormat
+        val ratio = if (f != null && f.width > 0 && f.height > 0) android.util.Rational(f.width, f.height) else android.util.Rational(16, 9)
+        runCatching {
+            enterPictureInPictureMode(
+                android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(ratio.coerceRatio())
+                    .build(),
+            )
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        ui.pip = isInPictureInPictureMode
+        if (isInPictureInPictureMode) {
+            ui.controls = false; ui.panel = false; ui.settings = false
+        } else if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+            // The floating window was closed: stop watching.
+            finish()
+        }
     }
 
     override fun onStart() {
@@ -206,8 +260,20 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        runCatching { stopService(Intent(this, PlaybackService::class.java)) }
+        PlayerHolder.player = null
         if (::engine.isInitialized) engine.release()
         super.onDestroy()
+    }
+}
+
+/** Android only accepts picture-in-picture ratios between 1:2.39 and 2.39:1. */
+private fun android.util.Rational.coerceRatio(): android.util.Rational {
+    val v = toFloat()
+    return when {
+        v > 2.39f -> android.util.Rational(239, 100)
+        v < 1 / 2.39f -> android.util.Rational(100, 239)
+        else -> this
     }
 }
 
@@ -221,6 +287,17 @@ class PlayerUiState {
     var pokes by mutableIntStateOf(0)
     /** Remote-control layout (Android TV, Fire TV, TV boxes). */
     var tv = false
+    /** Floating picture-in-picture window: no overlays. */
+    var pip by mutableStateOf(false)
+    /** Subtitle size 0..3 (PlayerPrefs). */
+    var subSize by mutableIntStateOf(1)
+    /** Sound keeps playing with the screen off. */
+    var background by mutableStateOf(true)
+    /** Sleep timer: minutes chosen (0 = off) and when it fires (ms since boot clock). */
+    var sleepMinutes by mutableIntStateOf(0)
+    var sleepAt by mutableStateOf(0L)
+    /** Set by the activity: starts / cancels the sleep timer (minutes, 0 = off). */
+    var onSleep: (Int) -> Unit = {}
 
     fun poke() {
         controls = true
@@ -286,7 +363,20 @@ private fun PlayerScreen(
                     descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 }
             },
-            update = { it.resizeMode = ui.resize },
+            update = { v ->
+                v.resizeMode = ui.resize
+                // Readable subtitles: white with a soft dark box, size from Settings.
+                v.subtitleView?.apply {
+                    setStyle(
+                        androidx.media3.ui.CaptionStyleCompat(
+                            android.graphics.Color.WHITE, android.graphics.Color.argb(140, 0, 0, 0),
+                            android.graphics.Color.TRANSPARENT, androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                            android.graphics.Color.BLACK, null,
+                        ),
+                    )
+                    setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * listOf(0.8f, 1f, 1.3f, 1.6f)[ui.subSize.coerceIn(0, 3)])
+                }
+            },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -324,7 +414,7 @@ private fun PlayerScreen(
         }
 
         engine.status?.let {
-            if (engine.error == null) Pill(it, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
+            if (engine.error == null && !ui.pip) Pill(it, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
         }
 
         engine.error?.let { msg ->
@@ -625,6 +715,7 @@ private fun GuideHeader(text: String, align: Alignment.Horizontal) {
 
 @Composable
 private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val VIDEO = androidx.media3.common.C.TRACK_TYPE_VIDEO
     val AUDIO = androidx.media3.common.C.TRACK_TYPE_AUDIO
     val TEXT = androidx.media3.common.C.TRACK_TYPE_TEXT
@@ -684,7 +775,7 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
         }
 
         if (audio.isNotEmpty()) {
-            item { Section("Audio") }
+            item { Section(if (audio.size > 1) "Audio language (${audio.size})" else "Audio") }
             itemsIndexed(audio) { _, o -> Option(o.label, o.selected) { TrackMenu.select(engine.player, o) } }
         }
 
@@ -701,6 +792,36 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
             item { Section("Speed") }
             itemsIndexed(listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)) { _, s ->
                 Option(if (s == 1f) "Normal" else "${s}×", speed == s) { engine.player.setPlaybackSpeed(s); speed = s }
+            }
+        }
+
+        if (text.isNotEmpty()) {
+            item { Section("Subtitle size") }
+            itemsIndexed(listOf("Small", "Normal", "Large", "Extra large")) { i, label ->
+                Option(label, ui.subSize == i) { ui.subSize = i; PlayerPrefs.setSubSize(ctx, i) }
+            }
+        }
+
+        item { Section("Sleep timer") }
+        itemsIndexed(listOf(0, 15, 30, 60, 90)) { _, m ->
+            val left = if (ui.sleepAt > 0 && ui.sleepMinutes == m) ((ui.sleepAt - System.currentTimeMillis()) / 60_000L + 1).coerceAtLeast(1) else 0
+            Option(
+                if (m == 0) "Off" else "$m minutes",
+                ui.sleepMinutes == m,
+                hint = if (left > 0) "Stops in $left min" else null,
+            ) { ui.onSleep(m) }
+        }
+
+        item { Section("Background") }
+        item {
+            Option(
+                "Keep sound with screen off",
+                ui.background,
+                hint = if (ui.background) "On: locks screen, sound continues" else "Off: pauses when you leave",
+            ) {
+                ui.background = !ui.background
+                PlayerPrefs.setBackgroundAudio(ctx, ui.background)
+                if (ui.background) runCatching { ctx.startService(Intent(ctx, PlaybackService::class.java)) }
             }
         }
 

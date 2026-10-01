@@ -32,8 +32,19 @@ object TrackMenu {
         }
         return when (type) {
             C.TRACK_TYPE_VIDEO -> listOfNotNull(if (f.height > 0) "${f.height}p" else "Track $n", mbps(f.bitrate)).joinToString(" · ")
-            C.TRACK_TYPE_AUDIO -> listOfNotNull(f.label ?: lang ?: "Track $n", channels(f.channelCount)).joinToString(" · ")
-            else -> f.label ?: lang ?: "Subtitle $n"
+            // e.g. "Kurdish · 5.1 · Dolby E-AC-3" or "Arabic (Commentary) · Stereo · AAC"
+            C.TRACK_TYPE_AUDIO -> listOfNotNull(
+                when {
+                    f.label != null && lang != null && !f.label!!.contains(lang, true) -> "$lang (${f.label})"
+                    else -> f.label ?: lang ?: "Audio $n"
+                },
+                channels(f.channelCount),
+                codec(f.sampleMimeType ?: f.codecs?.let { "audio/$it" }),
+            ).joinToString(" · ")
+            else -> when {
+                f.label != null && lang != null && !f.label!!.contains(lang, true) -> "$lang (${f.label})"
+                else -> f.label ?: lang ?: "Subtitle $n"
+            } + if ((f.selectionFlags and C.SELECTION_FLAG_FORCED) != 0) " · Forced" else ""
         }
     }
 

@@ -63,6 +63,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
     implementation("androidx.media3:media3-datasource-okhttp:$media3")
     implementation("androidx.media3:media3-ui:$media3")
+    // Lock-screen / notification controls and background playback.
+    implementation("androidx.media3:media3-session:$media3")
     // Software AC3 / E-AC3 / DTS / MP2 audio (sound on devices without those decoders).
     // Picked up automatically by DefaultRenderersFactory; no code references it.
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1")

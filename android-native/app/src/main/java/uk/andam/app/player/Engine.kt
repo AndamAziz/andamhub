@@ -143,6 +143,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        // Viewer's preferred audio / subtitle languages (Account → Player settings).
+        player.trackSelectionParameters = PlayerPrefs.apply(context, player.trackSelectionParameters)
 
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -358,6 +360,14 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         audioChecked = false
         requestHeaders = a.headers
         val builder = MediaItem.Builder().setUri(a.url)
+            // Title + logo for the lock screen, notification and Bluetooth displays.
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setArtist(subtitle.ifBlank { if (live) "Live" else "Andam" })
+                    .setArtworkUri(logo.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) })
+                    .build(),
+            )
         if (a.hls) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
         if (live) builder.setLiveConfiguration(
             MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(8_000).build(),

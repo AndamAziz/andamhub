@@ -306,6 +306,7 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit) {
                 shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp).tvFocus(RoundedCornerShape(14.dp), 1.02f),
             ) { Text("Sign out", color = C.Text) }
         }
+        PlayerSettingsCard()
         UpdateCard()
         DiagnosticsCard()
         ContactCard()
