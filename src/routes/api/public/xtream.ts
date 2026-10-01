@@ -235,14 +235,18 @@ export const Route = createFileRoute('/api/public/xtream')({
           if (action === 'categories') {
             const kind = (url.searchParams.get('type') ?? 'live') as XtreamKind;
 
-            // Curated live lists carry their own groups instead of provider
-            // category ids, so the filter bar must list those.
-            if (kind === 'live') {
+            const map: Record<XtreamKind, string> = {
+              live: 'get_live_categories',
+              vod: 'get_vod_categories',
+              series: 'get_series_categories',
+            };
+            // The provider's own categories, exactly as it lists them. A stored channel list
+            // (curated / imported) is only used when the provider itself gives no live list.
+            const own = await playerApi<Category[]>(source, { action: map[kind] }).catch(() => null);
+            if (kind === 'live' && !(Array.isArray(own) && own.length > 0)) {
               const curated = await curatedChannels(source.id);
               if (curated.length > 0) {
-                const groups = [...new Set(curated.map((c) => c.group))].sort((a, b) =>
-                  a.localeCompare(b),
-                );
+                const groups = [...new Set(curated.map((c) => c.group))];
                 return json({
                   categories: applyOverrides(
                     groups.map((g) => ({ id: g, name: g })),
@@ -252,13 +256,8 @@ export const Route = createFileRoute('/api/public/xtream')({
               }
             }
 
-            const map: Record<XtreamKind, string> = {
-              live: 'get_live_categories',
-              vod: 'get_vod_categories',
-              series: 'get_series_categories',
-            };
-            const cats = await playerApi<Category[]>(source, { action: map[kind] });
-            const categories = (Array.isArray(cats) ? cats : []).map((c) => ({
+            if (own == null) throw new Error('The provider did not answer. Try again.');
+            const categories = (Array.isArray(own) ? own : []).map((c) => ({
               id: String(c.category_id),
               name: c.category_name,
             }));
@@ -270,29 +269,32 @@ export const Route = createFileRoute('/api/public/xtream')({
           if (action === 'live') {
             const categoryId = url.searchParams.get('category_id') ?? '';
 
-            // A curated list (rebuilt from stored credentials, or imported from a
-            // provider submission) replaces the provider's own live list.
-            const curated = await curatedChannels(source.id);
-            if (curated.length > 0) {
-              const items = curated
-                .filter((c) => !categoryId || c.group === categoryId)
-                .map((c) => ({
-                  id: c.key,
-                  num: c.num,
-                  name: c.name,
-                  logo: c.logo,
-                  archive: false,
-                  archiveDays: 0,
-                  categoryId: c.group,
-                }));
-              const shown = applyOverrides(items, await loadOverrides(source.id, 'live'), 'logo');
-              return json({ items: shown, hasArchive: false, curated: true });
-            }
-
+            // The provider's own live list, in full. A stored channel list (curated or
+            // imported from a provider submission) is only used when the provider gives none.
             const streams = await playerApi<LiveStream[]>(source, {
               action: 'get_live_streams',
               ...(categoryId ? { category_id: categoryId } : {}),
-            });
+            }).catch(() => null);
+            if (!(Array.isArray(streams) && streams.length > 0)) {
+              const curated = await curatedChannels(source.id);
+              if (curated.length > 0) {
+                const items = curated
+                  .filter((c) => !categoryId || c.group === categoryId)
+                  .map((c) => ({
+                    id: c.key,
+                    num: c.num,
+                    name: c.name,
+                    logo: c.logo,
+                    archive: false,
+                    archiveDays: 0,
+                    categoryId: c.group,
+                  }));
+                const shown = applyOverrides(items, await loadOverrides(source.id, 'live'), 'logo');
+                return json({ items: shown, hasArchive: false, curated: true });
+              }
+            }
+
+            if (streams == null) throw new Error('The provider did not answer. Try again.');
             const list = Array.isArray(streams) ? streams : [];
             // Playback tokens are minted on demand (action=play) so a 5000-channel
             // list stays fast.
@@ -383,7 +385,11 @@ export const Route = createFileRoute('/api/public/xtream')({
                   return null;
                 }
               })();
-              if (channel) {
+              // A stored copy of this provider's own channel plays like any provider channel
+              // (with the device HLS route); only imported channels with their own URL differ.
+              const sameAsProvider =
+                channel != null && /^\d+$/.test(id) && channel.url === liveStreamUrl(source, id, 'ts');
+              if (channel && !sameAsProvider) {
                 // Imported/curated channels carry their own absolute stream URL.
                 return json({
                   play: await sealUrl(tagRelay(channel.url, source)),
