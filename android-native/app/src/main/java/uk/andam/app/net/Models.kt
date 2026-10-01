@@ -76,6 +76,8 @@ data class PlayTokens(
     val fallback: String?,
     /** Provider link for playing straight from this device (only for providers that block the relay). */
     val direct: String? = null,
+    /** Same provider link as a playlist (live channels). */
+    val directHls: String? = null,
 )
 
 class ApiException(val code: Int, message: String) : Exception(message)

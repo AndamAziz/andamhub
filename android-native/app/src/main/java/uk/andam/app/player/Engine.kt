@@ -158,7 +158,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 }
                 if (state == Player.STATE_ENDED) {
                     // A live stream never really ends: the upstream closed the socket. Reopen it.
-                    if (live) reconnect("Reconnecting…", 500) else {
+                    if (live) reconnect("Reconnecting…", 0) else {
                         playing = false
                         onEnded?.invoke()
                     }
@@ -277,8 +277,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 val list = ArrayList<Attempt>()
                 // Provider link to try from this device when the relay is refused (see DirectRoute).
                 var providerDirect: String? = null
+                var providerDirectHls: String? = null
                 val tokens: List<String> = when (next.kind) {
-                    Kind.LIVE -> Api.play(next.source, "live", next.id).let { providerDirect = it.direct; listOfNotNull(it.play, it.fallback) }
+                    Kind.LIVE -> Api.play(next.source, "live", next.id).let {
+                        providerDirect = it.direct; providerDirectHls = it.directHls
+                        listOfNotNull(it.play, it.fallback)
+                    }
                     Kind.VOD -> Api.play(next.source, "vod", next.id, next.ext).let { providerDirect = it.direct; listOf(it.play) }
                     Kind.EPISODE -> if (next.token != null) {
                         providerDirect = next.direct
@@ -314,6 +318,11 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 }
                 // Providers that refuse the relay (the server only sends `direct` for those) play
                 // straight from this device at once — no waiting on the relay first.
+                // Live: the provider's playlist first — the player keeps a few seconds in hand, so a
+                // network hiccup or a closed connection never shows as "Reconnecting…".
+                providerDirectHls?.let {
+                    list.add(Attempt(it, hls = true, fix = false, direct = true, headers = mapOf("User-Agent" to PLAYER_AGENT)))
+                }
                 if (direct != null) list.add(direct)
                 list.addAll(relayRoutes)
                 if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
@@ -399,7 +408,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     private fun reconnect(message: String, delayMs: Long) {
         val mine = session
-        status = message
+        // Quiet reconnect: the message only appears if the picture has not come back in 3 s.
+        status = null
+        scope.launch {
+            delay(3000)
+            if (mine == session && buffering && error == null) status = message
+        }
         retryJob?.cancel()
         retryJob = scope.launch {
             delay(delayMs)

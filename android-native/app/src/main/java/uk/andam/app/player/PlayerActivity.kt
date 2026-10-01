@@ -402,7 +402,13 @@ private fun PlayerScreen(
         )
 
         // Loading ring: same inset-aware centre as the controls, so it wraps the play button exactly.
-        if (engine.buffering && engine.error == null) {
+        // The ring only appears when loading lasts (short hiccups stay invisible).
+        var showRing by remember { mutableStateOf(false) }
+        LaunchedEffect(engine.buffering) {
+            showRing = false
+            if (engine.buffering) { delay(900); showRing = true }
+        }
+        if (showRing && engine.buffering && engine.error == null) {
             Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     color = C.Ember,

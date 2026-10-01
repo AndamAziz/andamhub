@@ -388,7 +388,11 @@ export const Route = createFileRoute('/api/public/xtream')({
               return json({
                 play: await sealUrl(tagRelay(liveStreamUrl(source, id, 'ts'), source)),
                 fallback: await sealUrl(tagRelay(liveStreamUrl(source, id, 'm3u8'), source)),
-                ...(device ? { direct: liveStreamUrl(source, id, 'ts') } : {}),
+                // Device route: the playlist (HLS) version rides out network hiccups without a
+                // visible reconnect; the progressive .ts link stays as its fallback.
+                ...(device
+                  ? { direct: liveStreamUrl(source, id, 'ts'), directHls: liveStreamUrl(source, id, 'm3u8') }
+                  : {}),
               });
             }
             if (kind === 'vod')

@@ -168,7 +168,10 @@ object Api {
     /** type = live | vod | series */
     suspend fun play(source: String, type: String, id: String, ext: String = ""): PlayTokens {
         val j = get(X, mapOf("action" to "play", "source" to source, "type" to type, "id" to id, "ext" to ext, "device" to "1"))
-        return PlayTokens(j.str("play"), j.str("fallback").ifBlank { null }, j.str("direct").ifBlank { null })
+        return PlayTokens(
+            j.str("play"), j.str("fallback").ifBlank { null }, j.str("direct").ifBlank { null },
+            j.str("directHls").ifBlank { null },
+        )
     }
 
     // ---------------- IPTV (M3U playlists) ----------------
