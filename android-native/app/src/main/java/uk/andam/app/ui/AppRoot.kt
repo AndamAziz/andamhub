@@ -116,6 +116,16 @@ private fun Main(onSignIn: () -> Unit) {
         Store.refresh(context)
         ready = true
     }
+    // Welcome screen on launch: stays until the app has loaded and its short intro has played,
+    // then fades into the app. Not shown again on rotation or when returning to the app.
+    var introDone by rememberSaveable { mutableStateOf(false) }
+    val launchedAt = remember { android.os.SystemClock.elapsedRealtime() }
+    LaunchedEffect(ready) {
+        if (ready && !introDone) {
+            kotlinx.coroutines.delay((1300L - (android.os.SystemClock.elapsedRealtime() - launchedAt)).coerceAtLeast(0L))
+            introDone = true
+        }
+    }
     // Quiet update check once per launch; a banner appears when a newer build exists.
     LaunchedEffect(Unit) {
         runCatching { uk.andam.app.Updater.check() }.getOrNull()?.let { UpdateState.available = it }
@@ -141,57 +151,69 @@ private fun Main(onSignIn: () -> Unit) {
         }
     }
 
-    if (LocalTv.current) {
-        TvShell(tab, account, onTab = { tab = it; account = false; admin = "" }, onAccount = { account = true; admin = "" }, body = body)
-        return
+    val shell: @Composable () -> Unit = {
+        if (LocalTv.current) {
+            TvShell(tab, account, onTab = { tab = it; account = false; admin = "" }, onAccount = { account = true; admin = "" }, body = body)
+        } else {
+            Scaffold(
+                containerColor = C.Bg,
+                topBar = {
+                    Row(
+                        Modifier.fillMaxWidth().background(C.Bg).statusBarsPadding().padding(start = 16.dp, end = 6.dp, top = 8.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (account) {
+                            IconButton(onClick = { if (admin.isNotEmpty()) admin = "" else account = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                            Text(if (admin.isNotEmpty()) "Admin" else "Account", style = MaterialTheme.typography.titleLarge)
+                        } else {
+                            BrandMark(30)
+                            Text("Andam", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 10.dp))
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (!account) {
+                            when (tab) {
+                                1, 2, 3 -> SourcePicker(Store.providers.map { it.id to it.name }, Store.provider) { Store.pickProvider(context, it) }
+                                4 -> SourcePicker(Store.iptvSources.map { it.id to it.name }, Store.iptvSource) { Store.pickIptv(context, it) }
+                            }
+                            IconButton(onClick = { account = true }) { Icon(Icons.Filled.AccountCircle, "Account", tint = C.Muted) }
+                        }
+                    }
+                },
+                bottomBar = {
+                    if (!account) NavigationBar(containerColor = C.Surface, tonalElevation = 0.dp) {
+                        tabs.forEachIndexed { i, t ->
+                            NavigationBarItem(
+                                selected = tab == i,
+                                onClick = { tab = i },
+                                icon = { Icon(t.icon, t.label) },
+                                label = { Text(t.label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = C.Ember, selectedTextColor = C.Text,
+                                    unselectedIconColor = C.Faint, unselectedTextColor = C.Faint,
+                                    indicatorColor = C.EmberDim,
+                                ),
+                            )
+                        }
+                    }
+                },
+            ) { pad ->
+                Column(Modifier.padding(pad).fillMaxSize()) {
+                    if (!account) UpdateBanner(onOpen = { account = true })
+                    Box(Modifier.weight(1f).fillMaxWidth()) { body() }
+                }
+            }
+        }
     }
 
-    Scaffold(
-        containerColor = C.Bg,
-        topBar = {
-            Row(
-                Modifier.fillMaxWidth().background(C.Bg).statusBarsPadding().padding(start = 16.dp, end = 6.dp, top = 8.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (account) {
-                    IconButton(onClick = { if (admin.isNotEmpty()) admin = "" else account = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                    Text(if (admin.isNotEmpty()) "Admin" else "Account", style = MaterialTheme.typography.titleLarge)
-                } else {
-                    BrandMark(30)
-                    Text("Andam", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 10.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                if (!account) {
-                    when (tab) {
-                        1, 2, 3 -> SourcePicker(Store.providers.map { it.id to it.name }, Store.provider) { Store.pickProvider(context, it) }
-                        4 -> SourcePicker(Store.iptvSources.map { it.id to it.name }, Store.iptvSource) { Store.pickIptv(context, it) }
-                    }
-                    IconButton(onClick = { account = true }) { Icon(Icons.Filled.AccountCircle, "Account", tint = C.Muted) }
-                }
-            }
-        },
-        bottomBar = {
-            if (!account) NavigationBar(containerColor = C.Surface, tonalElevation = 0.dp) {
-                tabs.forEachIndexed { i, t ->
-                    NavigationBarItem(
-                        selected = tab == i,
-                        onClick = { tab = i },
-                        icon = { Icon(t.icon, t.label) },
-                        label = { Text(t.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = C.Ember, selectedTextColor = C.Text,
-                            unselectedIconColor = C.Faint, unselectedTextColor = C.Faint,
-                            indicatorColor = C.EmberDim,
-                        ),
-                    )
-                }
-            }
-        },
-    ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
-            if (!account) UpdateBanner(onOpen = { account = true })
-            Box(Modifier.weight(1f).fillMaxWidth()) { body() }
-        }
+    Box(Modifier.fillMaxSize().background(C.Bg)) {
+        // After a rotation the app shows straight away (with its loading spinner) — no intro again.
+        if (ready || introDone) shell()
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !introDone,
+            enter = androidx.compose.animation.EnterTransition.None,
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(600)) +
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(600), targetScale = 1.06f),
+        ) { WelcomeScreen(user?.email) }
     }
 }
 
