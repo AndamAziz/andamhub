@@ -16,6 +16,19 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 
+/** The auth session id inside the bearer token (one sign-in = one login-log row). */
+function sessionIdOf(request: Request): string | null {
+  try {
+    const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const json = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.session_id === 'string' ? json.session_id : null;
+  } catch {
+    return null;
+  }
+}
+
 export const Route = createFileRoute('/api/public/access')({
   server: {
     handlers: {
@@ -23,6 +36,22 @@ export const Route = createFileRoute('/api/public/access')({
         try {
           const { resolveAccess } = await import('@/lib/access.server');
           const access = await resolveAccess(request);
+          // Register the account on first sight and log the sign-in (once per session), so
+          // accounts created in the Android / TV / Windows apps appear in the admin panel too.
+          if (access.signedIn && access.userId) {
+            try {
+              const { syncAccount } = await import('@/lib/account.server');
+              await syncAccount(
+                access.userId,
+                access.email ?? '',
+                request.headers.get('user-agent'),
+                true,
+                sessionIdOf(request),
+              );
+            } catch (err) {
+              console.error('[access] account sync failed', err);
+            }
+          }
           return json({
             signedIn: access.signedIn,
             admin: access.admin,

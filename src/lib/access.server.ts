@@ -20,6 +20,8 @@ export type Access = {
   sections: Section[];
   /** Provider ids allowed for `live`; `'all'` means every provider. */
   liveSources: string[] | 'all';
+  /** Signed-in account's e-mail (used to register the account on first sight). */
+  email?: string | null;
 };
 
 const LOCKED: Access = {
@@ -98,9 +100,10 @@ export async function resolveAccess(request: Request): Promise<Access> {
   const { data: userData } = await supabaseAdmin.auth.getUser(token);
   const userId = userData?.user?.id ?? null;
   if (!userId) return { ...LOCKED };
+  const email = userData?.user?.email ?? null;
 
   if (isOwnerEmail(userData?.user?.email)) {
-    return { signedIn: true, userId, admin: true, sections: [...SECTIONS], liveSources: 'all' };
+    return { signedIn: true, userId, email, admin: true, sections: [...SECTIONS], liveSources: 'all' };
   }
 
   const { data: roles } = await supabaseAdmin
@@ -110,7 +113,7 @@ export async function resolveAccess(request: Request): Promise<Access> {
 
   const admin = (roles ?? []).some((r) => r.role === 'admin');
   if (admin) {
-    return { signedIn: true, userId, admin: true, sections: [...SECTIONS], liveSources: 'all' };
+    return { signedIn: true, userId, email, admin: true, sections: [...SECTIONS], liveSources: 'all' };
   }
 
   const rows = await liveGrants(userId);
@@ -132,6 +135,7 @@ export async function resolveAccess(request: Request): Promise<Access> {
   return {
     signedIn: true,
     userId,
+    email,
     admin: false,
     sections: [...sections],
     liveSources: [...new Set((assigned ?? []).map((r) => String(r.source_id)))],

@@ -263,7 +263,55 @@ export type AdminUser = {
   sourceIds: string[];
 };
 
+/**
+ * Every registered sign-in account (auth users), page by page. Accounts created in the apps or
+ * that never opened the website have no profile row yet; those rows are created here so every
+ * account shows up in the admin panel and can be managed like any other.
+ */
+export async function ensureProfiles(): Promise<number> {
+  type AuthUser = { id: string; email?: string | null; created_at?: string; last_sign_in_at?: string | null };
+  const users: AuthUser[] = [];
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const batch = (data?.users ?? []) as AuthUser[];
+    users.push(...batch);
+    if (batch.length < 1000) break;
+  }
+
+  const have = new Set(
+    (
+      await allRows((a, b) => supabaseAdmin.from('profiles').select('id').order('id').range(a, b))
+    ).map((p) => p.id),
+  );
+  const missing = users.filter((u) => !have.has(u.id));
+  for (let i = 0; i < missing.length; i += 500) {
+    const part = missing.slice(i, i + 500);
+    const { error } = await supabaseAdmin.from('profiles').upsert(
+      part.map((u) => ({
+        id: u.id,
+        email: u.email ?? '',
+        display_name: (u.email ?? '').split('@')[0] || 'Viewer',
+        ...(u.created_at ? { created_at: u.created_at } : {}),
+        ...(u.last_sign_in_at ? { last_login_at: u.last_sign_in_at } : {}),
+      })),
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+    if (error) throw new Error(error.message);
+    await supabaseAdmin
+      .from('user_roles')
+      .upsert(
+        part.map((u) => ({ user_id: u.id, role: 'user' as const })),
+        { onConflict: 'user_id,role', ignoreDuplicates: true },
+      );
+  }
+  return users.length;
+}
+
 export async function listUsers(): Promise<AdminUser[]> {
+  // Accounts registered anywhere (website, Android/TV app, Windows) are listed — never only
+  // the ones that happened to open the website.
+  await ensureProfiles().catch((err) => console.error('[admin] profile backfill failed', err));
   // Every account, page by page — no cap on how many users are listed.
   const [profiles, roles, access] = await Promise.all([
     allRows((a, b) =>
@@ -525,7 +573,9 @@ export async function adminOverview() {
         ...(await probeProvider(s)),
       })),
     ),
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
+    ensureProfiles()
+      .catch(() => null)
+      .then(() => supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true })),
     supabaseAdmin
       .from('login_activity')
       .select('email, created_at, user_agent')
