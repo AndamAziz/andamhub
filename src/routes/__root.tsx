@@ -78,7 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      // Installable as an app ("Add to Home Screen" on iPhone/iPad, "Install app" on Android/desktop):
+      // opens full screen without browser bars, always the current version from the server.
+      { name: "theme-color", content: "#0A0B0F" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Andam" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { title: "Andam" },
       { name: "description", content: "Andam live TV, movies and shows." },
       { name: "author", content: "Andam" },
@@ -99,6 +106,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,

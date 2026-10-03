@@ -72,15 +72,23 @@ function Index() {
 
   return (
     <>
+      <div aria-hidden style={{ position: "fixed", inset: 0, background: "#08090C" }} />
       <iframe
       ref={frame}
       src="/andam.html"
       title="Andam streaming homepage"
+      allow="autoplay; fullscreen; picture-in-picture"
+      allowFullScreen
+      // Installed on an iPhone (full screen): keep the page clear of the notch / status bar
+      // and the home indicator. In a normal browser these insets are 0.
       style={{
         position: "fixed",
-        inset: 0,
-        width: "100%",
-        height: "100%",
+        top: "env(safe-area-inset-top, 0px)",
+        right: "env(safe-area-inset-right, 0px)",
+        bottom: "env(safe-area-inset-bottom, 0px)",
+        left: "env(safe-area-inset-left, 0px)",
+        width: "calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))",
+        height: "calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
         border: 0,
         background: "#08090C",
         }}
