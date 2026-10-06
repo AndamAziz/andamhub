@@ -152,8 +152,77 @@ export function readRelay(tagged: string): { upstream: string; relay: RelayConfi
   return { upstream, relay: null };
 }
 
+/** The provider address as entered, without a trailing slash or a pasted "/player_api.php". */
+function apiBase(source: Source): string {
+  return source.base_url.trim().replace(/\/+$/, '').replace(/\/player_api\.php$/i, '');
+}
+
+/**
+ * Where a provider serves its streams (/live, /movie, /series, /timeshift).
+ *
+ * Classic Xtream panels serve both the API and the streams from the server root. Some panels
+ * keep player_api.php under a path (e.g. https://host/api/public) but still serve the streams
+ * from the root. The right root is learned once per provider (see learnStreamBase); until then,
+ * and for every provider entered without a path, it is simply the address as entered.
+ */
+const streamRoots = new Map<string, string>();
+const rootKey = (source: Source) => `${source.id}|${apiBase(source)}`;
+function streamBase(source: Source): string {
+  return streamRoots.get(rootKey(source)) ?? apiBase(source);
+}
+
+/**
+ * For providers entered with a path: checks whether streams answer under that path; if they
+ * give 404 there but answer at the server root, the root is used from then on. Generic — no
+ * provider is named — and providers entered without a path are never probed.
+ */
+export async function learnStreamBase(
+  source: Source,
+  sampleId: string | number,
+  kind: 'live' | 'movie' | 'series' = 'live',
+  ext = 'm3u8',
+): Promise<void> {
+  const key = rootKey(source);
+  if (streamRoots.has(key)) return;
+  const base = apiBase(source);
+  let origin = '';
+  try {
+    const u = new URL(base);
+    if (u.pathname === '' || u.pathname === '/') {
+      streamRoots.set(key, base);
+      return;
+    }
+    origin = u.origin;
+  } catch {
+    return;
+  }
+  const status = async (root: string) => {
+    try {
+      const res = await fetch(`${root}/${kind}/${source.username}/${source.password}/${sampleId}.${ext}`, {
+        redirect: 'manual',
+        headers: { 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20' },
+      });
+      try {
+        await res.body?.cancel();
+      } catch {
+        /* nothing to release */
+      }
+      return res.status;
+    } catch {
+      return 0;
+    }
+  };
+  const answers = (code: number) => code >= 200 && code < 400;
+  const atBase = await status(base);
+  if (answers(atBase)) {
+    streamRoots.set(key, base);
+    return;
+  }
+  if (atBase === 404 && answers(await status(origin))) streamRoots.set(key, origin);
+}
+
 function apiUrl(source: Source, params: Record<string, string>): string {
-  const base = source.base_url.replace(/\/+$/, '');
+  const base = apiBase(source);
   const qs = new URLSearchParams({
     username: source.username,
     password: source.password,
@@ -219,17 +288,17 @@ export async function playerApi<T>(source: Source, params: Record<string, string
 
 
 export function liveStreamUrl(source: Source, streamId: string | number, ext = 'm3u8'): string {
-  const base = source.base_url.replace(/\/+$/, '');
+  const base = streamBase(source);
   return `${base}/live/${source.username}/${source.password}/${streamId}.${ext}`;
 }
 
 export function vodStreamUrl(source: Source, streamId: string | number, ext = 'mp4'): string {
-  const base = source.base_url.replace(/\/+$/, '');
+  const base = streamBase(source);
   return `${base}/movie/${source.username}/${source.password}/${streamId}.${ext}`;
 }
 
 export function seriesStreamUrl(source: Source, episodeId: string | number, ext = 'mp4'): string {
-  const base = source.base_url.replace(/\/+$/, '');
+  const base = streamBase(source);
   return `${base}/series/${source.username}/${source.password}/${episodeId}.${ext}`;
 }
 
@@ -240,6 +309,6 @@ export function timeshiftUrl(
   durationMinutes: number,
   start: string,
 ): string {
-  const base = source.base_url.replace(/\/+$/, '');
+  const base = streamBase(source);
   return `${base}/timeshift/${source.username}/${source.password}/${durationMinutes}/${start}/${streamId}.m3u8`;
 }

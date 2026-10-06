@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { sealUrl } from '@/lib/xtream-crypto';
 import {
+  learnStreamBase,
   liveStreamUrl,
   playerApi,
   seriesStreamUrl,
@@ -376,6 +377,15 @@ export const Route = createFileRoute('/api/public/xtream')({
             // Curated channel keys are not numeric, so live ids allow the wider set.
             const valid = kind === 'live' ? /^[A-Za-z0-9_.-]{1,80}$/ : /^\d+$/;
             if (!valid.test(id)) return json({ error: 'id is required' }, 400);
+            // Providers whose API sits under a path may serve streams from the server root.
+            if (/^\d+$/.test(id)) {
+              await learnStreamBase(
+                source,
+                id,
+                kind === 'live' ? 'live' : kind === 'vod' ? 'movie' : 'series',
+                kind === 'live' ? 'm3u8' : ext || 'mp4',
+              );
+            }
             if (kind === 'live') {
               const channel = await (async () => {
                 const { findLiveChannel } = await import('@/lib/live-channels.server');
@@ -435,6 +445,14 @@ export const Route = createFileRoute('/api/public/xtream')({
               action: 'get_series_info',
               series_id: seriesId,
             });
+            {
+              const firstEp = Object.values(info.episodes ?? {}).flat()[0] as
+                | { id?: string | number; container_extension?: string }
+                | undefined;
+              if (firstEp?.id != null) {
+                await learnStreamBase(source, firstEp.id, 'series', firstEp.container_extension || 'mp4');
+              }
+            }
             const seasonKeys = Object.keys(info.episodes ?? {}).sort(
               (a, b) => Number(a) - Number(b),
             );
