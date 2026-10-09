@@ -511,7 +511,11 @@ export const Route = createFileRoute('/api/public/xtream')({
             const id = url.searchParams.get('id') ?? '';
             if (!/^\d{1,12}$/.test(id)) return json({ error: 'id is required' }, 400);
             const { mediaDetails, langOf } = await import('@/lib/tmdb.server');
-            return json(await mediaDetails(source, type, id, langOf(url.searchParams.get('lang'))));
+            const hint = {
+              name: (url.searchParams.get('name') ?? '').slice(0, 200),
+              year: (url.searchParams.get('year') ?? '').slice(0, 10),
+            };
+            return json(await mediaDetails(source, type, id, langOf(url.searchParams.get('lang')), hint));
           }
 
           if (action === 'season') {

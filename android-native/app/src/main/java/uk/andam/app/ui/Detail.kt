@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Star
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -60,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,7 +96,7 @@ fun MovieDetail(source: String, vod: VodItem, onBack: () -> Unit) {
     var details by remember(vod.id) { mutableStateOf<MediaDetails?>(null) }
     var subs by remember(vod.id) { mutableStateOf<OnlineSubs?>(null) }
     LaunchedEffect(vod.id) {
-        details = runCatching { Api.details(source, "movie", vod.id) }.getOrNull()
+        details = runCatching { Api.details(source, "movie", vod.id, name = vod.name, year = vod.year) }.getOrNull()
         val tmdb = details?.tmdbId ?: 0
         if (tmdb > 0) subs = runCatching { Api.subtitles(tmdb, "movie") }.getOrNull()
     }
@@ -122,7 +125,7 @@ fun MovieDetail(source: String, vod: VodItem, onBack: () -> Unit) {
                             if (resume > 0) "Resume ${clock(resume)}" else "Play",
                             Icons.Filled.PlayArrow, primary = true, modifier = Modifier.weight(1f),
                         ) { prep.play(context, item, cc) { PlayQueue.open(context, listOf(it), 0) } }
-                        if (resume > 0) HeroButton("From start", Icons.Filled.Replay, primary = false) {
+                        if (resume > 0) HeroButton("", Icons.Filled.Replay, primary = false) {
                             Resume.clear(context, item.resumeKey); resume = 0
                             prep.play(context, item, cc) { PlayQueue.open(context, listOf(it), 0) }
                         }
@@ -218,36 +221,42 @@ fun PrepOverlay(prep: PrepWait) {
 fun CcRow(subs: OnlineSubs?, selected: String, keyOf: (String) -> SubPrep.Key, onSelect: (String) -> Unit) {
     val found = subs?.subs?.map { it.lang }.orEmpty()
     val kurdish = subs != null && (subs.kurdishUrl != null || "ku" in found)
-    val langs = listOf("off", "ku", "en", "ar") + found.filter { it !in setOf("ku", "en", "ar") }.distinct()
+    val langs = (listOf("off", "ku", "en", "ar") + found.filter { it !in setOf("ku", "en", "ar") }).distinct()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("SUBTITLES", color = C.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.ClosedCaption, null, tint = C.Faint, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            SectionLabel("Subtitles")
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             items(langs) { lang ->
                 val available = lang == "off" || (lang == "ku" && kurdish) || lang in found
                 val on = selected == lang
                 val state = if (lang == "off") null else SubPrep.states[keyOf(lang)]
                 Row(
                     Modifier
-                        .alpha(if (available || subs == null) 1f else 0.38f)
+                        .alpha(if (available || subs == null) 1f else 0.35f)
+                        .height(32.dp)
                         .tvFocus(RoundedCornerShape(50))
                         .clip(RoundedCornerShape(50))
-                        .background(if (on) C.Ember else Color(0x1FFFFFFF))
+                        .background(if (on) C.Ember else Color(0x14FFFFFF))
+                        .border(1.dp, if (on) Color.Transparent else Color(0x1AFFFFFF), RoundedCornerShape(50))
                         .clickable(enabled = available) { onSelect(lang) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         when (lang) { "off" -> "Off"; "ku" -> if ("ku" in found) "Kurdish" else "Kurdish · AI"; else -> SubPrep.label(lang) },
-                        color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold,
                     )
                     when (state) {
                         is SubPrep.State.Working -> {
-                            Spacer(Modifier.width(8.dp))
-                            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-                            Text(" ${(state.progress * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+                            Spacer(Modifier.width(7.dp))
+                            CircularProgressIndicator(color = Color.White, strokeWidth = 1.5.dp, modifier = Modifier.size(12.dp))
+                            Text(" ${(state.progress * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
                         }
-                        is SubPrep.State.Ready -> Text("  ✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        is SubPrep.State.Failed -> Text("  !", color = C.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        is SubPrep.State.Ready -> Text("  ✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        is SubPrep.State.Failed -> Text("  !", color = C.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         null -> {}
                     }
                 }
@@ -255,15 +264,16 @@ fun CcRow(subs: OnlineSubs?, selected: String, keyOf: (String) -> SubPrep.Key, o
         }
         val failed = if (selected == "off") null else SubPrep.states[keyOf(selected)] as? SubPrep.State.Failed
         when {
-            subs == null -> Text("Finding subtitles…", color = C.Faint, fontSize = 12.sp)
-            failed != null -> Text(failed.message, color = C.Gold, fontSize = 12.sp)
+            subs == null -> Text("Finding subtitles…", color = C.Faint, fontSize = 11.5.sp)
+            failed != null -> Text(failed.message, color = C.Gold, fontSize = 11.5.sp)
         }
     }
 }
 
 /**
- * The top of a detail page. [actions] are the buttons under the information (Play, Trailer…),
- * [cc] the subtitle row. Used by the film page and at the top of the series page.
+ * The top of a detail page: a wide faded backdrop, the poster with the facts beside it, then
+ * [actions] (Play, Trailer…), [cc] (the subtitle row), the story, credits and cast. Compact on
+ * phones, roomier on tablets and TV. Used by the film page and at the top of the series page.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -280,78 +290,71 @@ fun MediaHero(
     val d = details
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val wide = maxWidth >= 700.dp
-        val backdropH = if (wide) 340.dp else 250.dp
-        val posterW = if (wide) 170.dp else 118.dp
+        val backdropH = if (wide) 330.dp else (maxWidth * 0.5f).coerceIn(170.dp, 220.dp)
+        val posterW = if (wide) 150.dp else 96.dp
+        val overlap = if (wide) 120.dp else 64.dp
         Column(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth()) {
-                // Faded backdrop behind the header.
+                // Faded backdrop (TMDB), blending into the page.
                 Box(Modifier.fillMaxWidth().height(backdropH)) {
-                    AsyncImage(
-                        model = d?.backdrop?.ifBlank { null } ?: d?.poster?.ifBlank { null } ?: fallbackPoster,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        alpha = 0.6f,
-                        modifier = Modifier.fillMaxSize(),
+                    val art = d?.backdrop?.ifBlank { null } ?: d?.poster?.ifBlank { null } ?: fallbackPoster
+                    if (art.isNotBlank()) AsyncImage(
+                        model = art, contentDescription = null, contentScale = ContentScale.Crop,
+                        alpha = 0.7f, modifier = Modifier.fillMaxSize(),
                     )
                     Box(
                         Modifier.fillMaxSize().background(
-                            Brush.verticalGradient(listOf(C.Bg.copy(alpha = 0.45f), Color.Transparent, C.Bg.copy(alpha = 0.8f), C.Bg)),
+                            Brush.verticalGradient(0f to C.Bg.copy(alpha = 0.55f), 0.35f to Color.Transparent, 0.75f to C.Bg.copy(alpha = 0.7f), 1f to C.Bg),
                         ),
                     )
                     if (wide) Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(C.Bg.copy(alpha = 0.85f), Color.Transparent))))
                     Box(
-                        Modifier.statusBarsPadding().padding(10.dp).size(42.dp).tvFocus(CircleShape).clip(CircleShape)
-                            .background(Color(0x99000000)).clickable(onClick = onBack),
+                        Modifier.statusBarsPadding().padding(10.dp).size(38.dp).tvFocus(CircleShape).clip(CircleShape)
+                            .background(Color(0x8C000000)).border(1.dp, Color(0x26FFFFFF), CircleShape).clickable(onClick = onBack),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
+                    ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp)) }
                 }
                 // Poster with the facts beside it, overlapping the bottom of the backdrop.
                 Row(
-                    Modifier.padding(start = 16.dp, end = 16.dp, top = backdropH - (if (wide) 150.dp else 105.dp)),
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = backdropH - overlap),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    AsyncImage(
-                        model = d?.poster?.ifBlank { null } ?: fallbackPoster,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.width(posterW).aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp))
-                            .background(C.Surface2).border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp)),
-                    )
-                    Column(Modifier.padding(start = 16.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Box(
+                        Modifier.width(posterW).aspectRatio(2f / 3f)
+                            .shadow(18.dp, RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(12.dp)).background(C.Surface2)
+                            .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(12.dp)),
+                    ) {
+                        AsyncImage(
+                            model = d?.poster?.ifBlank { null } ?: fallbackPoster, contentDescription = null,
+                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Column(Modifier.padding(start = 14.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         val title = d?.title?.ifBlank { null } ?: fallbackTitle
                         Text(
-                            title,
-                            color = C.Text, fontSize = if (wide) 28.sp else 21.sp, fontWeight = FontWeight.Bold,
-                            lineHeight = if (wide) 32.sp else 25.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                            title, color = C.Text, fontSize = if (wide) 28.sp else 19.sp, fontWeight = FontWeight.Bold,
+                            lineHeight = if (wide) 32.sp else 23.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                         )
                         // Original / translated title, only when it really differs (year ignored).
                         val original = d?.originalTitle.orEmpty()
                         if (original.isNotBlank() && withoutYear(original) != withoutYear(title)) {
-                            Text(original, color = C.Faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(original, color = C.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (d == null) {
-                            if (fallbackMeta.isNotBlank()) Text(fallbackMeta, color = C.Muted, fontSize = 13.sp)
+                            if (fallbackMeta.isNotBlank()) Text(fallbackMeta, color = C.Muted, fontSize = 12.sp)
                         } else {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                if (d.rating > 0) FactChip(
-                                    "★ " + "%.1f".format(java.util.Locale.US, d.rating) + (if (d.votes > 0) "  ${compact(d.votes)} votes" else ""),
-                                    gold = true,
-                                )
-                                d.year.ifBlank { null }?.let { FactChip(it) }
-                                when {
-                                    d.seasons > 0 -> FactChip(
-                                        "${d.seasons} season${if (d.seasons > 1) "s" else ""}" +
-                                            if (d.episodes > 0) " · ${d.episodes} episodes" else "",
-                                    )
-                                    else -> runtimeText(d.runtime)?.let { FactChip(it) }
-                                }
-                                d.certification.ifBlank { null }?.let { FactChip(it) }
-                            }
+                            MetaLine(d)
                             if (d.genres.isNotEmpty()) {
-                                Text(d.genres.take(4).joinToString("  ·  "), color = C.Ember, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                            d.tagline.ifBlank { null }?.let {
-                                Text(it, color = C.Muted, fontSize = 13.sp, fontStyle = FontStyle.Italic, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    d.genres.take(3).forEach { g ->
+                                        Text(
+                                            g, color = C.Ember, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                                            modifier = Modifier.clip(RoundedCornerShape(50)).background(C.EmberDim)
+                                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -359,13 +362,16 @@ fun MediaHero(
             }
 
             Column(
-                Modifier.padding(horizontal = 16.dp).padding(top = 18.dp).widthIn(max = 900.dp),
+                Modifier.padding(horizontal = 16.dp).padding(top = 16.dp).widthIn(max = 900.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
+                d?.tagline?.ifBlank { null }?.let {
+                    Text(it, color = C.Muted, fontSize = 12.5.sp, fontStyle = FontStyle.Italic, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
                 if (progress > 0f) {
-                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
-                        Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(4.dp).background(C.Ember))
+                    Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
+                        Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(3.dp).background(C.Ember))
                     }
                 }
                 cc()
@@ -374,67 +380,102 @@ fun MediaHero(
                 if (story.isNotBlank()) {
                     var more by remember(story) { mutableStateOf(false) }
                     Column(Modifier.tvFocus(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp)).clickable { more = !more }) {
+                        SectionLabel("Story")
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            story, color = C.Text.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 21.sp,
+                            story, color = C.Text.copy(alpha = 0.82f), fontSize = 13.5.sp, lineHeight = 20.sp,
                             maxLines = if (more) Int.MAX_VALUE else 4, overflow = TextOverflow.Ellipsis,
                         )
-                        if (story.length > 220) Text(if (more) "Less" else "More", color = C.Ember, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                        if (story.length > 200) Text(if (more) "Less" else "More", color = C.Ember, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
                     }
                 }
-                if (d != null) {
-                    if (d.creator.isNotBlank()) InfoRow("Created by", d.creator)
-                    if (d.director.isNotBlank()) InfoRow("Director", d.director)
-                    if (d.country.isNotBlank()) InfoRow("Country", d.country)
+                if (d != null && (d.creator.isNotBlank() || d.director.isNotBlank() || d.country.isNotBlank())) {
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Surface)
+                            .border(1.dp, C.Hair, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (d.creator.isNotBlank()) InfoRow("Created by", d.creator)
+                        if (d.director.isNotBlank()) InfoRow("Director", d.director)
+                        if (d.country.isNotBlank()) InfoRow("Country", d.country)
+                    }
                 }
             }
 
             val cast = d?.cast.orEmpty()
             if (cast.isNotEmpty()) {
-                Text(
-                    "CAST", color = C.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp,
-                    modifier = Modifier.padding(start = 20.dp, top = 22.dp, bottom = 10.dp),
-                )
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionLabel("Cast", Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp))
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(cast.size) { i -> CastCard(cast[i]) }
                 }
             }
             if ((d?.tmdbId ?: 0) > 0) {
-                Text(
-                    "Facts and images: TMDB", color = C.Faint, fontSize = 10.sp,
-                    modifier = Modifier.padding(start = 20.dp, top = 16.dp),
-                )
+                Text("Facts and images: TMDB", color = C.Faint, fontSize = 10.sp, modifier = Modifier.padding(start = 16.dp, top = 14.dp))
             }
         }
     }
 }
 
+/** ★ 7.2 (4.0K) · 2022 · 2h 25m or 3 seasons · 24 ep · TV-14 */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FactChip(text: String, gold: Boolean = false) {
-    Text(
-        text, color = if (gold) C.Gold else C.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-        modifier = Modifier.clip(RoundedCornerShape(50))
-            .background(if (gold) Color(0x26FFD27A) else Color(0x1FFFFFFF))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    )
+private fun MetaLine(d: MediaDetails) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (d.rating > 0) {
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(Color(0x26FFD27A)).padding(horizontal = 7.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Star, null, tint = C.Gold, modifier = Modifier.size(12.dp))
+                Text(
+                    " " + "%.1f".format(java.util.Locale.US, d.rating), color = C.Gold, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
+                )
+                if (d.votes > 0) Text(" ${compact(d.votes)}", color = C.Gold.copy(alpha = 0.7f), fontSize = 10.5.sp)
+            }
+        }
+        val parts = listOfNotNull(
+            d.year.ifBlank { null },
+            if (d.seasons > 0) "${d.seasons} season${if (d.seasons > 1) "s" else ""}" + (if (d.episodes > 0) " · ${d.episodes} ep" else "")
+            else runtimeText(d.runtime),
+        )
+        if (parts.isNotEmpty()) Text(parts.joinToString("  ·  "), color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 1.dp))
+        d.certification.ifBlank { null }?.let {
+            Text(
+                it, color = C.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.border(1.dp, C.Faint, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text.uppercase(), color = C.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = modifier)
 }
 
 @Composable
 private fun CastCard(c: CastMember) {
-    Column(Modifier.width(78.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(66.dp).clip(CircleShape).background(C.Surface2), contentAlignment = Alignment.Center) {
-            Text(c.name.trim().firstOrNull()?.uppercase() ?: "?", color = C.Muted, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Column(Modifier.width(70.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(56.dp).clip(CircleShape).background(C.Surface2).border(1.dp, Color(0x1AFFFFFF), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(c.name.trim().firstOrNull()?.uppercase() ?: "?", color = C.Muted, fontSize = 19.sp, fontWeight = FontWeight.Bold)
             if (c.photo.isNotBlank()) AsyncImage(model = c.photo, contentDescription = c.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        Text(c.name, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-        if (c.role.isNotBlank()) Text(c.role, color = C.Faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            c.name, color = C.Text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 13.sp,
+            overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp),
+        )
+        if (c.role.isNotBlank()) Text(c.role, color = C.Faint, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row {
-        Text(label, color = C.Faint, fontSize = 13.sp, modifier = Modifier.width(92.dp))
-        Text(value, color = C.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = C.Faint, fontSize = 12.5.sp, modifier = Modifier.width(84.dp))
+        Text(value, color = C.Text, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -451,15 +492,18 @@ fun HeroButton(
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     if (primary && tv) LaunchedEffect(Unit) { kotlinx.coroutines.delay(200); runCatching { focus.requestFocus() } }
     Row(
-        modifier.height(48.dp).focusRequester(focus).tvFocus(RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
-            .background(if (primary) C.Ember else Color(0x1FFFFFFF))
-            .clickable(onClick = onClick).padding(horizontal = 18.dp),
+        modifier.height(if (tv) 48.dp else 44.dp).focusRequester(focus).tvFocus(RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+            .background(if (primary) C.Ember else Color(0x17FFFFFF))
+            .border(1.dp, if (primary) Color.Transparent else Color(0x1FFFFFFF), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        if (label.isNotEmpty()) {
+            Spacer(Modifier.width(7.dp))
+            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
     }
 }
 

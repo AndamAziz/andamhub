@@ -78,13 +78,17 @@ object Api {
         }
     }
 
-    /** A JSON answer from the 7-day disk cache, or fetched and stored there. */
-    private suspend fun factsCached(key: String, load: suspend () -> JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    /**
+     * A JSON answer from the 7-day disk cache, or fetched and stored there. Answers that [keep]
+     * rejects (e.g. a title TMDB did not match yet) are never stored, nor used from older copies.
+     */
+    private suspend fun factsCached(key: String, keep: (JSONObject) -> Boolean = { true }, load: suspend () -> JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val file = File(facts, key.hashCode().toUInt().toString(16) + ".json")
         if (file.exists() && System.currentTimeMillis() - file.lastModified() < FACTS_TTL) {
-            runCatching { JSONObject(file.readText()) }.getOrNull()?.let { return@withContext it }
+            runCatching { JSONObject(file.readText()) }.getOrNull()?.takeIf(keep)?.let { return@withContext it }
         }
         val j = load()
+        if (!keep(j)) return@withContext j
         runCatching {
             file.writeText(j.toString())
             facts.listFiles()?.sortedByDescending { it.lastModified() }?.drop(FACTS_MAX)?.forEach { it.delete() }
@@ -187,9 +191,11 @@ object Api {
     }
 
     /** Film or series details for the detail page. type = movie | series */
-    suspend fun details(source: String, type: String, id: String, lang: String = "en"): MediaDetails = cached("details:$source:$type:$id:$lang") {
-        val j = factsCached("details:$source:$type:$id:$lang") {
-            get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang))
+    /** [name] / [year] are what the list shows: the server searches TMDB with them when the provider's info has none. */
+    suspend fun details(source: String, type: String, id: String, lang: String = "en", name: String = "", year: String = ""): MediaDetails = cached("details:$source:$type:$id:$lang") {
+        // Only matched titles are kept for 7 days; the others are asked again next time.
+        val j = factsCached("details:$source:$type:$id:$lang", keep = { it.optInt("tmdbId") > 0 }) {
+            get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang, "name" to name, "year" to year))
         }
         MediaDetails(
             title = j.str("title"),
