@@ -7,15 +7,15 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import uk.andam.app.Config
 import uk.andam.app.net.Api
 import uk.andam.app.net.OnlineSub
 import uk.andam.app.net.OnlineSubs
 
 /**
  * Online subtitles for the film / episode playing: the list found on OpenSubtitles, the
- * Kurdish (Sorani) auto-translation, and the viewer's preferred language picked automatically
- * (Account → Playback → Subtitles).
+ * Kurdish (Sorani) auto-translation, and the language chosen on the detail page (or the viewer's
+ * default from Account → Playback) switched on by itself. Preparation goes through [SubPrep], so
+ * a subtitle prepared on the detail page is used at once.
  */
 class OnlineSubtitles(private val engine: Engine, private val scope: CoroutineScope, private val context: Context) {
 
@@ -23,27 +23,33 @@ class OnlineSubtitles(private val engine: Engine, private val scope: CoroutineSc
         private set
     var loading by mutableStateOf(false)
         private set
-    /** 0..1 while the Kurdish translation is being prepared, otherwise null. */
-    var kurdishProgress by mutableStateOf<Float?>(null)
-        private set
     var message by mutableStateOf<String?>(null)
         private set
 
+    private var item: PlayItem? = null
     private var key: String? = null
     private var job: Job? = null
     private var kurdishJob: Job? = null
 
+    /** 0..1 while the Kurdish translation for this item is being prepared, otherwise null. */
+    val kurdishProgress: Float?
+        get() = item?.let { (SubPrep.states[SubPrep.key(it, "ku")] as? SubPrep.State.Working)?.progress }
+
     /** Online subtitles exist only for films and episodes the server could match on TMDB. */
     fun supported(item: PlayItem?): Boolean =
-        item != null && !item.isLive && item.tmdb > 0
+        item != null && !item.isLive && item.catchupOf == null && item.tmdb > 0
 
     fun onItem(item: PlayItem) {
         val k = if (supported(item)) "${item.kind}:${item.tmdb}:${item.season}:${item.episode}" else null
         if (k == key) return
         key = k
+        this.item = if (k != null) item else null
         job?.cancel(); kurdishJob?.cancel()
-        list = null; loading = false; kurdishProgress = null; message = null
+        list = null; loading = false; message = null
         if (k == null) return
+        // The detail page's choice, else the viewer's default language.
+        val pref = item.subLang.ifBlank { PlayerPrefs.subLang(context) }
+        if (pref.isNotBlank() && pref != "off") SubPrep.ready(SubPrep.key(item, pref))?.let { engine.useSubtitle(it) }
         job = scope.launch {
             loading = true
             val subs = runCatching {
@@ -52,9 +58,7 @@ class OnlineSubtitles(private val engine: Engine, private val scope: CoroutineSc
             loading = false
             if (key != k) return@launch
             list = subs
-            // The viewer's preferred subtitle language, picked by itself.
-            val pref = PlayerPrefs.subLang(context)
-            if (subs == null || pref.isBlank()) return@launch
+            if (subs == null || pref.isBlank() || pref == "off" || engine.externalSub != null) return@launch
             val match = subs.subs.firstOrNull { it.lang == pref }
             when {
                 match != null -> use(match)
@@ -65,7 +69,9 @@ class OnlineSubtitles(private val engine: Engine, private val scope: CoroutineSc
 
     fun use(sub: OnlineSub) {
         message = null
+        val it = item ?: return
         engine.useSubtitle(Engine.ExternalSub(absolute(sub.url), sub.lang, sub.label))
+        SubPrep.prepare(context, SubPrep.key(it, sub.lang))
     }
 
     fun off() {
@@ -73,27 +79,25 @@ class OnlineSubtitles(private val engine: Engine, private val scope: CoroutineSc
         engine.useSubtitle(null)
     }
 
-    /** Kurdish (Sorani) translated from the English subtitle; the first time takes a moment. */
+    /** Kurdish (Sorani) made from the English subtitle; the first time takes a moment. */
     fun useKurdish() {
-        val l = list ?: return
-        val url = l.kurdishUrl ?: return
-        val part = l.kurdishPartUrl ?: return
-        if (kurdishProgress != null) return
-        val k = key
-        kurdishProgress = 0f
+        val it = item ?: return
+        val k = SubPrep.key(it, "ku")
+        val mine = key
         message = null
+        SubPrep.ready(k)?.let { sub -> engine.useSubtitle(sub); return }
+        val job = SubPrep.prepare(context, k) ?: return
+        kurdishJob?.cancel()
         kurdishJob = scope.launch {
-            runCatching { Api.kurdishSubtitle(url, part) { f -> kurdishProgress = f } }
-                .onSuccess { ready ->
-                    if (key == k) {
-                        engine.useSubtitle(Engine.ExternalSub(absolute(ready), "ku", "Kurdish (auto)"))
-                        message = "Kurdish subtitles are on"
-                    }
-                }
-                .onFailure { if (key == k) message = "Kurdish subtitles could not be prepared. Try again." }
-            kurdishProgress = null
+            job.join()
+            if (key != mine) return@launch
+            when (val st = SubPrep.states[k]) {
+                is SubPrep.State.Ready -> { engine.useSubtitle(st.sub); message = "Kurdish subtitles are on" }
+                is SubPrep.State.Failed -> message = st.message
+                else -> {}
+            }
         }
     }
 
-    private fun absolute(url: String) = if (url.startsWith("http")) url else Config.BASE_URL + url
+    private fun absolute(url: String) = if (url.startsWith("http")) url else uk.andam.app.Config.BASE_URL + url
 }

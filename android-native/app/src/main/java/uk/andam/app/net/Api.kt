@@ -29,7 +29,13 @@ object Api {
     private val memo = ConcurrentHashMap<String, Pair<Long, Any>>()
     private const val TTL = 5 * 60_000L
 
+    /** Film / series facts (TMDB) kept on disk for 7 days, newest ~120 titles. */
+    private lateinit var facts: File
+    private const val FACTS_TTL = 7L * 24 * 60 * 60_000
+    private const val FACTS_MAX = 120
+
     fun init(context: Context) {
+        facts = File(context.cacheDir, "facts").apply { mkdirs() }
         http = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)
@@ -70,6 +76,20 @@ object Api {
             if (json.has("error") && json.optString("error").isNotBlank()) throw ApiException(502, json.optString("error"))
             json
         }
+    }
+
+    /** A JSON answer from the 7-day disk cache, or fetched and stored there. */
+    private suspend fun factsCached(key: String, load: suspend () -> JSONObject): JSONObject = withContext(Dispatchers.IO) {
+        val file = File(facts, key.hashCode().toUInt().toString(16) + ".json")
+        if (file.exists() && System.currentTimeMillis() - file.lastModified() < FACTS_TTL) {
+            runCatching { JSONObject(file.readText()) }.getOrNull()?.let { return@withContext it }
+        }
+        val j = load()
+        runCatching {
+            file.writeText(j.toString())
+            facts.listFiles()?.sortedByDescending { it.lastModified() }?.drop(FACTS_MAX)?.forEach { it.delete() }
+        }
+        j
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -132,7 +152,7 @@ object Api {
 
     suspend fun live(source: String): List<LiveChannel> = cached("live:$source") {
         get(X, mapOf("action" to "live", "source" to source)).optJSONArray("items").mapObjects {
-            LiveChannel(it.str("id"), it.optInt("num"), it.str("name"), it.str("logo"), it.str("categoryId"))
+            LiveChannel(it.str("id"), it.optInt("num"), it.str("name"), it.str("logo"), it.str("categoryId"), it.optBoolean("archive"))
         }
     }
 
@@ -167,8 +187,10 @@ object Api {
     }
 
     /** Film or series details for the detail page. type = movie | series */
-    suspend fun details(source: String, type: String, id: String): MediaDetails = cached("details:$source:$type:$id") {
-        val j = get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id))
+    suspend fun details(source: String, type: String, id: String, lang: String = "en"): MediaDetails = cached("details:$source:$type:$id:$lang") {
+        val j = factsCached("details:$source:$type:$id:$lang") {
+            get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang))
+        }
         MediaDetails(
             title = j.str("title"),
             originalTitle = j.str("originalTitle"),
@@ -181,13 +203,26 @@ object Api {
             genres = j.optJSONArray("genres").let { a -> (0 until (a?.length() ?: 0)).map { a!!.optString(it) }.filter { it.isNotBlank() } },
             certification = j.str("certification"),
             director = j.str("director"),
+            creator = j.str("creator"),
+            country = j.str("country"),
             cast = j.optJSONArray("cast").mapObjects { CastMember(it.str("name"), it.str("role"), it.str("photo")) },
             poster = j.str("poster"),
             backdrop = j.str("backdrop"),
             trailer = j.str("trailer"),
             tmdbId = j.optInt("tmdbId"),
             seasons = j.optInt("seasons"),
+            episodes = j.optInt("episodes"),
         )
+    }
+
+    /** TMDB facts for one season of a series (empty when unknown or TMDB is unreachable). */
+    suspend fun season(source: String, tmdb: Int, season: Int, lang: String = "en"): List<EpisodeFacts> = cached("season:$tmdb:$season:$lang") {
+        val j = factsCached("season:$tmdb:$season:$lang") {
+            get(X, mapOf("action" to "season", "source" to source, "tmdb" to tmdb.toString(), "season" to season.toString(), "lang" to lang))
+        }
+        j.optJSONArray("episodes").mapObjects {
+            EpisodeFacts(it.optInt("episode"), it.str("name"), it.str("overview"), it.str("still"), it.optInt("runtime"))
+        }
     }
 
     /** Online subtitles for a film (type = movie) or an episode (series tmdb id + season/episode). */
@@ -197,10 +232,15 @@ object Api {
             mapOf("action" to "list", "tmdb" to tmdb.toString(), "type" to type, "season" to season.toString(), "episode" to episode.toString()),
         )
         val k = j.optJSONObject("kurdishAuto")
+        val engines = k?.optJSONArray("engines")
         OnlineSubs(
             j.optJSONArray("subtitles").mapObjects { OnlineSub(it.str("lang"), it.str("label"), it.str("url")) },
             k?.str("url")?.ifBlank { null },
             k?.str("partUrl")?.ifBlank { null },
+            k?.str("sourceUrl")?.ifBlank { null },
+            k?.str("uploadUrl")?.ifBlank { null },
+            (0 until (engines?.length() ?: 0)).map { engines!!.optString(it) }.filter { it.isNotBlank() },
+            k?.str("from")?.ifBlank { null } ?: "en",
         )
     }
 
@@ -238,6 +278,25 @@ object Api {
             }
         }
         throw ApiException(502, "Kurdish subtitles are not ready yet")
+    }
+
+    /** Catch-up link for a live channel: [minutes] ago, or the start of the programme on air (null). */
+    suspend fun catchup(source: String, id: String, minutes: Int?): Catchup {
+        val p = mutableMapOf("action" to "catchup", "source" to source, "stream_id" to id, "device" to "1")
+        if (minutes == null) p["from"] = "programme" else p["back"] = minutes.toString()
+        val j = get(X, p)
+        return Catchup(j.str("play"), j.str("direct").ifBlank { null }, j.str("start"), j.str("title"))
+    }
+
+    /**
+     * Raw request to the subtitle API (relative [path]): status code and body. Used by the
+     * Kurdish preparation, which needs the 202 "still preparing" answers too.
+     */
+    suspend fun subtitleCall(path: String, post: JSONObject? = null): Pair<Int, String> = withContext(Dispatchers.IO) {
+        val b = Request.Builder().url(Config.BASE_URL + path).header("Accept", "application/json").header("User-Agent", Config.USER_AGENT)
+        Session.accessToken()?.let { b.header("Authorization", "Bearer $it") }
+        if (post != null) b.post(post.toString().toRequestBody("application/json".toMediaType()))
+        http.newCall(b.build()).execute().use { res -> res.code to (res.body?.string().orEmpty()) }
     }
 
     /** type = live | vod | series */

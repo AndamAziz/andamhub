@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.ResolvingDataSource
@@ -69,6 +70,22 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     var position by mutableLongStateOf(0L)
     var duration by mutableLongStateOf(0L)
     var tracksVersion by mutableIntStateOf(0)
+
+    /**
+     * Live stream whose own window can be sought in (HLS live playlists keep the last minutes):
+     * the player shows a timeline, ±10 s and a LIVE pill. Progressive MPEG-TS live has no window
+     * (ExoPlayer cannot seek in it), so it keeps the plain live view.
+     */
+    var liveSeekable by mutableStateOf(false)
+        private set
+    /** How far behind the live edge the picture is (ms), while [liveSeekable]. */
+    var liveBehind by mutableLongStateOf(0L)
+        private set
+    /** A catch-up (archive) recording of a live channel is playing; Live returns to the channel. */
+    var catchup by mutableStateOf(false)
+        private set
+    /** Seeking is possible: films/episodes/catch-up, and live channels with a window. */
+    val canSeek: Boolean get() = !live || liveSeekable
 
     val player: ExoPlayer
 
@@ -170,7 +187,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 }
                 if (state == Player.STATE_ENDED) {
                     // A live stream never really ends: the upstream closed the socket. Reopen it.
-                    if (live) reconnect("Reconnecting…", 0) else {
+                    if (live) reconnect("Reconnecting…", 0)
+                    // A catch-up recording that reached "now" goes back to the live channel.
+                    else if (catchup) goLive() else {
                         playing = false
                         onEnded?.invoke()
                     }
@@ -217,6 +236,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 delay(1000)
                 position = player.currentPosition.coerceAtLeast(0)
                 if (player.duration > 0) duration = player.duration
+                updateLiveWindow()
                 val stalled = player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && item != null && error == null
                 if (stalled) {
                     stallSeconds++
@@ -263,6 +283,22 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    private val window = Timeline.Window()
+
+    /** Reads the live window (HLS): seekable range and the distance from the live edge. */
+    private fun updateLiveWindow() {
+        val tl = player.currentTimeline
+        if (!live || tl.isEmpty || player.currentMediaItemIndex >= tl.windowCount) {
+            liveSeekable = false
+            liveBehind = 0
+            return
+        }
+        tl.getWindow(player.currentMediaItemIndex, window)
+        // A few segments only (≤ 20 s) is not worth a timeline.
+        liveSeekable = window.isDynamic && window.isSeekable && window.durationMs != C.TIME_UNSET && window.durationMs > 20_000
+        liveBehind = if (liveSeekable) (window.defaultPositionMs - player.currentPosition).coerceAtLeast(0) else 0
+    }
+
     // ---------------- public API ----------------
 
     fun play(next: PlayItem) {
@@ -270,6 +306,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         if (next !== item) remints = 0
         if (next !== item) externalSub = null
         item = next
+        // Set before online.onItem, which may switch a subtitle on for this item.
+        live = next.isLive
         // The previous item's routes are dropped at once, so nothing (e.g. a subtitle that
         // arrives early) can restart the old stream while the new one is being resolved.
         attempts = emptyList()
@@ -281,6 +319,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         subtitle = next.subtitle
         logo = next.logo
         live = next.isLive
+        catchup = next.catchupOf != null
+        liveSeekable = false
+        liveBehind = 0
         error = null
         status = null
         buffering = true
@@ -302,7 +343,11 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 var providerDirect: String? = null
                 var providerDirectHls: String? = null
                 val tokens: List<String> = when (next.kind) {
-                    Kind.LIVE -> Api.play(next.source, "live", next.id).let {
+                    Kind.LIVE -> if (next.token != null) {
+                        // Catch-up: the archive link was minted when the viewer asked for it.
+                        providerDirect = next.direct
+                        listOf(next.token)
+                    } else Api.play(next.source, "live", next.id).let {
                         providerDirect = it.direct; providerDirectHls = it.directHls
                         listOfNotNull(it.play, it.fallback)
                     }
@@ -351,7 +396,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
                 attempts = list
                 start(0)
-                if (!next.isLive) {
+                if (!next.isLive && next.catchupOf == null) {
                     val resume = Resume.get(context, next.resumeKey)
                     if (resume > 0) player.seekTo(resume)
                 }
@@ -398,17 +443,61 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     }
 
     fun seekBy(ms: Long) {
-        if (live) return
-        player.seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, player.duration)))
+        if (!canSeek) return
+        val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration else player.duration
+        player.seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
+        if (live) updateLiveWindow()
     }
 
     fun seekTo(ms: Long) {
-        if (!live) player.seekTo(ms)
+        if (!canSeek) return
+        player.seekTo(ms)
+        if (live) updateLiveWindow()
+    }
+
+    /** LIVE: back to the live edge (or from a catch-up recording back to the channel). */
+    fun goLive() {
+        val current = item ?: return
+        current.catchupOf?.let { play(it); return }
+        if (!live) return
+        player.seekToDefaultPosition()
+        player.play()
+        updateLiveWindow()
+    }
+
+    /**
+     * Rewinds a live channel further through the provider's archive: [minutes] ago, or the start
+     * of the programme on air when [minutes] is null. Only for channels with an archive.
+     */
+    fun catchUp(minutes: Int?) {
+        val channel = item?.let { it.catchupOf ?: it } ?: return
+        if (channel.kind != Kind.LIVE || !channel.archive) return
+        val mine = session
+        status = "Opening the recording…"
+        scope.launch {
+            val c = runCatching { Api.catchup(channel.source, channel.id, minutes) }.getOrElse {
+                if (mine != session) return@launch
+                val msg = it.message ?: "The recording is not available"
+                status = msg
+                // The live channel keeps playing; the note goes away by itself.
+                delay(4000)
+                if (mine == session && status == msg) status = null
+                return@launch
+            }
+            if (mine != session) return@launch
+            val from = c.start.substringAfter(':').replace('-', ':')
+            play(
+                channel.copy(
+                    subtitle = listOf("Catch-up · from $from", c.title).filter { it.isNotBlank() }.joinToString(" · "),
+                    token = c.play, direct = c.direct, catchupOf = channel,
+                ),
+            )
+        }
     }
 
     fun saveResume() {
         val it = item ?: return
-        if (!it.isLive && player.duration > 0) Resume.put(context, it.resumeKey, player.currentPosition, player.duration)
+        if (!it.isLive && it.catchupOf == null && player.duration > 0) Resume.put(context, it.resumeKey, player.currentPosition, player.duration)
     }
 
     fun release() {

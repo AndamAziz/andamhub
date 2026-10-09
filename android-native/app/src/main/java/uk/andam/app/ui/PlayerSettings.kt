@@ -25,6 +25,7 @@ fun PlaybackSettings() {
     var aLang by remember { mutableStateOf(PlayerPrefs.audioLang(c)) }
     var sLang by remember { mutableStateOf(PlayerPrefs.subLang(c)) }
     var sSize by remember { mutableIntStateOf(PlayerPrefs.subSize(c)) }
+    var kEngine by remember { mutableStateOf(PlayerPrefs.kurdishEngine(c)) }
 
     SettingsGroup("Playback", footer = "Changes apply to the next channel, film or episode you open.") {
         SettingsSwitch(Icons.Filled.Headphones, Violet, "Background audio", "Keep listening with the screen locked", bg) {
@@ -43,5 +44,16 @@ fun PlaybackSettings() {
             Icons.Filled.FormatSize, C.Ember, "Subtitle size",
             listOf("0" to "Small", "1" to "Normal", "2" to "Large", "3" to "Extra large"), sSize.toString(),
         ) { sSize = it.toInt(); PlayerPrefs.setSubSize(c, sSize) }
+    }
+
+    SettingsGroup(
+        "Subtitles",
+        footer = "Kurdish (Sorani) subtitles are machine-translated from the English (or Arabic) subtitle. " +
+            "Google is free and runs on this device; Claude runs on the Andam server when it is set up there, " +
+            "otherwise Google is used. A title is translated once and then shared with every viewer.",
+    ) {
+        SettingsPicker(Icons.Filled.Translate, Teal, "Kurdish subtitles made by", PlayerPrefs.kurdishEngines, kEngine) {
+            kEngine = it; PlayerPrefs.setKurdishEngine(c, it)
+        }
     }
 }

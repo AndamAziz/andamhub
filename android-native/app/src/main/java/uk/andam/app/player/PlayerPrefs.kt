@@ -24,6 +24,21 @@ object PlayerPrefs {
     fun subLang(c: Context) = p(c).getString("slang", "").orEmpty()
     fun setSubLang(c: Context, v: String) = p(c).edit().putString("slang", v).apply()
 
+    /**
+     * Engine for Kurdish (Sorani) subtitles: "g" free Google Translate on this device (default),
+     * "claude-best" / "claude-fast" Claude on the Andam server, "ai" Gemini on the server.
+     * Server engines are used only when the server offers them; otherwise Google.
+     */
+    fun kurdishEngine(c: Context) = p(c).getString("kueng", "g").orEmpty().ifBlank { "g" }
+    fun setKurdishEngine(c: Context, v: String) = p(c).edit().putString("kueng", v).apply()
+
+    val kurdishEngines = listOf(
+        "g" to "Google (free)",
+        "claude-best" to "Claude · best",
+        "claude-fast" to "Claude · fast",
+        "ai" to "Gemini AI",
+    )
+
     /** Subtitle size: 0 small, 1 normal, 2 large, 3 extra large. */
     fun subSize(c: Context) = p(c).getInt("ssize", 1)
     fun setSubSize(c: Context, v: Int) = p(c).edit().putInt("ssize", v).apply()
@@ -36,6 +51,9 @@ object PlayerPrefs {
         "en" to "English",
         "fa" to "Persian",
         "tr" to "Turkish",
+        "fr" to "French",
+        "de" to "German",
+        "es" to "Spanish",
     )
 
     private fun codes(lang: String): Array<String> = when (lang) {
@@ -44,6 +62,9 @@ object PlayerPrefs {
         "ar" -> arrayOf("ar", "ara")
         "en" -> arrayOf("en", "eng")
         "tr" -> arrayOf("tr", "tur")
+        "fr" -> arrayOf("fr", "fre", "fra")
+        "de" -> arrayOf("de", "ger", "deu")
+        "es" -> arrayOf("es", "spa")
         else -> arrayOf(lang)
     }
 
