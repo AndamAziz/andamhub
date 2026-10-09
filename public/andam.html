@@ -1133,6 +1133,24 @@ h1,h2,h3{letter-spacing:-.3px}
   .catoption{min-height:52px;border-radius:12px;border-bottom:0;margin-bottom:4px}
   .catoption.on{border-left:0;background:var(--ember-dim);color:#fff}
 }
+/* ---------- Live TV / films / series in the browser: easier on phones ---------- */
+/* The LIVE tag only for live channels (its own rule used to override [hidden]). */
+.lvbar .live[hidden]{display:none!important}
+/* Films / episodes: no LIVE pill while the length is still unknown. */
+.lvstage.is-vod .livepill{display:none!important}
+.lvclose{display:none;flex:none;margin-left:auto;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.75);font:600 13px/1 Inter,sans-serif;cursor:pointer}
+.ltv:not(.is-idle) .lvclose{display:inline-flex;align-items:center;justify-content:center}
+/* Film / series pages: the channel search and categories do not apply there. */
+.ltv.in-detail .lvchips,.ltv.in-detail .lvsearch{display:none!important}
+@media (max-width:719px){
+  /* Nothing playing: no empty black box — lists and pages get the whole screen. */
+  .ltv.is-idle .lvplayer{display:none!important}
+  .ltv.is-idle .lvmain{grid-template-rows:minmax(0,1fr)!important}
+  .ltv.in-detail .lvscroll{padding:0 12px 16px}
+  .ltv .lvbar .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
 /* ---------- film & series pages (TMDB facts) + online subtitles ---------- */
 .dp{max-width:980px}
 .dphero{position:relative;margin:0 0 16px;padding:14px 0 0;min-height:200px}
@@ -1496,6 +1514,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         <span class="tg" id="ltvNowTag"></span>
         <span class="live" id="ltvLive" hidden><span class="ld"></span>LIVE</span>
         <span class="sb" id="ltvNowSub">Andam relay</span>
+        <button class="lvclose" type="button" data-close="live" aria-label="Close the player">✕</button>
       </div>
     </div>
     <div class="lvbrowse">
@@ -1540,6 +1559,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         <span class="tg" id="ipNowTag"></span>
         <span class="live" id="ipLive" hidden><span class="ld"></span>LIVE</span>
         <span class="sb" id="ipNowSub">Andam relay</span>
+        <button class="lvclose" type="button" data-close="iptv" aria-label="Close the player">✕</button>
       </div>
     </div>
     <div class="lvbrowse">
@@ -3380,6 +3400,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
     clearFail(s); busy(s,true);
     takeSub(s,token,liveish);
+    s.stage.classList.toggle('is-vod',!liveish);
     if(!repeated) s.edgeGap=null;
     s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:tc};
     applyTrack(s);
@@ -3716,6 +3737,21 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
 
   window.lvStopKind=function(kind){ if(SURF[kind]||document.getElementById(kind==='iptv'?'ipPlayer':'ltvPlayer')) lvStop(kind) };
+  /* Presentation only: a section with nothing playing is marked .is-idle (phones hide the empty
+     player box), and the ✕ in the now-playing bar stops playback and returns to that state. */
+  [['ltv','ltvIdle','live'],['iptv','ipIdle','iptv']].forEach(function(x){
+    var sec=document.getElementById(x[0]), idle=document.getElementById(x[1]);
+    if(!sec||!idle) return;
+    var sync=function(){ sec.classList.toggle('is-idle',!idle.classList.contains('hide')) };
+    sync(); new MutationObserver(sync).observe(idle,{attributes:true,attributeFilter:['class']});
+    var btn=sec.querySelector('[data-close]');
+    if(btn) btn.addEventListener('click',function(){
+      var s=surf(x[2]), d=deskApi();
+      lvStop(x[2]); if(d&&deskKind===x[2]){ try{ d.stop() }catch(_){} deskCard(s,false) }
+      setNow(s,'Nothing playing','',null); s.live.hidden=true; s.idle.classList.remove('hide');
+      [].forEach.call(sec.querySelectorAll('.chanrow.on,.epirow.on'),function(r){ r.classList.remove('on') });
+    });
+  });
   /* Controls are ready before providers load, including on an intentionally
      empty APK installation. No media request is made by this initialization. */
   surf('live'); surf('iptv');
@@ -3890,7 +3926,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* ---- data loading per tab ---- */
   function loadTab(){
     var my=++ltv.req;
-    if(ltvEl) ltvEl.setAttribute('data-tab',ltv.tab);
+    if(ltvEl){ ltvEl.setAttribute('data-tab',ltv.tab); ltvEl.classList.remove('in-detail') }
     if(ltvSearch) ltvSearch.placeholder=ltv.tab==='direct'?'Search channels':'Search titles';
     repBox.classList.toggle('hide',ltv.tab!=='replay');
     ltvSearch.parentNode.classList.toggle('hide',ltv.tab==='replay');
@@ -4183,17 +4219,17 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* The subtitle handed to the next film / episode started (consumed by lvPlay / deskPlay). */
   var pendSub=null;
   function takeSub(s,token,liveish){
-    if(liveish){ pendSub=null; s.sub=null; return null }
-    if(pendSub){ s.sub=pendSub; pendSub=null }
-    else if(!(s.last&&s.last.token===token)) s.sub=null;
-    return s.sub;
+    if(liveish){ pendSub=null; s.cue=null; return null }
+    if(pendSub){ s.cue=pendSub; pendSub=null }
+    else if(!(s.last&&s.last.token===token)) s.cue=null;
+    return s.cue;
   }
   function applyTrack(s){
     var v=s.video;
     [].slice.call(v.querySelectorAll('track[data-andam]')).forEach(function(t){ t.remove() });
-    if(!s.sub) return;
+    if(!s.cue) return;
     var t=document.createElement('track');
-    t.setAttribute('data-andam','1'); t.kind='subtitles'; t.src=s.sub.url; t.srclang=s.sub.lang||''; t.label=s.sub.label||'Subtitles'; t.default=true;
+    t.setAttribute('data-andam','1'); t.kind='subtitles'; t.src=s.cue.url; t.srclang=s.cue.lang||''; t.label=s.cue.label||'Subtitles'; t.default=true;
     v.appendChild(t);
     var show=function(){ try{ [].forEach.call(v.textTracks,function(tt){ tt.mode=(tt.label===t.label&&tt.language===t.srclang)?'showing':'disabled' }) }catch(_){} };
     t.addEventListener('load',show); setTimeout(show,300); setTimeout(show,2500);
@@ -4312,8 +4348,13 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   /* Film page (opened from a film card); Play keeps working through the same player as before. */
   var movieReq=0;
+  function enterDetail(){
+    if(ltvEl) ltvEl.classList.add('in-detail');
+    var sc=ltvBody.closest('.lvscroll'); if(sc) sc.scrollTop=0;
+    try{ window.scrollTo(0,0) }catch(_){}
+  }
   function openMovie(id,title,ext,poster,year,genre){
-    var my=++movieReq; ltvSet('');
+    var my=++movieReq; ltvSet(''); enterDetail();
     var fb={title:title,poster:poster,year:year,genre:genre};
     function paint(d){
       if(my!==movieReq) return;
@@ -4330,7 +4371,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
 
   function openSeries(id,title,poster,year,genre){
-    ltvBody.innerHTML=skelRows(6); ltvSet('');
+    ltvBody.innerHTML=skelRows(6); ltvSet(''); enterDetail();
     ltv.cc=ccPref();
     var sq={action:'series_info',source:ltv.prov,series_id:id}; if(deskApi()) sq.device='1';
     var fb={title:title,poster:poster,year:year,genre:genre}, my=++movieReq;
