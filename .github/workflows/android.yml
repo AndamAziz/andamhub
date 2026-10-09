@@ -7,6 +7,11 @@ on:
     paths:
       - "android-native/**"
       - ".github/workflows/android.yml"
+  # Pull requests build the app as a check; only pushes to main publish a release.
+  pull_request:
+    paths:
+      - "android-native/**"
+      - ".github/workflows/android.yml"
 
 permissions:
   contents: write
@@ -120,6 +125,7 @@ jobs:
             -Pandroid.injected.signing.key.password="${{ steps.sign.outputs.key_pass }}"
 
       - name: Prepare release downloads
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p release-files
           cp app/build/outputs/apk/release/app-release.apk \
@@ -131,6 +137,7 @@ jobs:
           fi
 
       - name: Publish APK and AAB in Releases
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: android-build-${{ github.run_number }}

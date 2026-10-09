@@ -83,7 +83,7 @@ fun LiveScreen() {
             Load.Ok(
                 ChannelData(
                     cats,
-                    chans.map { PlayItem(Kind.LIVE, source, it.id, it.name, subtitle = cats.firstOrNull { c -> c.id == it.categoryId }?.name.orEmpty(), logo = it.logo, group = it.categoryId) },
+                    chans.map { PlayItem(Kind.LIVE, source, it.id, it.name, subtitle = cats.firstOrNull { c -> c.id == it.categoryId }?.name.orEmpty(), logo = it.logo, group = it.categoryId, archive = it.archive) },
                     chans.map { it.num },
                 ),
             )
@@ -236,6 +236,9 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
     var details by remember(series.id) { mutableStateOf<uk.andam.app.net.MediaDetails?>(null) }
     var subs by remember(series.id) { mutableStateOf<uk.andam.app.net.OnlineSubs?>(null) }
     var season by rememberSaveable(series.id) { mutableIntStateOf(-1) }
+    var cc by rememberSaveable(series.id) { mutableStateOf(uk.andam.app.player.PlayerPrefs.subLang(context).ifBlank { "off" }) }
+    val prep = rememberPrep()
+    var facts by remember(series.id) { mutableStateOf<Map<Int, uk.andam.app.net.EpisodeFacts>>(emptyMap()) }
     LaunchedEffect(series.id, reload) {
         state = Load.Busy
         state = try { Load.Ok(Api.seriesInfo(source, series.id)) } catch (e: Exception) { Load.Err(e.message ?: "Could not load this series.") }
@@ -252,19 +255,33 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
         val first = a?.episodes?.firstOrNull()
         if (tmdb > 0 && a != null && first != null) subs = runCatching { Api.subtitles(tmdb, "episode", a.season, first.episode) }.getOrNull()
     }
+    // TMDB facts for the season shown: still, real episode name, summary (empty without TMDB).
+    LaunchedEffect(tmdb, active?.season) {
+        val a = active
+        facts = if (tmdb > 0 && a != null) {
+            runCatching { Api.season(source, tmdb, a.season) }.getOrDefault(emptyList()).associateBy { it.episode }
+        } else emptyMap()
+    }
+    val seriesTitle = details?.title?.ifBlank { null } ?: series.name
+    fun nameOf(e: uk.andam.app.net.Episode): String {
+        val real = facts[e.episode]?.name.orEmpty()
+        return if (real.isNotBlank() && genericEpisodeTitle(e.title, series.name)) real else e.title
+    }
     fun playFrom(i: Int) {
         val a = active ?: return
         val queue = a.episodes.map { e ->
             PlayItem(
                 Kind.EPISODE, source, e.id,
-                title = "${series.name} · S${a.season} E${e.episode}",
-                subtitle = e.title, logo = series.poster, token = e.play, direct = e.direct,
+                title = "$seriesTitle · S${a.season} E${e.episode}",
+                subtitle = nameOf(e), logo = series.poster, token = e.play, direct = e.direct,
                 tmdb = tmdb, season = a.season, episode = e.episode,
             )
         }
-        PlayQueue.open(context, queue, i)
+        // The chosen subtitle is prepared for the episode tapped; later ones in the player.
+        prep.play(context, queue[i], cc) { first -> PlayQueue.open(context, queue.map { it.copy(subLang = first.subLang) }, i) }
     }
 
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize().background(C.Bg), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             val info = (state as? Load.Ok<SeriesInfo>)?.value
@@ -274,13 +291,20 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                 fallbackPoster = info?.cover?.ifBlank { null } ?: series.poster,
                 fallbackMeta = listOf(series.year, info?.genre.orEmpty()).filter { it.isNotBlank() }.joinToString(" · "),
                 onBack = onBack,
-                subs = subs,
-            ) {
-                if (active != null) HeroButton("Play S${active.season} E${active.episodes.first().episode}", Icons.Filled.PlayArrow, primary = true, modifier = Modifier.weight(1f)) { playFrom(0) }
-                details?.trailer?.takeIf { it.isNotBlank() }?.let { key ->
-                    HeroButton("Trailer", Icons.Filled.Theaters, primary = false) { openTrailer(context, key) }
-                }
-            }
+                actions = {
+                    if (active != null) HeroButton("Play S${active.season} E${active.episodes.first().episode}", Icons.Filled.PlayArrow, primary = true, modifier = Modifier.weight(1f)) { playFrom(0) }
+                    details?.trailer?.takeIf { it.isNotBlank() }?.let { key ->
+                        HeroButton("Trailer", Icons.Filled.Theaters, primary = false) { openTrailer(context, key) }
+                    }
+                },
+                cc = {
+                    val a = active
+                    val firstEp = a?.episodes?.firstOrNull()
+                    if (tmdb > 0 && a != null && firstEp != null) {
+                        CcRow(subs, cc, { lang -> uk.andam.app.player.SubPrep.Key(tmdb, "episode", a.season, firstEp.episode, lang) }) { cc = it }
+                    }
+                },
+            )
         }
         when (val s = state) {
             is Load.Busy -> item { Box(Modifier.fillMaxWidth().height(160.dp)) { Busy() } }
@@ -310,13 +334,22 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                                 .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(Modifier.width(120.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)).background(C.Surface2), contentAlignment = Alignment.Center) {
-                                if (ep.image.isNotBlank()) AsyncImage(model = ep.image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            val f = facts[ep.episode]
+                            val still = f?.still?.ifBlank { null } ?: ep.image
+                            Box(Modifier.width(132.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)).background(C.Surface2), contentAlignment = Alignment.Center) {
+                                if (still.isNotBlank()) AsyncImage(model = still, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                 Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                                Text(
+                                    "E${ep.episode}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.align(Alignment.BottomStart).padding(5.dp).clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xB3000000)).padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
                             }
                             Column(Modifier.padding(start = 12.dp).weight(1f)) {
                                 Text("Episode ${ep.episode}", color = C.Ember, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(ep.title, color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(nameOf(ep), color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                val summary = f?.overview?.ifBlank { null } ?: ep.plot
+                                if (summary.isNotBlank()) Text(summary, color = C.Muted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 if (ep.duration.isNotBlank()) Text(ep.duration, color = C.Faint, fontSize = 12.sp)
                             }
                         }
@@ -325,6 +358,17 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
             }
         }
     }
+    PrepOverlay(prep)
+    }
+}
+
+/** A provider episode title that says nothing ("Name - S01E03", "Episode 3"): TMDB's name is shown instead. */
+private fun genericEpisodeTitle(title: String, series: String): Boolean {
+    val t = title.trim()
+    if (t.isBlank()) return true
+    if (Regex("(?i)\\bS\\d{1,2}\\s*E\\d{1,3}\\b").containsMatchIn(t)) return true
+    if (Regex("(?i)^(episode|ep\\.?|e)\\s*\\d+$").matches(t)) return true
+    return t.equals(series.trim(), ignoreCase = true)
 }
 
 // ---------------------------------------------------------------- Home
@@ -355,7 +399,7 @@ fun HomeScreen(onTab: (Int) -> Unit) {
                     HeroPicker.newLiveIds(context, "live:$src", raw.map { it.id })
                 }
                 live = raw.map { ch ->
-                    PlayItem(Kind.LIVE, src, ch.id, ch.name, subtitle = cats.firstOrNull { it.id == ch.categoryId }?.name.orEmpty(), logo = ch.logo, group = ch.categoryId)
+                    PlayItem(Kind.LIVE, src, ch.id, ch.name, subtitle = cats.firstOrNull { it.id == ch.categoryId }?.name.orEmpty(), logo = ch.logo, group = ch.categoryId, archive = ch.archive)
                 }
             }
             runCatching { movies = Api.vod(src, "") }

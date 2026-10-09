@@ -14,6 +14,8 @@ data class LiveChannel(
     val name: String,
     val logo: String,
     val categoryId: String,
+    /** The provider keeps an archive of this channel (catch-up / rewind further). */
+    val archive: Boolean = false,
 )
 
 data class VodItem(
@@ -80,6 +82,9 @@ data class PlayTokens(
     val directHls: String? = null,
 )
 
+/** A catch-up (archive) link for a live channel; [start] is "yyyy-MM-dd:HH-mm" on the provider's clock. */
+data class Catchup(val play: String, val direct: String?, val start: String, val title: String)
+
 class ApiException(val code: Int, message: String) : Exception(message)
 
 /** Provider account summary from `action=info` (real counts; server host only for admins). */
@@ -116,16 +121,37 @@ data class MediaDetails(
     val genres: List<String>,
     val certification: String,
     val director: String,
+    /** Series creators (films leave it empty). */
+    val creator: String,
+    val country: String,
     val cast: List<CastMember>,
     val poster: String,
     val backdrop: String,
     val trailer: String,
     val tmdbId: Int,
     val seasons: Int,
+    val episodes: Int,
 )
+
+/** One episode's facts from TMDB (still, real name, summary). */
+data class EpisodeFacts(val episode: Int, val name: String, val overview: String, val still: String, val runtime: Int)
 
 /** A subtitle the server found online (OpenSubtitles) — `url` is relative to the server. */
 data class OnlineSub(val lang: String, val label: String, val url: String)
 
-/** Online subtitles for one film / episode, plus the Kurdish auto-translation links when offered. */
-data class OnlineSubs(val subs: List<OnlineSub>, val kurdishUrl: String?, val kurdishPartUrl: String?)
+/**
+ * Online subtitles for one film / episode, plus the Kurdish (Sorani) auto-translation when one
+ * can be made: [kurdishUrl] answers the finished file (add `&e=ENGINE`), [kurdishSourceUrl] /
+ * [kurdishUploadUrl] serve the free Google engine run on this device, [kurdishPartUrl] the
+ * server's AI engines. [kurdishEngines] lists the engines on offer ("g" is always there).
+ */
+data class OnlineSubs(
+    val subs: List<OnlineSub>,
+    val kurdishUrl: String?,
+    val kurdishPartUrl: String?,
+    val kurdishSourceUrl: String? = null,
+    val kurdishUploadUrl: String? = null,
+    val kurdishEngines: List<String> = emptyList(),
+    /** Language the Kurdish is made from (en, else ar, …). */
+    val kurdishFrom: String = "en",
+)

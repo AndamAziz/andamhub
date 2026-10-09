@@ -1133,12 +1133,77 @@ h1,h2,h3{letter-spacing:-.3px}
   .catoption{min-height:52px;border-radius:12px;border-bottom:0;margin-bottom:4px}
   .catoption.on{border-left:0;background:var(--ember-dim);color:#fff}
 }
+/* ---------- film & series pages (TMDB facts) + online subtitles ---------- */
+.dp{max-width:980px}
+.dphero{position:relative;margin:0 0 16px;padding:14px 0 0;min-height:200px}
+.dpbg{position:absolute;inset:-8px -16px auto;height:260px;background-size:cover;background-position:center 25%;opacity:.38;border-radius:18px;
+  -webkit-mask-image:linear-gradient(180deg,#000 30%,transparent);mask-image:linear-gradient(180deg,#000 30%,transparent);pointer-events:none}
+.dphero .pill{position:relative;margin-bottom:14px}
+.dprow{position:relative;display:flex;gap:18px;align-items:flex-end}
+.dpposter{width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:14px;flex:none;background:var(--surface-2);box-shadow:0 18px 40px rgba(0,0,0,.45);border:1px solid var(--hair)}
+.dpinfo{min-width:0;display:flex;flex-direction:column;gap:7px}
+.dpinfo h1{margin:0;font:700 clamp(22px,3.4vw,32px)/1.15 Inter,sans-serif;unicode-bidi:plaintext}
+.dporig{color:var(--muted);font-size:13px;unicode-bidi:plaintext}
+.dpchips{display:flex;flex-wrap:wrap;gap:6px}
+.dpchips span{padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);font:600 12px/1.3 Inter,sans-serif}
+.dpchips .gold{color:var(--gold);background:rgba(245,197,107,.14)}
+.dpgen{color:var(--ember);font:600 13px/1.4 Inter,sans-serif}
+.dptag{color:var(--muted);font-style:italic;font-size:13px;unicode-bidi:plaintext}
+.dpact{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 14px}
+.dpbtn{min-height:44px;padding:0 20px;border-radius:12px;border:0;background:rgba(255,255,255,.1);color:#fff;font:700 14px/1 Inter,sans-serif;cursor:pointer}
+.dpbtn.primary{background:var(--ember);min-width:150px}
+.dpbtn:focus-visible,.ccchip:focus-visible,.dpplot:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.dplabel{color:var(--faint);font:700 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin:16px 0 8px}
+.dpcc{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.ccchip{flex:none;display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:rgba(255,255,255,.09);color:#fff;font:600 13px/1 Inter,sans-serif;cursor:pointer}
+.ccchip.on{background:var(--ember)}
+.ccchip.dim,.ccchip:disabled{opacity:.38;cursor:default}
+.ccspin{width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:ccspin .8s linear infinite}
+@keyframes ccspin{to{transform:rotate(360deg)}}
+.dpeng{display:inline-flex;gap:8px;align-items:center;margin-top:8px;color:var(--muted);font-size:12px}
+.dpeng select{background:var(--surface-2);color:var(--text);border:1px solid var(--hair);border-radius:8px;padding:4px 8px}
+.dpnote{color:var(--faint);font-size:12px;margin-top:6px}.dpnote.warn{color:var(--gold)}
+.dpplot{margin:16px 0 0;color:rgba(246,246,248,.88);font-size:14.5px;line-height:1.6;unicode-bidi:plaintext;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.dpplot.open{-webkit-line-clamp:unset;display:block}
+.dpcrew{display:grid;gap:6px;margin-top:14px;font-size:13px}
+.dpcrew span{display:inline-block;width:96px;color:var(--faint)}.dpcrew b{font-weight:500;unicode-bidi:plaintext}
+.dpcast{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.dpperson{flex:none;width:80px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.dpface{width:66px;height:66px;border-radius:50%;overflow:hidden;background:var(--surface-2);display:grid;place-items:center;color:var(--muted);font:700 22px Inter,sans-serif}
+.dpface img{width:100%;height:100%;object-fit:cover}
+.dpperson b{font:600 12px/1.25 Inter,sans-serif;unicode-bidi:plaintext}.dpperson small{color:var(--faint);font-size:11px;unicode-bidi:plaintext;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dptmdb{margin-top:14px;color:var(--faint);font-size:10.5px}
+.epirow.dpep{align-items:flex-start}
+.epthumb{position:relative;flex:none;width:132px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.epthumb img{width:100%;height:100%;object-fit:cover}
+.epthumb i{position:absolute;left:5px;bottom:5px;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.7);font:700 11px/1.3 Inter,sans-serif;font-style:normal}
+.eptext{display:flex;flex-direction:column;gap:3px;min-width:0}
+.eptext .nm{white-space:normal;unicode-bidi:plaintext}
+.eptext .sm{color:var(--muted);font-size:12px;line-height:1.4;unicode-bidi:plaintext;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.subprep{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);padding:16px}
+.subprep[hidden]{display:none!important}
+.spcard{width:min(420px,100%);display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 20px;border-radius:20px;background:var(--surface);border:1px solid var(--hair);text-align:center}
+.spcard .dpbtn{width:100%}
+.spring{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--ember);animation:ccspin .9s linear infinite}
+.spring[hidden]{display:none}
+@media (max-width:640px){
+  .dpposter{width:104px}.dprow{gap:14px}
+  .dpbg{height:200px}
+  .epthumb{width:108px}
+  .dpbtn.primary{flex:1 1 auto}
+}
+
 /* ---------- player v2.1: auto-hiding controls + full-width settings sheet ---------- */
 /* keyboard/TV focus may keep controls up; a tap that leaves focus on the stage must not */
 .lvstage:focus-within:not(.controls-on):not(.fsactive) .lvcontrols{opacity:0}
 html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 /* live streams: no meaningless 0:10 / 0:15 timeline — the LIVE pill jumps to the live edge */
 .lvstage.is-live .ctrlseek{display:none!important}
+/* …unless the stream keeps a window (playlist window / what this player buffered): then a real
+   timeline, ±10 s, and a LIVE pill that shows how far behind live the picture is */
+.lvstage.is-live.is-liveseek .ctrlseek{display:flex!important}
+.lvstage.is-behind .livepill{background:rgba(10,11,15,.55);box-shadow:inset 0 0 0 1px var(--ember)}
+.lvstage.is-behind .livepill i{background:var(--ember)}
 .ctrlrange{height:4px}
 .lvcontrols .ctrlbtn.primary{width:58px;height:58px;font-size:22px;background:rgba(10,11,15,.55)!important;border:1px solid rgba(255,255,255,.22)!important}
 .lvcontrols .ctrlnav{background:rgba(10,11,15,.45)}
@@ -2192,6 +2257,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var dirs=['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'];
     if(dirs.indexOf(e.key)<0) return;
     if(typing&&(e.key==='ArrowLeft'||e.key==='ArrowRight')) return;
+    /* On the player itself, left / right skip 10 s (films, and live channels with a window). */
+    if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&window.andamSeekKey&&window.andamSeekKey(el,e.key)){ e.preventDefault(); return; }
 
     var now=Date.now();
     if(now-lastKeyAt<DEBOUNCE){ e.preventDefault(); return; }
@@ -2597,7 +2664,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   var PROV_KEY='andam:provider';
   var ltv={providers:[],prov:null,tab:'direct',cat:'',q:'',hasArchive:false,req:0,started:false,channels:[],
-           archive:[],series:null};
+           archive:[],series:null,cc:'off'};
   var lcache={}, TTL=5*60*1000;   // client cache so tab switches don't refetch
 
   function ltvSet(m){ ltvMsg.textContent=m||''; ltvMsg.classList.toggle('hide',!m); }
@@ -2657,16 +2724,70 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     clearTimeout(s.ctrlTimer); s.stage.classList.add('controls-on');
     if(!hold) s.ctrlTimer=setTimeout(function(){ if(s.video.paused||(s.settings&&!s.settings.hidden)) return; s.stage.classList.remove('controls-on') },3000);
   }
+  /* Live window: the playlist's window (hls.js) or what this player has buffered (MPEG-TS via
+     mpegts.js, native). Null when there is nothing worth a timeline. */
+  function liveRange(s){
+    var v=s.video;
+    try{
+      var r=s.hls?v.seekable:v.buffered;
+      if(!r||!r.length) return null;
+      var a=r.start(0),b=r.end(r.length-1);
+      if(!s.hls){ for(var i=r.length-1;i>=0;i--){ if(r.start(i)<=v.currentTime+0.5){ a=r.start(i); break } } }
+      return b-a>20?{start:a,end:b}:null;
+    }catch(_){ return null }
+  }
+  function canSeek(s){ var d=s.video.duration; return (isFinite(d)&&d>0)||!!liveRange(s) }
+  /* ±seconds inside the film, or inside the live window (never past the live edge). */
+  function seekBy(s,sec){
+    var v=s.video,d=v.duration;
+    try{
+      if(isFinite(d)&&d>0){ v.currentTime=Math.max(0,Math.min(d,v.currentTime+sec)); return }
+      var r=liveRange(s); if(!r) return;
+      v.currentTime=Math.max(r.start+0.5,Math.min(r.end-1.5,v.currentTime+sec));
+    }catch(_){}
+  }
+  function goLiveEdge(s){
+    var v=s.video, r=liveRange(s);
+    try{
+      /* hls.js knows its own live position (a few segments from the edge); otherwise the newest
+         buffered moment. */
+      var at=s.hls&&isFinite(s.hls.liveSyncPosition)&&s.hls.liveSyncPosition>0?s.hls.liveSyncPosition:(r?r.end-1.5:null);
+      if(at!=null){ v.currentTime=at; if(r) s.edgeGap=Math.max(0,r.end-at) }
+      else { var sk=v.seekable; if(sk&&sk.length) v.currentTime=sk.end(sk.length-1)-1 }
+    }catch(_){}
+    v.play().catch(function(){});
+  }
+  window.andamSeekKey=function(el,key){
+    var stage=el&&el.closest&&el.closest('.lvstage'); if(!stage) return false;
+    if(el.closest('.fsnav,.ctrlsettings,input,select')) return false;
+    var s=null; for(var k in SURF){ if(SURF[k].stage===stage) s=SURF[k] }
+    if(!s||!canSeek(s)) return false;
+    seekBy(s,key==='ArrowLeft'?-10:10); updateControls(s); showControls(s); return true;
+  };
   function updateControls(s){
     if(!s||!s.controls) return;
     var v=s.video,d=v.duration,finite=isFinite(d)&&d>0;
-    var sk=v.seekable, win=0; try{ if(sk&&sk.length) win=sk.end(sk.length-1)-sk.start(0) }catch(_){}
-    var seekable=finite||win>30;
+    var r=finite?null:liveRange(s);
+    /* "Behind live" is measured from where the stream normally plays (hls.js keeps a few segments
+       in hand, mpegts.js a little buffer), learnt while playing live, so live reads as LIVE. */
+    if(r&&s.edgeGap==null&&!v.paused&&v.currentTime>0) s.edgeGap=Math.max(0,r.end-v.currentTime);
+    var behind=r?Math.max(0,r.end-v.currentTime-(s.edgeGap||0)):0;
+    var seekable=finite||!!r;
     s.stage.classList.toggle('is-seekable',seekable);
     s.stage.classList.toggle('is-live',!finite);
-    s.current.textContent=timeText(v.currentTime);
-    s.duration.textContent=finite?timeText(d):(win>30?timeText(win):'');
-    s.seek.disabled=!finite; s.seek.value=finite?String(Math.round((v.currentTime/d)*1000)):'1000';
+    s.stage.classList.toggle('is-liveseek',!!r);
+    s.stage.classList.toggle('is-behind',!!r&&behind>6);
+    var pill=s.controls.querySelector('[data-ui="liveedge"]');
+    if(pill) pill.innerHTML='<i></i>'+(r&&behind>6?'-'+timeText(behind)+' · LIVE':'LIVE');
+    if(r){
+      s.current.textContent=behind>6?'-'+timeText(behind):'LIVE';
+      s.duration.textContent='LIVE';
+      s.seek.disabled=false; s.seek.value=String(Math.round(((v.currentTime-r.start)/(r.end-r.start))*1000));
+    }else{
+      s.current.textContent=timeText(v.currentTime);
+      s.duration.textContent=finite?timeText(d):'';
+      s.seek.disabled=!finite; s.seek.value=finite?String(Math.round((v.currentTime/d)*1000)):'1000';
+    }
     s.playBtn.textContent=v.paused?'▶':'❚❚';
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
     var ml=s.controls.querySelector('[data-mutelbl]'); if(ml) ml.textContent=(v.muted||v.volume===0)?'Muted':'On';
@@ -2852,8 +2973,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.controls.addEventListener('click',function(e){
       var b=e.target.closest('[data-control]'); if(!b) return; e.stopPropagation(); var a=b.getAttribute('data-control'),v=s.video;
       if(a==='play'){ if(v.paused) v.play().catch(function(){}); else v.pause() }
-      else if(a==='back') try{ v.currentTime=Math.max(0,v.currentTime-10) }catch(_){}
-      else if(a==='forward') try{ v.currentTime=Math.min(isFinite(v.duration)?v.duration:v.currentTime+10,v.currentTime+10) }catch(_){}
+      else if(a==='back') seekBy(s,-10);
+      else if(a==='forward') seekBy(s,10);
       else if(a==='mute') v.muted=!v.muted;
       else if(a==='fit'){ s.fit=(s.fit+1)%3; v.style.objectFit=['contain','cover','fill'][s.fit]; b.textContent=['Fit','Fill','Wide'][s.fit] }
       else if(a==='settings') s.settings.hidden=!s.settings.hidden;
@@ -2874,7 +2995,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       var u=b.getAttribute('data-ui');
       if(u==='settings-close'){ s.settings.hidden=true; showControls(s); return }
       if(u==='mute'){ v.muted=!v.muted; updateControls(s) }
-      else if(u==='liveedge'){ try{ var sk=v.seekable; if(sk&&sk.length) v.currentTime=sk.end(sk.length-1)-1 }catch(_){} v.play().catch(function(){}) }
+      else if(u==='liveedge') goLiveEdge(s);
       else if(u==='prev'||u==='next') stepChannel(s,u==='next'?1:-1);
       else if(u==='list'){
         if(s.kind==='live'&&ltv.tab!=='direct'){ if(isStageFullscreen(s)) toggleStageFullscreen(s); openCatDrawer('live') }
@@ -2884,8 +3005,13 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     });
     s.controls.querySelector('[data-control="settings"]').addEventListener('click',function(){ fillSettings(s) });
     s.video.addEventListener('playing',function(){ if(s.stage.classList.contains('controls-on')) showControls(s,!!(s.settings&&!s.settings.hidden)) });
-    s.seek.addEventListener('input',function(e){ e.stopPropagation(); if(isFinite(s.video.duration)) s.video.currentTime=(Number(s.seek.value)/1000)*s.video.duration; updateControls(s) });
-    ['timeupdate','durationchange','play','pause','volumechange','loadedmetadata'].forEach(function(ev){ s.video.addEventListener(ev,function(){ updateControls(s) }) });
+    s.seek.addEventListener('input',function(e){
+      e.stopPropagation(); var f=Number(s.seek.value)/1000;
+      if(isFinite(s.video.duration)) s.video.currentTime=f*s.video.duration;
+      else { var r=liveRange(s); if(r) try{ s.video.currentTime=Math.min(r.end-1.5,r.start+f*(r.end-r.start)) }catch(_){} }
+      updateControls(s);
+    });
+    ['timeupdate','durationchange','play','pause','volumechange','loadedmetadata','progress'].forEach(function(ev){ s.video.addEventListener(ev,function(){ updateControls(s) }) });
   }
   function fillSettings(s){
     var v=s.video, box=s.controls.querySelector('[data-audiotracks]'), q=s.controls.querySelector('[data-quality]');
@@ -2922,8 +3048,13 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });
     s.video.addEventListener('ended',function(){ nextEpisode(s) });
     s.err.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' ') s.err.click() });
+    s.stage.addEventListener('touchstart',function(){ s.lastTouch=Date.now() },{passive:true});
     s.stage.addEventListener('dblclick',function(e){
       if(e.target.closest('.fsnav')) return;
+      /* Phones: double-tap the left / right half skips 10 s (films, and live with a window). */
+      if(Date.now()-(s.lastTouch||0)<900&&canSeek(s)&&!e.target.closest('.lvcontrols button,.lvcontrols input')){
+        var rc=s.stage.getBoundingClientRect(); seekBy(s,e.clientX<rc.left+rc.width/2?-10:10); updateControls(s); showControls(s); return;
+      }
       toggleStageFullscreen(s);
     });
     s.stage.addEventListener('keydown',function(e){
@@ -3206,6 +3337,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     lvStop(kind);
     s.idle.classList.add('hide'); setNow(s,title,sub,nowLogoOf(kind)); clearFail(s); busy(s,false);
     var nd=deskNextDirect; deskNextDirect=null;
+    var cue=takeSub(s,token,/live/i.test(sub||''));
     s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:false,direct:nd&&nd.link,src:nd&&nd.src,directTried:false};
     var pill=s.stage.querySelector('.deskpill'); if(pill) pill.remove();
     deskKind=kind; deskCard(s,true); deskListen();
@@ -3214,7 +3346,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.last.relayUrl=url;
     if(s.last.direct){ url=s.last.direct; s.last.directTried=true }
     var back=function(){ deskCard(s,false); deskReplayHere(s) };
-    Promise.resolve(d.play({url:url,title:title||'Andam',live:/live/i.test(sub||''),nav:/live|^Episode/i.test(sub||'')}))
+    Promise.resolve(d.play({url:url,title:title||'Andam',live:/live/i.test(sub||''),nav:/live|^Episode/i.test(sub||''),
+      subs:cue?[{url:cue.url,lang:cue.lang,label:cue.label,select:true}]:[]}))
       .then(function(r){ if(!r||!r.ok) back() }, back);
     return true;
   }
@@ -3224,7 +3357,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
     }
     var s=surf(kind),
-        src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':'');
+        src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':''),
+        liveish=/live/i.test(sub||'');
     var repeated=!!(s.last&&s.last.token===token);
     s.repairCount=repeated?(s.repairCount||0)+1:0;
     lvStop(kind);
@@ -3234,7 +3368,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     setNow(s,title,sub,nowLogoOf(kind));
 
     clearFail(s); busy(s,true);
+    takeSub(s,token,liveish);
+    if(!repeated) s.edgeGap=null;
     s.last={token:token,title:title,sub:sub,isHls:isHls,alt:alt,tc:tc};
+    applyTrack(s);
     showControls(s,true); updateControls(s);
     var ok=false,timer=null;
 
@@ -3417,7 +3554,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       var h=new Hls({
         lowLatencyMode:false,
         maxBufferLength:30,maxMaxBufferLength:90,maxBufferSize:60*1000*1000,
-        backBufferLength:45,
+        /* Live keeps 4 minutes behind for rewinding inside the window; films as before. */
+        backBufferLength:liveish?240:45,
         liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,
         manifestLoadingTimeOut:30000,manifestLoadingMaxRetry:4,
         levelLoadingTimeOut:30000,levelLoadingMaxRetry:4,
@@ -3478,7 +3616,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
                 autoCleanupMinBackwardDuration:30}
                :{enableStashBuffer:true,stashInitialSize:1024*1024,
                   liveBufferLatencyChasing:false,
-                lazyLoad:false,autoCleanupSourceBuffer:true});
+                lazyLoad:false,autoCleanupSourceBuffer:true,
+                /* Keep what was already played (about 4 minutes) so live can be rewound. */
+                autoCleanupMaxBackwardDuration:240,autoCleanupMinBackwardDuration:180});
       }catch(_){ retryable('Stream failed to load'); return }
       s.mts=p;
       p.on(mpegts.Events.ERROR,function(t,d){
@@ -3701,7 +3841,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   function vodCard(it,kind){
     return '<button class="pcard" type="button" data-'+kind+'="'+esc(it.id)+'" data-ext="'+esc(it.ext||'')+'" '+
-      'data-title="'+esc(it.name)+'">'+
+      'data-title="'+esc(it.name)+'" data-poster="'+esc(it.poster||'')+'" data-year="'+esc(it.year||'')+'" data-genre="'+esc(it.genre||'')+'">'+
       (it.poster?'<img loading="lazy" src="'+esc(it.poster)+'" alt="'+esc(it.name)+' poster" />':'')+
       '<span class="pi"><span class="pt">'+esc(it.name)+'</span><span class="pm">'+
       '<span>'+esc(it.year||'—')+'</span>'+(it.rating?'<b>★ '+esc(it.rating)+'</b>':'')+
@@ -3815,17 +3955,37 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     }
     var mv=e.target.closest('[data-vod]');
     if(mv){
-      playById('vod',mv.getAttribute('data-vod'),mv.getAttribute('data-ext'),
-        mv.getAttribute('data-title'),'Movie · provider VOD',false);
+      /* A film opens its page (facts, subtitles); Play there starts it as before. */
+      openMovie(mv.getAttribute('data-vod'),mv.getAttribute('data-title'),mv.getAttribute('data-ext'),
+        mv.getAttribute('data-poster'),mv.getAttribute('data-year'),mv.getAttribute('data-genre'));
       return;
     }
+    var pl=e.target.closest('[data-dpplay]');
+    if(pl){
+      var q={tmdb:Number(pl.getAttribute('data-tmdb'))||0,type:'movie'};
+      playWithSub(q,ltv.cc,function(sub){
+        pendSub=sub;
+        playById('vod',pl.getAttribute('data-dpplay'),pl.getAttribute('data-ext'),pl.getAttribute('data-title'),'Movie · provider VOD',false);
+      });
+      return;
+    }
+    var tr=e.target.closest('[data-trailer]');
+    if(tr){ window.open('https://www.youtube.com/watch?v='+encodeURIComponent(tr.getAttribute('data-trailer')),'_blank','noopener'); return }
+    var plot=e.target.closest('.dpplot');
+    if(plot){ plot.classList.toggle('open'); return }
     var sr=e.target.closest('[data-series]');
-    if(sr){ openSeries(sr.getAttribute('data-series'),sr.getAttribute('data-title')); return }
+    if(sr){ openSeries(sr.getAttribute('data-series'),sr.getAttribute('data-title'),sr.getAttribute('data-poster'),sr.getAttribute('data-year'),sr.getAttribute('data-genre')); return }
     var ep=e.target.closest('[data-play]');
     if(ep){
       [].forEach.call(document.querySelectorAll('#srEps .epirow.on'),function(x){x.classList.remove('on')}); ep.classList.add('on');
-      deskNextDirect={link:ep.getAttribute('data-direct')||null,src:ltv.prov};
-      playToken(ep.getAttribute('data-play'),ep.getAttribute('data-title'),'Episode · provider series',false); return
+      var eq={tmdb:Number(ep.getAttribute('data-tmdb'))||0,type:'episode',season:Number(ep.getAttribute('data-season'))||0,episode:Number(ep.getAttribute('data-episode'))||0};
+      /* The chosen subtitle is prepared for the episode tapped, then it plays as before. */
+      playWithSub(eq,ltv.cc,function(sub){
+        pendSub=sub;
+        deskNextDirect={link:ep.getAttribute('data-direct')||null,src:ltv.prov};
+        playToken(ep.getAttribute('data-play'),ep.getAttribute('data-title'),'Episode · provider series',false);
+      });
+      return
     }
     var back=e.target.closest('#srBack');
     if(back){ loadTab(); }
@@ -3838,31 +3998,374 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(ch){ playById('live',ch.getAttribute('data-fsch'),'',ch.getAttribute('data-name'),'● LIVE · '+(ltvSub.textContent.split(' ·')[0]),true); renderFsNav('live'); showFsNav(surf('live'),false) }
   });
 
-  function openSeries(id,title){
+  /* ================= Film & series pages (TMDB facts) and online subtitles =================
+     Every part fails softly: without TMDB / OpenSubtitles / Google the page shows the provider's
+     own info and plays exactly as before. */
+  var SUB_API='/api/public/subtitles';
+  var FACTS_KEY='andam.facts.v1', FACTS_TTL=7*864e5, FACTS_MAX=120;
+  function factsGet(k){ try{ var all=JSON.parse(localStorage.getItem(FACTS_KEY)||'{}'), e=all[k]; return e&&Date.now()-e.t<FACTS_TTL?e.v:null }catch(_){ return null } }
+  function factsPut(k,v){
+    try{
+      var all=JSON.parse(localStorage.getItem(FACTS_KEY)||'{}'); all[k]={t:Date.now(),v:v};
+      var keys=Object.keys(all).sort(function(a,b){ return all[b].t-all[a].t });
+      keys.slice(FACTS_MAX).forEach(function(x){ delete all[x] });
+      localStorage.setItem(FACTS_KEY,JSON.stringify(all));
+    }catch(_){}
+  }
+  /* Film / series facts (7-day local cache). Resolves null when nothing could be fetched. */
+  function facts(type,id){
+    var k=ltv.prov+'|'+type+'|'+id+'|en', hit=factsGet(k);
+    if(hit) return Promise.resolve(hit);
+    return api({action:'details',source:ltv.prov,type:type,id:id,lang:'en'})
+      .then(function(d){ factsPut(k,d); return d }).catch(function(){ return null });
+  }
+  function seasonFacts(tmdb,season){
+    if(!tmdb) return Promise.resolve({});
+    var k='season|'+tmdb+'|'+season+'|en', hit=factsGet(k);
+    var p=hit?Promise.resolve(hit):api({action:'season',source:ltv.prov,tmdb:tmdb,season:season,lang:'en'}).then(function(d){ factsPut(k,d); return d });
+    return p.then(function(d){ var m={}; (d.episodes||[]).forEach(function(e){ m[e.episode]=e }); return m }).catch(function(){ return {} });
+  }
+
+  function authHeaders(json){ var h={accept:'application/json'}; if(authToken) h.Authorization='Bearer '+authToken; if(json) h['Content-Type']='application/json'; return h }
+  var subLists={};
+  function subList(q){
+    var k=q.tmdb+'|'+q.type+'|'+(q.season||0)+'|'+(q.episode||0);
+    if(subLists[k]) return subLists[k];
+    var p=fetch(SUB_API+'?action=list&tmdb='+q.tmdb+'&type='+q.type+'&season='+(q.season||0)+'&episode='+(q.episode||0),{headers:authHeaders()})
+      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json() })
+      .catch(function(e){ delete subLists[k]; throw e });
+    subLists[k]=p; return p;
+  }
+  var LANG_NAMES={ku:'Kurdish',en:'English',ar:'العربية',fa:'فارسی',tr:'Türkçe',fr:'Français',de:'Deutsch',es:'Español'};
+  function langName(l){ return LANG_NAMES[l]||String(l).toUpperCase() }
+  function ccPref(){ try{ return localStorage.getItem('andam.cc')||'off' }catch(_){ return 'off' } }
+  function ccSet(l){ try{ localStorage.setItem('andam.cc',l) }catch(_){} }
+  function kuEngine(){ try{ return localStorage.getItem('andam.kuEngine')||'g' }catch(_){ return 'g' } }
+
+  /* ---- free Kurdish (Sorani) through Google Translate, asked from this browser ----
+     One request at a time with a short gap, batches of ~4000 characters / 100 cues, rotation
+     between the addresses that allow browsers, growing pauses after a full round. Finished cues
+     are kept, so "tap again" resumes where it stopped. */
+  var GT=['https://translate.googleapis.com/translate_a/t?client=gtx&sl=auto&tl=ckb&format=text',
+          'https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ckb'];
+  var gtAt=0, gtLast=0, gtDone={};
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms) }) }
+  function gtRequest(texts){
+    var body=texts.map(function(t){ return 'q='+encodeURIComponent(t) }).join('&');
+    return fetch(GT[gtAt],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+      .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json() })
+      .then(function(a){
+        if(!Array.isArray(a)||a.length!==texts.length) throw new Error('bad answer');
+        return a.map(function(x){ return typeof x==='string'?x:(Array.isArray(x)?String(x[0]||''):'') });
+      });
+  }
+  function gtTranslate(key,lines,onProg){
+    var out=gtDone[key]&&gtDone[key].length===lines.length?gtDone[key]:new Array(lines.length);
+    gtDone[key]=out;
+    var PAUSES=[8000,16000,32000,60000];
+    function next(){
+      var first=-1; for(var i=0;i<out.length;i++){ if(out[i]==null){ first=i; break } }
+      if(first<0){ delete gtDone[key]; return Promise.resolve(out) }
+      var batch=[],chars=0;
+      for(var j=first;j<lines.length&&out[j]==null&&batch.length<100;j++){
+        if(batch.length&&chars+lines[j].length+3>4000) break; batch.push(j); chars+=lines[j].length+3;
+      }
+      var ask=batch.filter(function(n){ return lines[n].trim() });
+      batch.forEach(function(n){ if(!lines[n].trim()) out[n]=lines[n] });
+      if(!ask.length) return next();
+      var tries=0;
+      function attempt(){
+        var wait=Math.max(0,400-(Date.now()-gtLast));
+        return sleep(wait).then(function(){ gtLast=Date.now(); return gtRequest(ask.map(function(n){ return lines[n] })) })
+          .then(function(res){
+            ask.forEach(function(n,k){ out[n]=res[k]||lines[n] });
+            onProg(out.filter(function(x){ return x!=null }).length/lines.length);
+            return next();
+          },function(){
+            tries++; if(tries>=10) throw new Error('Google is busy — tap again to continue');
+            gtAt=(gtAt+1)%GT.length;
+            var pause=tries%GT.length===0?PAUSES[Math.min(PAUSES.length-1,tries/GT.length-1)]:0;
+            return sleep(pause).then(attempt);
+          });
+      }
+      return attempt();
+    }
+    return next();
+  }
+
+  /* ---- preparing a subtitle (shared by the CC chips, Play and episodes) ---- */
+  var subState={};   // key → {st:'work'|'ready'|'fail', p, sub:{url,lang,label}, msg}
+  var subJobs={};
+  function subKey(q,lang){ return q.tmdb+'|'+q.type+'|'+(q.season||0)+'|'+(q.episode||0)+'|'+lang }
+  var subListeners=[];
+  function subNotify(){ subListeners.slice().forEach(function(f){ try{ f() }catch(_){} }) }
+  function errOf(r){ return r.json().then(function(j){ return (j&&(j.error||j.message))||('http '+r.status) },function(){ return 'http '+r.status }) }
+  function prepareSub(q,lang){
+    var k=subKey(q,lang);
+    if(subState[k]&&subState[k].st==='ready') return Promise.resolve(subState[k].sub);
+    if(subJobs[k]) return subJobs[k];
+    subState[k]={st:'work',p:0}; subNotify();
+    function prog(f){ if(subState[k].st==='work'){ subState[k].p=Math.max(0,Math.min(1,f)); subNotify() } }
+    var abs=function(u){ return new URL(u,location.href).href };
+    var job=subList(q).then(function(list){
+      var real=(list.subtitles||[]).filter(function(x){ return x.lang===lang })[0];
+      if(real){
+        return fetch(real.url).then(function(r){
+          if(!r.ok) return errOf(r).then(function(m){ throw new Error(m) });
+          prog(1); return {url:abs(real.url),lang:real.lang,label:real.label};
+        });
+      }
+      var ka=list.kurdishAuto;
+      if(lang!=='ku') throw new Error('No '+langName(lang)+' subtitles for this title');
+      if(!ka) throw new Error('No subtitle to make Kurdish from');
+      var eng=kuEngine(); if(eng!=='g'&&(ka.engines||[]).indexOf(eng)<0) eng='g';
+      var done=ka.url+'&e='+eng;
+      function state(){ return fetch(done,{headers:authHeaders()}).then(function(r){
+        if(r.status===200) return {ready:true};
+        if(r.status!==202) return errOf(r).then(function(m){ throw new Error(m) });
+        return r.json();
+      }) }
+      function viaGoogle(st){
+        var parts=Math.max(1,st.parts||1), missing=st.missing||[], finished=parts-missing.length;
+        prog(finished/parts);
+        return missing.reduce(function(p,n){
+          return p.then(function(){
+            return fetch(ka.sourceUrl+'&n='+n,{headers:authHeaders()})
+              .then(function(r){ if(!r.ok) return errOf(r).then(function(m){ throw new Error(m) }); return r.json() })
+              .then(function(src){ return gtTranslate(ka.sourceUrl+'#'+n,src.lines||[],function(f){ prog((finished+f)/parts) }) })
+              .then(function(lines){
+                return fetch(ka.uploadUrl+'&n='+n,{method:'POST',headers:authHeaders(true),body:JSON.stringify({lines:lines})})
+                  .then(function(r){ if(!r.ok) return errOf(r).then(function(m){ throw new Error(m) }); finished++; prog(finished/parts) });
+              });
+          });
+        },Promise.resolve());
+      }
+      function viaServer(st){
+        var parts=Math.max(1,st.parts||1), missing=st.missing||[], finished=parts-missing.length;
+        prog(finished/parts);
+        var groups=[]; for(var i=0;i<missing.length;i+=4) groups.push(missing.slice(i,i+4));
+        return groups.reduce(function(p,g){
+          return p.then(function(){
+            return Promise.all(g.map(function(n){ return fetch(ka.partUrl+'&e='+eng+'&n='+n,{headers:authHeaders()}).catch(function(){}) }))
+              .then(function(){ finished+=g.length; prog(finished/parts) });
+          });
+        },Promise.resolve());
+      }
+      function round(left){
+        return state().then(function(st){
+          if(st.ready) return {url:abs(done),lang:'ku',label:'Kurdish (auto)'};
+          if(left<=0) throw new Error('Kurdish subtitles are not ready yet — tap again to continue');
+          return (eng==='g'?viaGoogle(st):viaServer(st)).then(function(){ return round(left-1) });
+        });
+      }
+      return round(2);
+    });
+    subJobs[k]=job;
+    job.then(function(sub){ subState[k]={st:'ready',p:1,sub:sub} },
+             function(e){ subState[k]={st:'fail',msg:(e&&e.message&&e.message.length<140)?e.message:'Subtitles are not available right now'} })
+       .then(function(){ delete subJobs[k]; subNotify() });
+    return job;
+  }
+
+  /* The subtitle handed to the next film / episode started (consumed by lvPlay / deskPlay). */
+  var pendSub=null;
+  function takeSub(s,token,liveish){
+    if(liveish){ pendSub=null; s.sub=null; return null }
+    if(pendSub){ s.sub=pendSub; pendSub=null }
+    else if(!(s.last&&s.last.token===token)) s.sub=null;
+    return s.sub;
+  }
+  function applyTrack(s){
+    var v=s.video;
+    [].slice.call(v.querySelectorAll('track[data-andam]')).forEach(function(t){ t.remove() });
+    if(!s.sub) return;
+    var t=document.createElement('track');
+    t.setAttribute('data-andam','1'); t.kind='subtitles'; t.src=s.sub.url; t.srclang=s.sub.lang||''; t.label=s.sub.label||'Subtitles'; t.default=true;
+    v.appendChild(t);
+    var show=function(){ try{ [].forEach.call(v.textTracks,function(tt){ tt.mode=(tt.label===t.label&&tt.language===t.srclang)?'showing':'disabled' }) }catch(_){} };
+    t.addEventListener('load',show); setTimeout(show,300); setTimeout(show,2500);
+  }
+
+  /* ---- "Preparing subtitles… 45%" before playback, with a way out ---- */
+  var prepBox=null, prepWait=null;
+  function prepPaint(){
+    if(!prepWait) return;
+    var st=subState[prepWait.key]||{st:'work',p:0};
+    if(st.st==='ready'){ var go=prepWait.go; prepClose(); go(st.sub); return }
+    prepBox.querySelector('.spmsg').textContent=st.st==='fail'?st.msg:('Preparing '+langName(prepWait.lang)+' subtitles… '+Math.round((st.p||0)*100)+'%');
+    prepBox.querySelector('[data-sp="retry"]').hidden=st.st!=='fail';
+    prepBox.querySelector('.spring').hidden=st.st==='fail';
+  }
+  function prepClose(){ prepWait=null; if(prepBox) prepBox.hidden=true }
+  function playWithSub(q,lang,go){
+    if(!q.tmdb||!lang||lang==='off'){ go(null); return }
+    var k=subKey(q,lang);
+    if(subState[k]&&subState[k].st==='ready'){ go(subState[k].sub); return }
+    if(!prepBox){
+      prepBox=document.createElement('div'); prepBox.className='subprep'; prepBox.hidden=true;
+      prepBox.innerHTML='<div class="spcard" role="dialog" aria-live="polite"><span class="spring"></span><b class="spmsg"></b>'+
+        '<button type="button" class="dpbtn primary" data-sp="retry" hidden>Try again</button>'+
+        '<button type="button" class="dpbtn" data-sp="skip">Play without subtitles</button></div>';
+      document.body.appendChild(prepBox);
+      prepBox.addEventListener('click',function(e){
+        var b=e.target.closest('[data-sp]'); if(!b||!prepWait) return;
+        if(b.getAttribute('data-sp')==='skip'){ var go=prepWait.go; prepClose(); go(null) }
+        else prepareSub(prepWait.q,prepWait.lang).catch(function(){});
+      });
+      subListeners.push(prepPaint);
+    }
+    prepWait={key:k,q:q,lang:lang,go:go}; prepBox.hidden=false;
+    prepareSub(q,lang).catch(function(){});
+    prepPaint();
+    var first=prepBox.querySelector('[data-sp="skip"]'); if(first) first.focus();
+  }
+
+  /* ---- CC chips: Off, Kurdish · AI, English, العربية, then the others found ---- */
+  function ccRow(host,q,getLang,setLang){
+    if(!host) return;
+    function paint(list){
+      var found=list?(list.subtitles||[]).map(function(x){ return x.lang }):[];
+      var kurdish=!!(list&&(list.kurdishAuto||found.indexOf('ku')>=0));
+      var langs=['off','ku','en','ar'].concat(found.filter(function(l){ return ['ku','en','ar'].indexOf(l)<0 }));
+      var cur=getLang();
+      var engines=list&&list.kurdishAuto&&list.kurdishAuto.engines||['g'];
+      host.innerHTML='<div class="dplabel">Subtitles</div><div class="dpcc">'+langs.filter(function(l,i){ return langs.indexOf(l)===i }).map(function(l){
+        var ok=l==='off'||(l==='ku'&&kurdish)||found.indexOf(l)>=0;
+        var st=l==='off'?null:subState[subKey(q,l)];
+        var badge=!st?'':st.st==='work'?' <span class="ccspin"></span><bdi>'+Math.round((st.p||0)*100)+'%</bdi>':st.st==='ready'?' ✓':' !';
+        var name=l==='off'?'Off':l==='ku'?(found.indexOf('ku')>=0?'Kurdish':'Kurdish · AI'):langName(l);
+        return '<button type="button" class="ccchip'+(cur===l?' on':'')+(ok||!list?'':' dim')+'" data-cc="'+l+'"'+(ok?'':' disabled')+'>'+esc(name)+badge+'</button>';
+      }).join('')+'</div>'+
+      (engines.length>1&&kurdish?'<label class="dpeng">Kurdish made by <select data-cceng>'+[['g','Google (free)'],['claude-best','Claude · best'],['claude-fast','Claude · fast'],['ai','Gemini AI']].filter(function(e){ return engines.indexOf(e[0])>=0 }).map(function(e){
+        return '<option value="'+e[0]+'"'+(kuEngine()===e[0]?' selected':'')+'>'+e[1]+'</option>' }).join('')+'</select></label>':'')+
+      (function(){ var st=cur!=='off'&&subState[subKey(q,cur)]; return !list?'<div class="dpnote">Finding subtitles…</div>':st&&st.st==='fail'?'<div class="dpnote warn">'+esc(st.msg)+'</div>':'' })();
+    }
+    var list=null;
+    paint(null);
+    subList(q).then(function(l){ list=l; paint(list) },function(){ host.innerHTML='' });
+    var repaint=function(){ if(!host.isConnected){ subListeners.splice(subListeners.indexOf(repaint),1); return } paint(list) };
+    subListeners.push(repaint);
+    host.addEventListener('click',function(e){
+      var b=e.target.closest('[data-cc]'); if(!b||b.disabled) return;
+      var l=b.getAttribute('data-cc'); setLang(l); ccSet(l);
+      if(l!=='off') prepareSub(q,l).catch(function(){});
+      paint(list);
+    });
+    host.addEventListener('change',function(e){
+      var s=e.target.closest('[data-cceng]'); if(!s) return;
+      try{ localStorage.setItem('andam.kuEngine',s.value) }catch(_){}
+    });
+  }
+
+  /* ---- the page header: faded backdrop, poster + facts, buttons, CC, story, cast ---- */
+  function runtimeText(m){ m=Number(m)||0; return m<=0?'':m<60?m+'m':Math.floor(m/60)+'h '+(m%60)+'m' }
+  function compactNum(n){ n=Number(n)||0; return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n) }
+  function noYear(t){ return String(t||'').replace(/\s*[(\[]\s*\d{4}\s*[)\]]\s*/g,' ').trim().toLowerCase() }
+  function detailHead(d,fb){
+    d=d||{};
+    var title=d.title||fb.title||'', orig=d.originalTitle||'';
+    var chips=[];
+    if(d.rating) chips.push('<span class="gold">★ <bdi>'+esc(Number(d.rating).toFixed(1))+'</bdi>'+(d.votes?' <bdi>'+compactNum(d.votes)+'</bdi> votes':'')+'</span>');
+    if(d.year||fb.year) chips.push('<span><bdi>'+esc(d.year||fb.year)+'</bdi></span>');
+    if(d.seasons) chips.push('<span><bdi>'+d.seasons+'</bdi> season'+(d.seasons>1?'s':'')+(d.episodes?' · <bdi>'+d.episodes+'</bdi> episodes':'')+'</span>');
+    else if(runtimeText(d.runtime)) chips.push('<span><bdi>'+runtimeText(d.runtime)+'</bdi></span>');
+    if(d.certification) chips.push('<span>'+esc(d.certification)+'</span>');
+    var genres=(d.genres&&d.genres.length?d.genres:(fb.genre?String(fb.genre).split(/[,/]/):[])).slice(0,4).map(function(g){ return esc(String(g).trim()) });
+    var backdrop=d.backdrop||d.poster||fb.poster||'';
+    return '<div class="dphero">'+(backdrop?'<div class="dpbg" style="background-image:url(\''+esc(backdrop).replace(/'/g,'%27')+'\')"></div>':'')+
+      '<button class="pill" id="srBack" type="button">← Back</button>'+
+      '<div class="dprow">'+((d.poster||fb.poster)?'<img class="dpposter" src="'+esc(d.poster||fb.poster)+'" alt="">':'')+
+      '<div class="dpinfo"><h1 dir="auto">'+esc(title)+'</h1>'+
+      (orig&&noYear(orig)!==noYear(title)?'<div class="dporig" dir="auto">'+esc(orig)+'</div>':'')+
+      (chips.length?'<div class="dpchips">'+chips.join('')+'</div>':'')+
+      (genres.length?'<div class="dpgen">'+genres.join(' · ')+'</div>':'')+
+      (d.tagline?'<div class="dptag" dir="auto">'+esc(d.tagline)+'</div>':'')+
+      '</div></div></div>';
+  }
+  function detailBody(d){
+    d=d||{}; var h='';
+    if(d.overview) h+='<p class="dpplot" dir="auto" tabindex="0">'+esc(d.overview)+'</p>';
+    var crew=[];
+    if(d.creator) crew.push(['Created by',d.creator]);
+    if(d.director) crew.push(['Director',d.director]);
+    if(d.country) crew.push(['Country',d.country]);
+    if(crew.length) h+='<div class="dpcrew">'+crew.map(function(c){ return '<div><span>'+c[0]+'</span><b dir="auto">'+esc(c[1])+'</b></div>' }).join('')+'</div>';
+    if(d.cast&&d.cast.length) h+='<div class="dplabel">Cast</div><div class="dpcast">'+d.cast.slice(0,15).map(function(c){
+      return '<div class="dpperson"><span class="dpface">'+(c.photo?'<img loading="lazy" src="'+esc(c.photo)+'" alt="">':esc((c.name||'?').charAt(0)))+'</span>'+
+        '<b dir="auto">'+esc(c.name||'')+'</b>'+(c.role?'<small dir="auto">'+esc(c.role)+'</small>':'')+'</div>' }).join('')+'</div>';
+    if(d.tmdbId) h+='<div class="dptmdb">Facts and images: TMDB</div>';
+    return h;
+  }
+
+  /* Film page (opened from a film card); Play keeps working through the same player as before. */
+  var movieReq=0;
+  function openMovie(id,title,ext,poster,year,genre){
+    var my=++movieReq; ltvSet('');
+    var fb={title:title,poster:poster,year:year,genre:genre};
+    function paint(d){
+      if(my!==movieReq) return;
+      var q={tmdb:(d&&d.tmdbId)||0,type:'movie'};
+      ltvBody.innerHTML='<div class="dp">'+detailHead(d,fb)+
+        '<div class="dpact"><button class="dpbtn primary" type="button" data-dpplay="'+esc(id)+'" data-ext="'+esc(ext||'')+'" data-title="'+esc((d&&d.title)||title||'')+'" data-tmdb="'+q.tmdb+'">▶ Play</button>'+
+        (d&&d.trailer?'<button class="dpbtn" type="button" data-trailer="'+esc(d.trailer)+'">Trailer</button>':'')+'</div>'+
+        '<div class="dpccbox" id="dpCc"></div>'+detailBody(d)+'</div>';
+      if(q.tmdb) ccRow(document.getElementById('dpCc'),q,function(){ return ltv.cc },function(l){ ltv.cc=l });
+    }
+    ltv.cc=ccPref();
+    paint(null);
+    facts('movie',id).then(function(d){ if(d) paint(d) });
+  }
+
+  function openSeries(id,title,poster,year,genre){
     ltvBody.innerHTML=skelRows(6); ltvSet('');
+    ltv.cc=ccPref();
     var sq={action:'series_info',source:ltv.prov,series_id:id}; if(deskApi()) sq.device='1';
-    api(sq)
-      .then(function(d){
+    var fb={title:title,poster:poster,year:year,genre:genre}, my=++movieReq;
+    Promise.all([api(sq),facts('series',id)])
+      .then(function(res){
+        if(my!==movieReq) return;
+        var d=res[0], f=res[1]||null, tmdb=(f&&f.tmdbId)||0;
         ltv.series=d;
         var seasons=d.seasons||[];
         if(!seasons.length){ ltvBody.innerHTML=''; ltvSet('No episodes listed for this series.'); return }
-        ltvBody.innerHTML='<div class="repbox" style="margin-bottom:12px"><button class="pill" id="srBack" type="button">← Back</button>'+
-          '<select id="srSeason" aria-label="Season">'+seasons.map(function(s){
+        var showTitle=(f&&f.title)||d.title||title||'Series';
+        ltvBody.innerHTML='<div class="dp">'+detailHead(f,{title:d.title||title,poster:d.cover||poster,year:year,genre:d.genre||genre})+
+          '<div class="dpact"><button class="dpbtn primary" type="button" id="srPlay">▶ Play</button>'+
+          (f&&f.trailer?'<button class="dpbtn" type="button" data-trailer="'+esc(f.trailer)+'">Trailer</button>':'')+'</div>'+
+          '<div class="dpccbox" id="dpCc"></div>'+detailBody(f)+
+          '<div class="repbox" style="margin:18px 0 12px"><select id="srSeason" aria-label="Season">'+seasons.map(function(s){
             return '<option value="'+s.season+'">Season '+s.season+' · '+s.episodes.length+' ep</option>' }).join('')+
-          '</select></div><h1 style="font-size:20px;margin:0 0 10px">'+esc(d.title||title||'Series')+'</h1>'+
-
-          '<div class="epilist" id="srEps"></div>';
+          '</select></div><div class="epilist" id="srEps"></div></div>';
         var sel=document.getElementById('srSeason');
+        function generic(t){ t=String(t||'').trim(); return !t||/\bS\d{1,2}\s*E\d{1,3}\b/i.test(t)||/^(episode|ep\.?|e)\s*\d+$/i.test(t)||t.toLowerCase()===String(d.title||title||'').trim().toLowerCase() }
         function paint(){
           var s=seasons.filter(function(x){return String(x.season)===sel.value})[0]||seasons[0];
-          document.getElementById('srEps').innerHTML=s.episodes.map(function(ep){
-            return '<button class="epirow" type="button" data-play="'+esc(ep.play)+'" '+(ep.direct?'data-direct="'+esc(ep.direct)+'" ':'')+
-              'data-title="'+esc((d.title||title||'')+' · S'+s.season+'E'+ep.episode)+'">'+
-              '<span class="en">S'+s.season+'E'+ep.episode+'</span>'+
-              '<span class="nm">'+esc(ep.title||('Episode '+ep.episode))+'</span></button>';
-          }).join('');
+          var mine=sel.value;
+          function rows(fx){
+            if(sel.value!==mine) return;
+            document.getElementById('srEps').innerHTML=s.episodes.map(function(ep){
+              var e=fx[ep.episode]||{}, name=(e.name&&generic(ep.title))?e.name:(ep.title||('Episode '+ep.episode));
+              var still=e.still||ep.image||'';
+              return '<button class="epirow dpep" type="button" data-play="'+esc(ep.play)+'" '+(ep.direct?'data-direct="'+esc(ep.direct)+'" ':'')+
+                'data-tmdb="'+tmdb+'" data-season="'+s.season+'" data-episode="'+ep.episode+'" '+
+                'data-title="'+esc(showTitle+' · S'+s.season+'E'+ep.episode)+'">'+
+                '<span class="epthumb">'+(still?'<img loading="lazy" src="'+esc(still)+'" alt="">':'')+'<i>E'+ep.episode+'</i></span>'+
+                '<span class="eptext"><span class="en">S'+s.season+'E'+ep.episode+'</span>'+
+                '<span class="nm" dir="auto">'+esc(name)+'</span>'+
+                ((e.overview||ep.plot)?'<span class="sm" dir="auto">'+esc(e.overview||ep.plot)+'</span>':'')+'</span></button>';
+            }).join('');
+          }
+          rows({});
+          if(tmdb) seasonFacts(tmdb,s.season).then(rows);
+          var first=s.episodes[0];
+          var cc=document.getElementById('dpCc');
+          if(tmdb&&first&&cc){ var fresh=cc.cloneNode(false); cc.parentNode.replaceChild(fresh,cc);
+            ccRow(fresh,{tmdb:tmdb,type:'episode',season:s.season,episode:first.episode},function(){ return ltv.cc },function(l){ ltv.cc=l }) }
         }
         sel.addEventListener('change',paint); paint();
+        document.getElementById('srPlay').addEventListener('click',function(){
+          var firstRow=document.querySelector('#srEps .epirow'); if(firstRow) firstRow.click();
+        });
       })
       .catch(function(){ ltvBody.innerHTML=''; ltvSet('Could not load this series.') });
   }

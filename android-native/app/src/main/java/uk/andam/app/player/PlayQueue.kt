@@ -25,8 +25,14 @@ data class PlayItem(
     val tmdb: Int = 0,
     val season: Int = 0,
     val episode: Int = 0,
+    /** Live channel with a provider archive (tv_archive=1): it can be rewound further (catch-up). */
+    val archive: Boolean = false,
+    /** Catch-up (archive) playback of this live channel; Live returns to it. */
+    val catchupOf: PlayItem? = null,
+    /** Subtitle chosen on the detail page: "" = the viewer's default, "off" = none, else a language. */
+    val subLang: String = "",
 ) {
-    val isLive: Boolean get() = kind == Kind.LIVE || kind == Kind.IPTV
+    val isLive: Boolean get() = (kind == Kind.LIVE || kind == Kind.IPTV) && catchupOf == null
     val resumeKey: String get() = "${kind.name}:$source:$id"
 }
 
@@ -60,8 +66,13 @@ object PlayQueue {
 object Resume {
     private fun prefs(c: Context) = c.getSharedPreferences("andam_resume", Context.MODE_PRIVATE)
     fun get(c: Context, key: String): Long = prefs(c).getLong(key, 0L)
+    /** Length of the title when it was last watched (0 when unknown) — for progress bars. */
+    fun duration(c: Context, key: String): Long = prefs(c).getLong("$key#d", 0L)
     fun put(c: Context, key: String, positionMs: Long, durationMs: Long) {
         val done = durationMs > 0 && positionMs > durationMs - 90_000
-        prefs(c).edit().apply { if (done || positionMs < 30_000) remove(key) else putLong(key, positionMs) }.apply()
+        prefs(c).edit().apply {
+            if (done || positionMs < 30_000) { remove(key); remove("$key#d") } else { putLong(key, positionMs); putLong("$key#d", durationMs) }
+        }.apply()
     }
+    fun clear(c: Context, key: String) = prefs(c).edit().remove(key).remove("$key#d").apply()
 }

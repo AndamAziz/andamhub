@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -191,8 +192,8 @@ class PlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
                 engine.togglePlay(); ui.poke(); return true
             }
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (!live) { engine.seekBy(30_000); ui.poke(); return true }
-            KeyEvent.KEYCODE_MEDIA_REWIND -> if (!live) { engine.seekBy(-30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (engine.canSeek) { engine.seekBy(30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> if (engine.canSeek) { engine.seekBy(-30_000); ui.poke(); return true }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
                 ui.panel = false; ui.settings = !ui.settings; return true
             }
@@ -210,8 +211,9 @@ class PlayerActivity : ComponentActivity() {
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> { if (live) zap(-1) else ui.poke(); return true }
                 KeyEvent.KEYCODE_DPAD_DOWN -> { if (live) zap(1) else ui.poke(); return true }
-                KeyEvent.KEYCODE_DPAD_LEFT -> { if (!live) engine.seekBy(-10_000); ui.poke(); return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> { if (!live) engine.seekBy(10_000); ui.poke(); return true }
+                // Films, and live channels whose stream keeps a window: ±10 s.
+                KeyEvent.KEYCODE_DPAD_LEFT -> { if (engine.canSeek) engine.seekBy(-10_000); ui.poke(); return true }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> { if (engine.canSeek) engine.seekBy(10_000); ui.poke(); return true }
             }
         } else if (ui.controls) {
             ui.keep()
@@ -384,7 +386,7 @@ private fun PlayerScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(engine.live) {
+                .pointerInput(engine.canSeek) {
                     detectTapGestures(
                         onTap = {
                             if (ui.panel || ui.settings) {
@@ -392,7 +394,7 @@ private fun PlayerScreen(
                             } else if (ui.controls) ui.controls = false else ui.poke()
                         },
                         onDoubleTap = { o ->
-                            if (!engine.live) {
+                            if (engine.canSeek) {
                                 engine.seekBy(if (o.x < size.width / 2f) -10_000L else 10_000L)
                                 ui.poke()
                             }
@@ -504,7 +506,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 Text(engine.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (engine.subtitle.isNotBlank()) Text(engine.subtitle, color = C.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (engine.live) LiveBadge()
+            if (engine.live || engine.catchup) LivePill(engine) { ui.poke() }
         }
 
         // Centre: previous / play-pause / next.
@@ -542,7 +544,9 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (!engine.live && engine.duration > 0) {
+            if (engine.live && engine.liveSeekable) {
+                LiveTimeline(engine, ui)
+            } else if (!engine.live && engine.duration > 0) {
                 var dragging by remember { mutableStateOf(false) }
                 var dragValue by remember { mutableFloatStateOf(0f) }
                 val progress = if (dragging) dragValue else (engine.position.toFloat() / engine.duration).coerceIn(0f, 1f)
@@ -559,6 +563,8 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 Spacer(Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Channels with a provider archive: rewind further than the stream itself allows.
+                if ((engine.live || engine.catchup) && PlayQueue.current()?.archive == true) CatchupButton(engine, ui)
                 if (PlayQueue.items.size > 1 && engine.live) {
                     RoundIcon(Icons.AutoMirrored.Filled.FormatListBulleted, "Channels") { ui.panel = true }
                 }
@@ -807,7 +813,7 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
                     Option(
                         "Kurdish (Sorani) · auto",
                         ext?.label == "Kurdish (auto)",
-                        hint = if (p != null) "Preparing… ${(p * 100).toInt()}%" else "Translated by AI from the English subtitle",
+                        hint = if (p != null) "Preparing… ${(p * 100).toInt()}%" else "Machine-translated from the ${SubPrep.label(list.kurdishFrom)} subtitle",
                     ) { online.useKurdish() }
                 }
                 if (list.subs.isEmpty() && list.kurdishUrl == null) item { Note("No online subtitles found for this title.") }
@@ -930,6 +936,77 @@ private fun RoundIcon(icon: ImageVector, label: String, big: Boolean = false, on
         modifier = Modifier.tvRing(CircleShape).size(if (big) 56.dp else 46.dp).clip(CircleShape).background(Color(0x590A0B0F)),
     ) {
         Icon(icon, contentDescription = label, tint = Color.White)
+    }
+}
+
+/**
+ * LIVE pill. Filled red at the live edge; behind it, it shows how far ("-02:15") and a tap jumps
+ * back to the live edge. During a catch-up recording a tap returns to the live channel.
+ */
+@Composable
+private fun LivePill(engine: Engine, onAction: () -> Unit) {
+    val atEdge = !engine.catchup && (!engine.liveSeekable || engine.liveBehind < 6_000)
+    if (atEdge && !engine.liveSeekable) { LiveBadge(); return }
+    Row(
+        Modifier
+            .padding(end = 6.dp)
+            .tvRing(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(50))
+            .background(if (atEdge) C.Ember else Color(0x590A0B0F))
+            .border(1.dp, C.Ember, RoundedCornerShape(50))
+            .clickable(enabled = !atEdge) { engine.goLive(); onAction() }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(if (atEdge) Color.White else C.Ember))
+        Spacer(Modifier.width(6.dp))
+        val text = when {
+            engine.catchup -> "LIVE"
+            atEdge -> "LIVE"
+            else -> "-${fmt(engine.liveBehind)}  LIVE"
+        }
+        Text(text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+    }
+}
+
+/** Timeline for a live channel with a window: drag inside it, ±10 s, and how far behind live. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.LiveTimeline(engine: Engine, ui: PlayerUiState) {
+    val span = engine.duration.coerceAtLeast(1)
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableFloatStateOf(1f) }
+    val progress = if (dragging) dragValue else (engine.position.toFloat() / span).coerceIn(0f, 1f)
+    RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
+    Slider(
+        value = progress,
+        onValueChange = { dragging = true; dragValue = it; ui.poke() },
+        onValueChangeFinished = { engine.seekTo((dragValue * span).toLong()); dragging = false },
+        colors = SliderDefaults.colors(thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF)),
+        modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+    )
+    RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
+    Text(
+        if (engine.liveBehind >= 6_000) "-${fmt(engine.liveBehind)}" else "LIVE",
+        color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+    )
+}
+
+/** "Rewind further" through the provider's archive: programme start, or 30 min / 1 h / 2 h ago. */
+@Composable
+private fun CatchupButton(engine: Engine, ui: PlayerUiState) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIcon(Icons.Filled.History, "Rewind (catch-up)") { open = true; ui.keep() }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf<Pair<String, Int?>>(
+                "Start of this programme" to null, "30 minutes ago" to 30, "1 hour ago" to 60, "2 hours ago" to 120,
+            ).forEach { (label, minutes) ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = { open = false; engine.catchUp(minutes); ui.poke() },
+                )
+            }
+        }
     }
 }
 

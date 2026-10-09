@@ -7,12 +7,17 @@ on:
       - "windows-app/**"
       - ".github/workflows/windows.yml"
   workflow_dispatch:
+  # Pull requests build the installer as a check; only pushes to main publish it.
+  pull_request:
+    paths:
+      - "windows-app/**"
+      - ".github/workflows/windows.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: windows-build
+  group: windows-build-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
   cancel-in-progress: true
 
 jobs:
@@ -54,6 +59,7 @@ jobs:
       # One rolling pre-release holds the newest installer + latest.yml for auto-update.
       # It is marked pre-release so the Android app's "releases/latest" check never sees it.
       - name: Publish to the "windows-latest" release
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

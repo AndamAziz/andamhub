@@ -4,12 +4,20 @@ import { createFileRoute } from '@tanstack/react-router';
  * Subtitles for the apps' player.
  *
  *  GET ?action=list&tmdb=&type=movie|episode&season=&episode=
- *      → { subtitles: [{ lang, label, url }], kurdishAuto: { url, partUrl } | null }
+ *      → { subtitles: [{ lang, label, url }],
+ *          kurdishAuto: { url, partUrl, sourceUrl, uploadUrl, from, engines } | null }
  *      (signed-in viewers with Live TV / films access)
  *  GET ?action=file&t=TOKEN          → the subtitle as text/vtt
- *  GET ?action=kurdish&t=TOKEN       → Kurdish (Sorani) text/vtt when ready,
+ *  GET ?action=kurdish&t=TOKEN&e=ENGINE → Kurdish (Sorani) text/vtt when ready,
  *                                      otherwise 202 { preparing, parts, missing }
- *  GET ?action=kurdish-part&t=TOKEN&n=N → translates part N (signed-in viewers only)
+ *  GET ?action=kurdish-source&t=TOKEN&n=N → { parts, lines } — part N's source cues, for the
+ *                                      viewer's device to translate with Google (signed-in only)
+ *  POST ?action=kurdish-upload&t=TOKEN&n=N  body { lines } → stores part N translated on the
+ *                                      device (Google engine; signed-in only, never overwrites)
+ *  GET ?action=kurdish-part&t=TOKEN&n=N&e=ai|claude-best|claude-fast → translates part N on
+ *                                      this server (signed-in viewers only)
+ *
+ * ENGINE: g (Google on the device, default) | ai | claude-best | claude-fast.
  *
  * TOKEN is an opaque, expiring token for one OpenSubtitles file id, so subtitle links can be
  * handed to the player without exposing anything or opening the API to everyone.
@@ -68,15 +76,19 @@ export const Route = createFileRoute('/api/public/subtitles')({
                 return { lang: f.lang, label: f.label, url: `${base}?action=file&t=${t}`, token: t };
               }),
             );
-            const english = out.find((s) => s.lang === 'en');
-            const hasKurdish = out.some((s) => s.lang === 'ku');
-            const kurdishAuto =
-              english && !hasKurdish && subs.kurdishAiConfigured()
-                ? {
-                    url: `${base}?action=kurdish&t=${english.token}`,
-                    partUrl: `${base}?action=kurdish-part&t=${english.token}`,
-                  }
-                : null;
+            // Kurdish is made from English, else Arabic, else any human-made file.
+            const from = subs.kurdishSource(files);
+            const src = from ? out.find((s) => s.lang === from.lang) : undefined;
+            const kurdishAuto = src
+              ? {
+                  url: `${base}?action=kurdish&t=${src.token}`,
+                  partUrl: `${base}?action=kurdish-part&t=${src.token}`,
+                  sourceUrl: `${base}?action=kurdish-source&t=${src.token}`,
+                  uploadUrl: `${base}?action=kurdish-upload&t=${src.token}`,
+                  from: src.lang,
+                  engines: ['g', ...subs.serverEngines()],
+                }
+              : null;
             return json({
               subtitles: out.map(({ token: _t, ...s }) => s),
               kurdishAuto,
@@ -93,7 +105,7 @@ export const Route = createFileRoute('/api/public/subtitles')({
           if (action === 'kurdish') {
             const fileId = await fileOf(url.searchParams.get('t'));
             if (!fileId) return json({ error: 'Invalid subtitle link' }, 404);
-            const { vtt: text, state } = await subs.kurdishState(fileId);
+            const { vtt: text, state } = await subs.kurdishState(fileId, subs.kurdishEngine(url.searchParams.get('e')));
             if (text) return vtt(text);
             return json({ preparing: true, ...state }, 202);
           }
@@ -103,14 +115,44 @@ export const Route = createFileRoute('/api/public/subtitles')({
             const fileId = await fileOf(url.searchParams.get('t'));
             const n = Number(url.searchParams.get('n') ?? -1);
             if (!fileId || !(n >= 0)) return json({ error: 'Invalid request' }, 400);
-            await subs.translateKurdishPart(fileId, n);
+            await subs.translateKurdishPart(fileId, n, subs.kurdishEngine(url.searchParams.get('e') ?? 'ai'));
             return json({ ok: true, part: n });
+          }
+
+          if (action === 'kurdish-source') {
+            if (!(await viewer(request))) return json({ error: 'Sign in first.' }, 403);
+            const fileId = await fileOf(url.searchParams.get('t'));
+            const n = Number(url.searchParams.get('n') ?? 0);
+            if (!fileId || !(n >= 0)) return json({ error: 'Invalid request' }, 400);
+            return json({ part: n, ...(await subs.kurdishSourcePart(fileId, n)) });
           }
 
           return json({ error: `Unknown action: ${action}` }, 400);
         } catch (err) {
           console.error('[subtitles]', action, err);
           return json({ error: err instanceof Error ? err.message : 'Subtitle request failed' }, 502);
+        }
+      },
+
+      // Kurdish parts translated on the viewer's device (free Google engine) are stored here so
+      // every later viewer gets the finished file at once.
+      POST: async ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('action') !== 'kurdish-upload') return json({ error: 'Unknown action' }, 400);
+        try {
+          if (!(await viewer(request))) return json({ error: 'Sign in first.' }, 403);
+          const fileId = await fileOf(url.searchParams.get('t'));
+          const n = Number(url.searchParams.get('n') ?? -1);
+          if (!fileId || !(n >= 0)) return json({ error: 'Invalid request' }, 400);
+          const raw = await request.text();
+          if (raw.length > 400_000) return json({ error: 'Too large' }, 413);
+          const body = JSON.parse(raw) as { lines?: unknown };
+          const subs = await import('@/lib/subtitles.server');
+          await subs.storeKurdishPart(fileId, n, body.lines);
+          return json({ ok: true, part: n });
+        } catch (err) {
+          console.error('[subtitles] kurdish-upload', err);
+          return json({ error: err instanceof Error ? err.message : 'Upload failed' }, 400);
         }
       },
     },
