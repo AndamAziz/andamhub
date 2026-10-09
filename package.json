@@ -12,6 +12,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
     "@capacitor/app": "6.0.2",
     "@capacitor/browser": "6.0.2",
     "@capacitor/core": "6.2.0",

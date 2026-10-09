@@ -153,6 +153,21 @@ const num = (v: unknown, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/**
+ * The provider's wall-clock "now" as a UTC-shaped timestamp (its local time read as if it were
+ * UTC), from server_info.time_now. Remembered per provider for 10 minutes as an offset.
+ */
+const clockOffsets = new Map<string, { at: number; offset: number }>();
+async function providerNow(source: Source): Promise<number> {
+  const hit = clockOffsets.get(source.id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return Date.now() + hit.offset;
+  const acct = await playerApi<{ server_info?: { time_now?: string } }>(source, {}).catch(() => null);
+  const local = acct?.server_info?.time_now ? Date.parse(acct.server_info.time_now.replace(' ', 'T') + 'Z') : NaN;
+  const offset = Number.isFinite(local) ? local - Date.now() : 0;
+  clockOffsets.set(source.id, { at: Date.now(), offset });
+  return Date.now() + offset;
+}
+
 export const Route = createFileRoute('/api/public/xtream')({
   server: {
     handlers: {
@@ -495,8 +510,17 @@ export const Route = createFileRoute('/api/public/xtream')({
             const type = url.searchParams.get('type') === 'series' ? 'series' : 'movie';
             const id = url.searchParams.get('id') ?? '';
             if (!/^\d{1,12}$/.test(id)) return json({ error: 'id is required' }, 400);
-            const { mediaDetails } = await import('@/lib/tmdb.server');
-            return json(await mediaDetails(source, type, id));
+            const { mediaDetails, langOf } = await import('@/lib/tmdb.server');
+            return json(await mediaDetails(source, type, id, langOf(url.searchParams.get('lang'))));
+          }
+
+          if (action === 'season') {
+            // TMDB facts for one season's episodes (still, real name, summary). Empty when unknown.
+            const tmdbId = num(url.searchParams.get('tmdb'));
+            const season = num(url.searchParams.get('season'), -1);
+            if (!(tmdbId > 0) || season < 0) return json({ error: 'tmdb and season are required' }, 400);
+            const { seasonFacts, langOf } = await import('@/lib/tmdb.server');
+            return json({ episodes: await seasonFacts(tmdbId, season, langOf(url.searchParams.get('lang'))) });
           }
 
           if (action === 'timeshift') {
@@ -510,6 +534,47 @@ export const Route = createFileRoute('/api/public/xtream')({
               play: await sealUrl(
                 tagRelay(timeshiftUrl(source, streamId, duration, start), source),
               ),
+            });
+          }
+
+          if (action === 'catchup') {
+            // "Rewind further" on channels with an archive (tv_archive=1): a timeshift link that
+            // starts N minutes ago, or at the start of the programme on air (short EPG). Times
+            // are worked out on the provider's own clock, so its time zone never matters.
+            const streamId = url.searchParams.get('stream_id') ?? '';
+            if (!/^\d{1,12}$/.test(streamId)) return json({ error: 'stream_id is required' }, 400);
+            const nowMs = await providerNow(source);
+            let startMs = nowMs - Math.min(Math.max(num(url.searchParams.get('back'), 30), 1), 7 * 24 * 60) * 60_000;
+            let title = '';
+            if (url.searchParams.get('from') === 'programme') {
+              const epg = await playerApi<{ epg_listings?: Array<{ start?: string; title?: string }> }>(source, {
+                action: 'get_short_epg',
+                stream_id: streamId,
+                limit: '1',
+              }).catch(() => null);
+              const first = epg?.epg_listings?.[0];
+              const at = first?.start ? Date.parse(first.start.replace(' ', 'T') + 'Z') : NaN;
+              if (!Number.isFinite(at) || at > nowMs) return json({ error: 'No programme guide for this channel' }, 404);
+              startMs = at;
+              try {
+                title = first?.title
+                  ? new TextDecoder().decode(Uint8Array.from(atob(first.title), (c) => c.charCodeAt(0)))
+                  : '';
+              } catch {
+                title = '';
+              }
+            }
+            const d = new Date(startMs);
+            const two = (n: number) => String(n).padStart(2, '0');
+            const start = `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}:${two(d.getUTCHours())}-${two(d.getUTCMinutes())}`;
+            // Up to the present moment (plus a little), so it plays on until it reaches "now".
+            const duration = Math.ceil((nowMs - startMs) / 60_000) + 5;
+            return json({
+              play: await sealUrl(tagRelay(timeshiftUrl(source, streamId, duration, start), source)),
+              start,
+              minutes: duration - 5,
+              title,
+              ...(wantsDeviceRoute(url) ? { direct: timeshiftUrl(source, streamId, duration, start) } : {}),
             });
           }
 
