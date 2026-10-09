@@ -490,6 +490,15 @@ export const Route = createFileRoute('/api/public/xtream')({
             });
           }
 
+          // Detail page of a film or series: provider info enriched with TMDB.
+          if (action === 'details') {
+            const type = url.searchParams.get('type') === 'series' ? 'series' : 'movie';
+            const id = url.searchParams.get('id') ?? '';
+            if (!/^\d{1,12}$/.test(id)) return json({ error: 'id is required' }, 400);
+            const { mediaDetails } = await import('@/lib/tmdb.server');
+            return json(await mediaDetails(source, type, id));
+          }
+
           if (action === 'timeshift') {
             const streamId = url.searchParams.get('stream_id') ?? '';
             const start = url.searchParams.get('start') ?? '';

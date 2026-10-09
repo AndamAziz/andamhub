@@ -72,6 +72,16 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     val player: ExoPlayer
 
+    /** A subtitle file added from outside the stream (online subtitles, Kurdish auto-translation). */
+    data class ExternalSub(val url: String, val lang: String, val label: String)
+
+    /** The external subtitle in use (null = none). */
+    var externalSub by mutableStateOf<ExternalSub?>(null)
+        private set
+
+    /** Online subtitles (OpenSubtitles + Kurdish auto-translation) for the item playing. */
+    val online by lazy { OnlineSubtitles(this, scope, context) }
+
     /** Called when a film / episode plays to the end (the activity moves on to the next episode). */
     var onEnded: (() -> Unit)? = null
 
@@ -258,7 +268,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     fun play(next: PlayItem) {
         saveResume()
         if (next !== item) remints = 0
+        if (next !== item) externalSub = null
         item = next
+        // The previous item's routes are dropped at once, so nothing (e.g. a subtitle that
+        // arrives early) can restart the old stream while the new one is being resolved.
+        attempts = emptyList()
+        online.onItem(next)
         session++
         provenIndex = -1
         val mine = session
@@ -346,6 +361,23 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * Shows an external subtitle (or none). The film reloads with the subtitle attached and
+     * continues from the same second.
+     */
+    fun useSubtitle(sub: ExternalSub?) {
+        if (live || item == null) return
+        externalSub = sub
+        val b = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        if (sub == null) b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        else b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(sub.lang)
+        player.trackSelectionParameters = b.build()
+        if (attempts.isEmpty()) return
+        val pos = player.currentPosition
+        start(attemptIndex)
+        if (pos > 0) player.seekTo(pos)
+    }
+
     fun retry() {
         val current = item ?: return
         play(current)
@@ -405,6 +437,18 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     .build(),
             )
         if (a.hls) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+        externalSub?.let { sub ->
+            builder.setSubtitleConfigurations(
+                listOf(
+                    MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(sub.url))
+                        .setMimeType(MimeTypes.TEXT_VTT)
+                        .setLanguage(sub.lang)
+                        .setLabel(sub.label)
+                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                        .build(),
+                ),
+            )
+        }
         // Live: no forced distance from the live edge. The player uses the stream's own
         // (3 segments, or the server's HOLD-BACK) like every IPTV player. A fixed 8 s sat
         // inside the newest segment of 10-second-segment channels: nothing in hand, the

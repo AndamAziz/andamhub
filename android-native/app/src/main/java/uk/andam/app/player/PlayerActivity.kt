@@ -419,6 +419,9 @@ private fun PlayerScreen(
             }
         }
 
+        engine.online.kurdishProgress?.let { p ->
+            if (!ui.pip) Pill("Preparing Kurdish subtitles · ${(p * 100).toInt()}%", Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp))
+        }
         engine.status?.let {
             if (engine.error == null && !ui.pip) Pill(it, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
         }
@@ -786,6 +789,32 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
             itemsIndexed(audio) { _, o -> Option(o.label, o.selected) { TrackMenu.select(engine.player, o) } }
         }
 
+        // Online subtitles (films / episodes): OpenSubtitles + Kurdish auto-translation.
+        val online = engine.online
+        if (!engine.live && online.supported(PlayQueue.current())) {
+            item { Section("Online subtitles") }
+            val list = online.list
+            val ext = engine.externalSub
+            if (online.loading) item { Note("Finding subtitles…") }
+            else if (list == null) item { Note("Online subtitles are not available right now.") }
+            else {
+                item { Option("Off", ext == null) { online.off() } }
+                itemsIndexed(list.subs) { _, sub ->
+                    Option(sub.label, ext != null && ext.lang == sub.lang && ext.label == sub.label) { online.use(sub) }
+                }
+                if (list.kurdishUrl != null) item {
+                    val p = online.kurdishProgress
+                    Option(
+                        "Kurdish (Sorani) · auto",
+                        ext?.label == "Kurdish (auto)",
+                        hint = if (p != null) "Preparing… ${(p * 100).toInt()}%" else "Translated by AI from the English subtitle",
+                    ) { online.useKurdish() }
+                }
+                if (list.subs.isEmpty() && list.kurdishUrl == null) item { Note("No online subtitles found for this title.") }
+            }
+            online.message?.let { m -> item { Note(m) } }
+        }
+
         if (text.isNotEmpty()) {
             item { Section("Subtitles") }
             item { Option("Off", subsOff) { TrackMenu.disable(engine.player, TEXT); subsOff = true } }
@@ -856,6 +885,11 @@ private fun InfoLine(label: String, value: String) {
         Text(label, color = C.Faint, fontSize = 12.sp, modifier = Modifier.width(56.dp))
         Text(value, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
+}
+
+@Composable
+private fun Note(text: String) {
+    Text(text, color = C.Faint, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
 }
 
 @Composable

@@ -21,6 +21,10 @@ data class PlayItem(
     val token: String? = null,
     /** Provider link to try straight from the device (series episodes arrive with one). */
     val direct: String? = null,
+    /** TMDB id (the film, or the series for an episode) — finds online subtitles. 0 = unknown. */
+    val tmdb: Int = 0,
+    val season: Int = 0,
+    val episode: Int = 0,
 ) {
     val isLive: Boolean get() = kind == Kind.LIVE || kind == Kind.IPTV
     val resumeKey: String get() = "${kind.name}:$source:$id"

@@ -26,6 +26,7 @@ import { Route as AuthenticatedAdminSubmissionsRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as ApiPublicAccessRouteImport } from './routes/api/public/access'
 import { Route as ApiPublicDownloadRouteImport } from './routes/api/public/download'
+import { Route as ApiPublicSubtitlesRouteImport } from './routes/api/public/subtitles'
 import { Route as ApiPublicAdminRouteImport } from './routes/api/public/admin'
 import { Route as ApiPublicIptvRouteImport } from './routes/api/public/iptv'
 import { Route as ApiPublicTmdbDiscoverRouteImport } from './routes/api/public/tmdb-discover'
@@ -122,6 +123,11 @@ const ApiPublicDownloadRoute = ApiPublicDownloadRouteImport.update({
   path: '/api/public/download',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSubtitlesRoute = ApiPublicSubtitlesRouteImport.update({
+  id: '/api/public/subtitles',
+  path: '/api/public/subtitles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAdminRoute = ApiPublicAdminRouteImport.update({
   id: '/api/public/admin',
   path: '/api/public/admin',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/public/access'
     | '/api/public/download'
+    | '/api/public/subtitles'
     | '/api/public/admin'
     | '/api/public/iptv'
     | '/api/public/tmdb-discover'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/public/access'
     | '/api/public/download'
+    | '/api/public/subtitles'
     | '/api/public/admin'
     | '/api/public/iptv'
     | '/api/public/tmdb-discover'
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/api/public/access'
     | '/api/public/download'
+    | '/api/public/subtitles'
     | '/api/public/admin'
     | '/api/public/iptv'
     | '/api/public/tmdb-discover'
@@ -309,6 +321,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicAccessRoute: typeof ApiPublicAccessRoute
   ApiPublicDownloadRoute: typeof ApiPublicDownloadRoute
+  ApiPublicSubtitlesRoute: typeof ApiPublicSubtitlesRoute
   ApiPublicAdminRoute: typeof ApiPublicAdminRoute
   ApiPublicIptvRoute: typeof ApiPublicIptvRoute
   ApiPublicTmdbDiscoverRoute: typeof ApiPublicTmdbDiscoverRoute
@@ -438,6 +451,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/subtitles': {
+      id: '/api/public/subtitles'
+      path: '/api/public/subtitles'
+      fullPath: '/api/public/subtitles'
+      preLoaderRoute: typeof ApiPublicSubtitlesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin': {
       id: '/api/public/admin'
       path: '/api/public/admin'
@@ -532,6 +552,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicAccessRoute: ApiPublicAccessRoute,
   ApiPublicDownloadRoute: ApiPublicDownloadRoute,
+  ApiPublicSubtitlesRoute: ApiPublicSubtitlesRoute,
   ApiPublicAdminRoute: ApiPublicAdminRoute,
   ApiPublicIptvRoute: ApiPublicIptvRoute,
   ApiPublicTmdbDiscoverRoute: ApiPublicTmdbDiscoverRoute,

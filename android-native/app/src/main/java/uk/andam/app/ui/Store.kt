@@ -15,6 +15,8 @@ object Store {
     var providers by mutableStateOf<List<Provider>>(emptyList())
     /** A series picked on Home (hero) that the Series tab should open straight away. */
     var pendingSeries by mutableStateOf<uk.andam.app.net.SeriesItem?>(null)
+    /** Film to open on the Movies tab (e.g. from the home hero). */
+    var pendingMovie by mutableStateOf<uk.andam.app.net.VodItem?>(null)
     var provider by mutableStateOf("")
     var iptvSources by mutableStateOf<List<IptvSource>>(emptyList())
     var iptvSource by mutableStateOf("")

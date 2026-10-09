@@ -100,3 +100,32 @@ data class ProviderInfo(
     val seriesCategories: Int,
     val ms: Long,
 )
+
+/** Detail page of a film or series (provider info enriched with TMDB). */
+data class CastMember(val name: String, val role: String, val photo: String)
+
+data class MediaDetails(
+    val title: String,
+    val originalTitle: String,
+    val tagline: String,
+    val overview: String,
+    val year: String,
+    val runtime: Int,
+    val rating: Double,
+    val votes: Int,
+    val genres: List<String>,
+    val certification: String,
+    val director: String,
+    val cast: List<CastMember>,
+    val poster: String,
+    val backdrop: String,
+    val trailer: String,
+    val tmdbId: Int,
+    val seasons: Int,
+)
+
+/** A subtitle the server found online (OpenSubtitles) — `url` is relative to the server. */
+data class OnlineSub(val lang: String, val label: String, val url: String)
+
+/** Online subtitles for one film / episode, plus the Kurdish auto-translation links when offered. */
+data class OnlineSubs(val subs: List<OnlineSub>, val kurdishUrl: String?, val kurdishPartUrl: String?)

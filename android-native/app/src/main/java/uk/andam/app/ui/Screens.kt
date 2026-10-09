@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -131,19 +132,19 @@ fun IptvScreen() {
 
 @Composable
 fun MoviesScreen() {
-    val context = LocalContext.current
     val source = Store.provider
+    // Tapping a film opens its detail page (poster, information, cast, trailer, subtitles).
+    var open by remember(source) { mutableStateOf<VodItem?>(Store.pendingMovie.also { Store.pendingMovie = null }) }
+    val current = open
+    if (current != null) {
+        MovieDetail(source, current) { open = null }
+        return
+    }
     PosterGrid(
         key = "vod:$source",
         loadCats = { Api.categories(source, "vod") },
         loadItems = { cat -> Api.vod(source, cat).map { Poster(it.id, it.name, it.poster, listOf(it.year, it.genre.substringBefore(',')).filter { s -> s.isNotBlank() }.joinToString(" · "), it.rating, it) } },
-        onOpen = { list, index ->
-            val items = list.map { p ->
-                val v = p.payload as VodItem
-                PlayItem(Kind.VOD, source, v.id, v.name, subtitle = v.year, logo = v.poster, ext = v.ext)
-            }
-            PlayQueue.open(context, items, index)
-        },
+        onOpen = { list, index -> open = list[index].payload as VodItem },
     )
 }
 
@@ -232,38 +233,61 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
     val context = LocalContext.current
     var reload by remember { mutableIntStateOf(0) }
     var state by remember(series.id) { mutableStateOf<Load<SeriesInfo>>(Load.Busy) }
+    var details by remember(series.id) { mutableStateOf<uk.andam.app.net.MediaDetails?>(null) }
+    var subs by remember(series.id) { mutableStateOf<uk.andam.app.net.OnlineSubs?>(null) }
     var season by rememberSaveable(series.id) { mutableIntStateOf(-1) }
     LaunchedEffect(series.id, reload) {
         state = Load.Busy
         state = try { Load.Ok(Api.seriesInfo(source, series.id)) } catch (e: Exception) { Load.Err(e.message ?: "Could not load this series.") }
     }
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-            Text(series.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    LaunchedEffect(series.id) {
+        details = runCatching { Api.details(source, "series", series.id) }.getOrNull()
+    }
+    val tmdb = details?.tmdbId ?: 0
+    val seasons = (state as? Load.Ok<SeriesInfo>)?.value?.seasons?.filter { it.episodes.isNotEmpty() }.orEmpty()
+    val active = seasons.firstOrNull { it.season == season } ?: seasons.firstOrNull()
+    // Which subtitles exist (shown under the story) — checked on the first episode of the season.
+    LaunchedEffect(tmdb, active?.season) {
+        val a = active
+        val first = a?.episodes?.firstOrNull()
+        if (tmdb > 0 && a != null && first != null) subs = runCatching { Api.subtitles(tmdb, "episode", a.season, first.episode) }.getOrNull()
+    }
+    fun playFrom(i: Int) {
+        val a = active ?: return
+        val queue = a.episodes.map { e ->
+            PlayItem(
+                Kind.EPISODE, source, e.id,
+                title = "${series.name} · S${a.season} E${e.episode}",
+                subtitle = e.title, logo = series.poster, token = e.play, direct = e.direct,
+                tmdb = tmdb, season = a.season, episode = e.episode,
+            )
+        }
+        PlayQueue.open(context, queue, i)
+    }
+
+    LazyColumn(Modifier.fillMaxSize().background(C.Bg), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            val info = (state as? Load.Ok<SeriesInfo>)?.value
+            MediaHero(
+                details = details,
+                fallbackTitle = info?.title?.ifBlank { null } ?: series.name,
+                fallbackPoster = info?.cover?.ifBlank { null } ?: series.poster,
+                fallbackMeta = listOf(series.year, info?.genre.orEmpty()).filter { it.isNotBlank() }.joinToString(" · "),
+                onBack = onBack,
+                subs = subs,
+            ) {
+                if (active != null) HeroButton("Play S${active.season} E${active.episodes.first().episode}", Icons.Filled.PlayArrow, primary = true, modifier = Modifier.weight(1f)) { playFrom(0) }
+                details?.trailer?.takeIf { it.isNotBlank() }?.let { key ->
+                    HeroButton("Trailer", Icons.Filled.Theaters, primary = false) { openTrailer(context, key) }
+                }
+            }
         }
         when (val s = state) {
-            is Load.Busy -> Busy()
-            is Load.Err -> ErrorBox(s.message) { reload++ }
+            is Load.Busy -> item { Box(Modifier.fillMaxWidth().height(160.dp)) { Busy() } }
+            is Load.Err -> item { Box(Modifier.fillMaxWidth().height(200.dp)) { ErrorBox(s.message) { reload++ } } }
             is Load.Ok -> {
-                val info = s.value
-                val seasons = info.seasons.filter { it.episodes.isNotEmpty() }
-                if (seasons.isEmpty()) { ErrorBox("No episodes yet."); return@Column }
-                val active = seasons.firstOrNull { it.season == season } ?: seasons.first()
-                LazyColumn(Modifier.fillMaxSize()) {
-                    item {
-                        Row(Modifier.padding(horizontal = 16.dp)) {
-                            AsyncImage(
-                                model = info.cover.ifBlank { series.poster }, contentDescription = null, contentScale = ContentScale.Crop,
-                                modifier = Modifier.width(110.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(14.dp)).background(C.Surface2),
-                            )
-                            Column(Modifier.padding(start = 14.dp)) {
-                                Text(info.title.ifBlank { series.name }, style = MaterialTheme.typography.titleLarge)
-                                Text(listOf(series.year, info.genre).filter { it.isNotBlank() }.joinToString(" · "), color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                                if (info.plot.isNotBlank()) Text(info.plot, color = C.Muted, fontSize = 13.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-                            }
-                        }
-                    }
+                if (active == null) { item { Box(Modifier.fillMaxWidth().height(160.dp)) { ErrorBox("No episodes yet.") } } }
+                else {
                     item {
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -281,16 +305,7 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                                 .padding(horizontal = 12.dp, vertical = 4.dp)
                                 .tvFocus(RoundedCornerShape(14.dp), 1.02f)
                                 .clip(RoundedCornerShape(14.dp))
-                                .clickable {
-                                    val queue = active.episodes.map { e ->
-                                        PlayItem(
-                                            Kind.EPISODE, source, e.id,
-                                            title = "${series.name} · S${active.season} E${e.episode}",
-                                            subtitle = e.title, logo = series.poster, token = e.play, direct = e.direct,
-                                        )
-                                    }
-                                    PlayQueue.open(context, queue, i)
-                                }
+                                .clickable { playFrom(i) }
                                 .background(C.Surface)
                                 .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -306,7 +321,6 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                             }
                         }
                     }
-                    item { Spacer(Modifier.height(20.dp)) }
                 }
             }
         }
@@ -375,9 +389,7 @@ fun HomeScreen(onTab: (Int) -> Unit) {
         when (sl.kind) {
             "live" -> live.indexOfFirst { it.id == sl.live?.id }.takeIf { it >= 0 }?.let { PlayQueue.open(context, live, it, liveCats) }
             "iptv" -> iptv.indexOfFirst { it.id == sl.live?.id }.takeIf { it >= 0 }?.let { PlayQueue.open(context, iptv, it, iptvCats) }
-            "movie" -> sl.movie?.let { v ->
-                PlayQueue.open(context, listOf(PlayItem(Kind.VOD, Store.provider, v.id, v.name, subtitle = v.year, logo = v.poster, ext = v.ext)), 0)
-            }
+            "movie" -> sl.movie?.let { Store.pendingMovie = it; onTab(2) }
             "series" -> sl.series?.let { Store.pendingSeries = it; onTab(3) }
         }
     }

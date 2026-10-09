@@ -3,6 +3,7 @@ package uk.andam.app.net
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.MediaType.Companion.toMediaType
@@ -163,6 +164,80 @@ object Api {
             })
         }
         return SeriesInfo(j.str("title"), j.str("cover"), j.str("plot"), j.str("genre"), j.str("rating"), seasons)
+    }
+
+    /** Film or series details for the detail page. type = movie | series */
+    suspend fun details(source: String, type: String, id: String): MediaDetails = cached("details:$source:$type:$id") {
+        val j = get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id))
+        MediaDetails(
+            title = j.str("title"),
+            originalTitle = j.str("originalTitle"),
+            tagline = j.str("tagline"),
+            overview = j.str("overview"),
+            year = j.str("year"),
+            runtime = j.optInt("runtime"),
+            rating = j.optDouble("rating", 0.0).takeIf { !it.isNaN() } ?: 0.0,
+            votes = j.optInt("votes"),
+            genres = j.optJSONArray("genres").let { a -> (0 until (a?.length() ?: 0)).map { a!!.optString(it) }.filter { it.isNotBlank() } },
+            certification = j.str("certification"),
+            director = j.str("director"),
+            cast = j.optJSONArray("cast").mapObjects { CastMember(it.str("name"), it.str("role"), it.str("photo")) },
+            poster = j.str("poster"),
+            backdrop = j.str("backdrop"),
+            trailer = j.str("trailer"),
+            tmdbId = j.optInt("tmdbId"),
+            seasons = j.optInt("seasons"),
+        )
+    }
+
+    /** Online subtitles for a film (type = movie) or an episode (series tmdb id + season/episode). */
+    suspend fun subtitles(tmdb: Int, type: String, season: Int = 0, episode: Int = 0): OnlineSubs = cached("subs:$tmdb:$type:$season:$episode") {
+        val j = get(
+            "/api/public/subtitles",
+            mapOf("action" to "list", "tmdb" to tmdb.toString(), "type" to type, "season" to season.toString(), "episode" to episode.toString()),
+        )
+        val k = j.optJSONObject("kurdishAuto")
+        OnlineSubs(
+            j.optJSONArray("subtitles").mapObjects { OnlineSub(it.str("lang"), it.str("label"), it.str("url")) },
+            k?.str("url")?.ifBlank { null },
+            k?.str("partUrl")?.ifBlank { null },
+        )
+    }
+
+    /**
+     * Kurdish (Sorani) subtitle generated from the English one. Translates the missing parts
+     * (a few at a time) and returns the link to the finished file. Already translated titles
+     * return at once. [progress] gets 0..1.
+     */
+    suspend fun kurdishSubtitle(kurdishUrl: String, partUrl: String, progress: (Float) -> Unit): String = withContext(Dispatchers.IO) {
+        fun request(path: String) = Request.Builder().url(Config.BASE_URL + path).header("Accept", "application/json").header("User-Agent", Config.USER_AGENT)
+        repeat(3) {
+            val state = http.newCall(request(kurdishUrl).build()).execute().use { res ->
+                if (res.code == 200) return@withContext kurdishUrl
+                runCatching { JSONObject(res.body?.string().orEmpty()) }.getOrElse { JSONObject() }
+            }
+            val parts = state.optInt("parts", 1).coerceAtLeast(1)
+            val missing = state.optJSONArray("missing").let { a -> (0 until (a?.length() ?: 0)).map { a!!.optInt(it) } }
+            if (missing.isEmpty() && !state.optBoolean("preparing")) throw ApiException(502, state.optString("error").ifBlank { "Could not prepare Kurdish subtitles" })
+            var done = parts - missing.size
+            progress(done.toFloat() / parts)
+            val token = Session.accessToken()
+            // Four parts at a time keeps it quick without flooding the server.
+            missing.chunked(4).forEach { group ->
+                kotlinx.coroutines.coroutineScope {
+                    group.map { n ->
+                        async {
+                            val b = request("$partUrl&n=$n")
+                            token?.let { b.header("Authorization", "Bearer $it") }
+                            runCatching { http.newCall(b.build()).execute().close() }
+                        }
+                    }.forEach { it.await() }
+                }
+                done += group.size
+                progress(done.toFloat() / parts)
+            }
+        }
+        throw ApiException(502, "Kurdish subtitles are not ready yet")
     }
 
     /** type = live | vod | series */
