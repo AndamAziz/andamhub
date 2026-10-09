@@ -25,3 +25,17 @@ mp.add_hook("on_load", 10, function()
     if msg then mp.commandv("script-message", msg) end
     mp.command("stop")
 end)
+
+-- Live TV: jump back to the live edge after pausing or rewinding (newest moment in the cache).
+mp.register_script_message("andam-live", function()
+    local st = mp.get_property_native("demuxer-cache-state")
+    local ranges = st and st["seekable-ranges"]
+    if ranges and #ranges > 0 then
+        local edge = ranges[#ranges]["end"]
+        if edge then
+            mp.commandv("seek", tostring(math.max(0, edge - 2)), "absolute")
+        end
+    end
+    mp.set_property_bool("pause", false)
+    mp.osd_message("LIVE", 1)
+end)

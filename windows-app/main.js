@@ -186,6 +186,8 @@ let mpv = null;
 let sock = null;
 let sockBuf = '';
 let pending = [];
+// Subtitles for the stream being loaded: added with sub-add once mpv reports that stream's path.
+let pendingSubs = null;
 
 function hasPlayer() {
   return process.platform === 'win32' && fs.existsSync(MPV_EXE);
@@ -211,11 +213,18 @@ function onLine(line) {
     if (m.args[0] === 'andam-ended') notify({ type: 'ended' });
   }
   if (m.event === 'end-file' && m.reason === 'error') notify({ type: 'error', message: m.file_error || '' });
+  if (m.event === 'property-change' && m.name === 'path' && pendingSubs && m.data === pendingSubs.url) {
+    const { subs } = pendingSubs;
+    pendingSubs = null;
+    subs.forEach((sub) => send(['sub-add', sub.url, sub.select ? 'select' : 'auto', sub.label, sub.lang]));
+  }
 }
 function connect(tries = 0) {
   const c = net.connect(PIPE);
   c.on('connect', () => {
     sock = c;
+    // Reports each new stream's path, so its subtitles are added to the right one.
+    c.write(JSON.stringify({ command: ['observe_property', 1, 'path'] }) + '\n');
     pending.splice(0).forEach((l) => c.write(l));
   });
   c.on('data', (d) => {
@@ -236,7 +245,8 @@ function connect(tries = 0) {
 }
 // Loads a stream. Live channels and episodes get marker entries around them so the player's
 // own ⏮ ⏭ buttons work (see mpv/portable_config/scripts/andam.lua).
-function load(url, title, nav) {
+function load(url, title, nav, subs) {
+  pendingSubs = subs && subs.length ? { url, subs } : null;
   send(['set_property', 'force-media-title', title]);
   send(['loadfile', url, 'replace']);
   if (nav) {
@@ -247,7 +257,7 @@ function load(url, title, nav) {
   send(['set_property', 'pause', false]);
 }
 
-function startPlayer(url, title, nav) {
+function startPlayer(url, title, nav, subs) {
   sockBuf = '';
   pending = [];
   mpv = spawn(MPV_EXE, [`--input-ipc-server=${PIPE}`, '--idle=yes', `--force-media-title=${title}`], {
@@ -265,7 +275,7 @@ function startPlayer(url, title, nav) {
     mpv = null;
     notify({ type: 'closed' });
   });
-  load(url, title, nav);
+  load(url, title, nav, subs);
   setTimeout(() => connect(), 150);
 }
 
@@ -277,10 +287,20 @@ ipcMain.handle('player:play', (_e, o) => {
   const allowed = /^https?:\/\/[^\s]+$/i.test(url);
   if (!allowed) return { ok: false };
   const title = String((o && o.title) || 'Andam').replace(/[\r\n]/g, ' ').slice(0, 200);
+  // Online subtitles (films / episodes): only the Andam site's own subtitle links.
+  const subs = (Array.isArray(o && o.subs) ? o.subs : [])
+    .filter((x) => x && /^https:\/\/ip\.andam\.uk\/api\/public\/subtitles\?/.test(String(x.url || '')))
+    .slice(0, 8)
+    .map((x) => ({
+      url: String(x.url),
+      lang: String(x.lang || '').replace(/[^a-z-]/gi, '').slice(0, 8),
+      label: String(x.label || x.lang || 'Subtitles').replace(/[\r\n]/g, ' ').slice(0, 40),
+      select: Boolean(x.select),
+    }));
   try {
     const nav = Boolean(o && o.nav);
-    if (mpv) load(url, title, nav);
-    else startPlayer(url, title, nav);
+    if (mpv) load(url, title, nav, subs);
+    else startPlayer(url, title, nav, subs);
     return { ok: true };
   } catch {
     return { ok: false };
