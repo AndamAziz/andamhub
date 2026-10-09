@@ -244,7 +244,7 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
         state = try { Load.Ok(Api.seriesInfo(source, series.id)) } catch (e: Exception) { Load.Err(e.message ?: "Could not load this series.") }
     }
     LaunchedEffect(series.id) {
-        details = runCatching { Api.details(source, "series", series.id) }.getOrNull()
+        details = runCatching { Api.details(source, "series", series.id, name = series.name, year = series.year) }.getOrNull()
     }
     val tmdb = details?.tmdbId ?: 0
     val seasons = (state as? Load.Ok<SeriesInfo>)?.value?.seasons?.filter { it.episodes.isNotEmpty() }.orEmpty()

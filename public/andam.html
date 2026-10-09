@@ -1140,14 +1140,14 @@ h1,h2,h3{letter-spacing:-.3px}
   -webkit-mask-image:linear-gradient(180deg,#000 30%,transparent);mask-image:linear-gradient(180deg,#000 30%,transparent);pointer-events:none}
 .dphero .pill{position:relative;margin-bottom:14px}
 .dprow{position:relative;display:flex;gap:18px;align-items:flex-end}
-.dpposter{width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:14px;flex:none;background:var(--surface-2);box-shadow:0 18px 40px rgba(0,0,0,.45);border:1px solid var(--hair)}
+.dpposter{width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;flex:none;background:var(--surface-2);box-shadow:0 18px 40px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.14)}
 .dpinfo{min-width:0;display:flex;flex-direction:column;gap:7px}
 .dpinfo h1{margin:0;font:700 clamp(22px,3.4vw,32px)/1.15 Inter,sans-serif;unicode-bidi:plaintext}
 .dporig{color:var(--muted);font-size:13px;unicode-bidi:plaintext}
 .dpchips{display:flex;flex-wrap:wrap;gap:6px}
 .dpchips span{padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);font:600 12px/1.3 Inter,sans-serif}
 .dpchips .gold{color:var(--gold);background:rgba(245,197,107,.14)}
-.dpgen{color:var(--ember);font:600 13px/1.4 Inter,sans-serif}
+.dpgen{color:var(--ember);font:600 12px/1.4 Inter,sans-serif}
 .dptag{color:var(--muted);font-style:italic;font-size:13px;unicode-bidi:plaintext}
 .dpact{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 14px}
 .dpbtn{min-height:44px;padding:0 20px;border-radius:12px;border:0;background:rgba(255,255,255,.1);color:#fff;font:700 14px/1 Inter,sans-serif;cursor:pointer}
@@ -1165,7 +1165,7 @@ h1,h2,h3{letter-spacing:-.3px}
 .dpnote{color:var(--faint);font-size:12px;margin-top:6px}.dpnote.warn{color:var(--gold)}
 .dpplot{margin:16px 0 0;color:rgba(246,246,248,.88);font-size:14.5px;line-height:1.6;unicode-bidi:plaintext;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
 .dpplot.open{-webkit-line-clamp:unset;display:block}
-.dpcrew{display:grid;gap:6px;margin-top:14px;font-size:13px}
+.dpcrew{display:grid;gap:6px;margin-top:14px;font-size:13px;padding:10px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--hair)}
 .dpcrew span{display:inline-block;width:96px;color:var(--faint)}.dpcrew b{font-weight:500;unicode-bidi:plaintext}
 .dpcast{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
 .dpperson{flex:none;width:80px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
@@ -1187,8 +1187,19 @@ h1,h2,h3{letter-spacing:-.3px}
 .spring{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--ember);animation:ccspin .9s linear infinite}
 .spring[hidden]{display:none}
 @media (max-width:640px){
-  .dpposter{width:104px}.dprow{gap:14px}
-  .dpbg{height:200px}
+  /* Phones: a compact header so the buttons and subtitles are on the first screen. */
+  .dphero{min-height:0}
+  .dpposter{width:92px}.dprow{gap:13px}
+  .dpbg{height:180px}
+  .dpinfo{gap:5px}
+  .dpinfo h1{font-size:19px;line-height:1.2}
+  .dpchips span{padding:3px 8px;font-size:11px}
+  .dpgen{font-size:11.5px}.dptag{font-size:12px}
+  .dpbtn{min-height:42px;padding:0 16px;font-size:13.5px}
+  .ccchip{min-height:32px;padding:0 12px;font-size:12.5px}
+  .dpplot{font-size:13.5px;line-height:1.55}
+  .dpcrew{font-size:12.5px}.dpcrew span{width:84px}
+  .dpperson{width:70px}.dpface{width:56px;height:56px;font-size:19px}
   .epthumb{width:108px}
   .dpbtn.primary{flex:1 1 auto}
 }
@@ -4003,7 +4014,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
      own info and plays exactly as before. */
   var SUB_API='/api/public/subtitles';
   var FACTS_KEY='andam.facts.v1', FACTS_TTL=7*864e5, FACTS_MAX=120;
-  function factsGet(k){ try{ var all=JSON.parse(localStorage.getItem(FACTS_KEY)||'{}'), e=all[k]; return e&&Date.now()-e.t<FACTS_TTL?e.v:null }catch(_){ return null } }
+  /* Only titles TMDB matched are kept for 7 days; the others are asked again next time. */
+  function factsGet(k){ try{ var all=JSON.parse(localStorage.getItem(FACTS_KEY)||'{}'), e=all[k]; return e&&Date.now()-e.t<FACTS_TTL&&!(e.v&&e.v.type&&!e.v.tmdbId)?e.v:null }catch(_){ return null } }
   function factsPut(k,v){
     try{
       var all=JSON.parse(localStorage.getItem(FACTS_KEY)||'{}'); all[k]={t:Date.now(),v:v};
@@ -4013,11 +4025,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     }catch(_){}
   }
   /* Film / series facts (7-day local cache). Resolves null when nothing could be fetched. */
-  function facts(type,id){
+  function facts(type,id,name,year){
     var k=ltv.prov+'|'+type+'|'+id+'|en', hit=factsGet(k);
     if(hit) return Promise.resolve(hit);
-    return api({action:'details',source:ltv.prov,type:type,id:id,lang:'en'})
-      .then(function(d){ factsPut(k,d); return d }).catch(function(){ return null });
+    /* The list's name / year help the server find the title when the provider's info has none. */
+    return api({action:'details',source:ltv.prov,type:type,id:id,lang:'en',name:name||'',year:year||''})
+      .then(function(d){ if(d&&d.tmdbId) factsPut(k,d); return d }).catch(function(){ return null });
   }
   function seasonFacts(tmdb,season){
     if(!tmdb) return Promise.resolve({});
@@ -4313,7 +4326,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     }
     ltv.cc=ccPref();
     paint(null);
-    facts('movie',id).then(function(d){ if(d) paint(d) });
+    facts('movie',id,title,year).then(function(d){ if(d) paint(d) });
   }
 
   function openSeries(id,title,poster,year,genre){
@@ -4321,7 +4334,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     ltv.cc=ccPref();
     var sq={action:'series_info',source:ltv.prov,series_id:id}; if(deskApi()) sq.device='1';
     var fb={title:title,poster:poster,year:year,genre:genre}, my=++movieReq;
-    Promise.all([api(sq),facts('series',id)])
+    Promise.all([api(sq),facts('series',id,title,year)])
       .then(function(res){
         if(my!==movieReq) return;
         var d=res[0], f=res[1]||null, tmdb=(f&&f.tmdbId)||0;

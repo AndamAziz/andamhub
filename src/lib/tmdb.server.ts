@@ -48,6 +48,8 @@ export type MediaDetails = {
 
 const cache = new Map<string, { at: number; value: MediaDetails }>();
 const TTL = 6 * 60 * 60 * 1000;
+/** A title TMDB could not be matched for (or TMDB was down) is asked again soon, not hours later. */
+const MISS_TTL = 10 * 60 * 1000;
 
 function key(): string {
   return (process.env['TMDB_API_KEY'] ?? '').trim();
@@ -195,10 +197,12 @@ export async function mediaDetails(
   type: 'movie' | 'series',
   id: string,
   lang: Lang = 'en',
+  /** The name / year the app shows in its list: used when the provider's own info has none. */
+  hint: { name?: string; year?: string } = {},
 ): Promise<MediaDetails> {
   const cacheKey = `${source.id}|${type}|${id}|${lang}`;
   const hit = cache.get(cacheKey);
-  if (hit && Date.now() - hit.at < TTL) return hit.value;
+  if (hit && Date.now() - hit.at < (hit.value.tmdbId ? TTL : MISS_TTL)) return hit.value;
 
   // 1. The provider's own info.
   const raw = await playerApi<Record<string, unknown>>(
@@ -207,11 +211,17 @@ export async function mediaDetails(
   ).catch(() => null);
   const info = ((raw?.['info'] as Record<string, unknown> | undefined) ?? {}) as Record<string, unknown>;
   const movieData = ((raw?.['movie_data'] as Record<string, unknown> | undefined) ?? {}) as Record<string, unknown>;
-  const providerName = str(info['name']) || str(movieData['name']) || str(info['title']);
+  const providerName = str(info['name']) || str(movieData['name']) || str(info['title']) || str(hint.name);
   const cleaned = cleanTitle(providerName);
   const providerYear =
     /\d{4}/.exec(str(info['releasedate']) || str(info['releaseDate']) || str(info['release_date']) || str(info['year']))?.[0] ||
-    cleaned.year;
+    cleaned.year ||
+    /\b(19|20)\d{2}\b/.exec(str(hint.year))?.[0] ||
+    '';
+  // Other names to search with when the first finds nothing (list name, original name).
+  const altNames = [str(hint.name), str(info['o_name']), str(info['original_name'])]
+    .map((n) => cleanTitle(n).title)
+    .filter((n, i, all) => n && n !== cleaned.title && all.indexOf(n) === i);
 
   const base: MediaDetails = {
     type,
@@ -253,7 +263,7 @@ export async function mediaDetails(
   let details: MediaDetails = base;
   if (key()) {
     try {
-      details = await enrich(base, type, lang);
+      details = await enrich(base, type, lang, altNames);
     } catch (err) {
       console.error('[tmdb] enrich failed', err);
     }
@@ -264,8 +274,14 @@ export async function mediaDetails(
   return details;
 }
 
-async function enrich(base: MediaDetails, type: 'movie' | 'series', lang: Lang): Promise<MediaDetails> {
-  const tmdbId = base.tmdbId || (await findTmdbId(type, base.title, base.year));
+async function enrich(base: MediaDetails, type: 'movie' | 'series', lang: Lang, altNames: string[] = []): Promise<MediaDetails> {
+  let tmdbId = base.tmdbId || (await findTmdbId(type, base.title, base.year));
+  // "Dune: Part Two - Extended" → "Dune: Part Two"; then the list / original names.
+  const shorter = base.title.split(/\s[-–|]\s/)[0]?.trim() ?? '';
+  for (const name of [shorter !== base.title ? shorter : '', ...altNames]) {
+    if (tmdbId || !name) continue;
+    tmdbId = await findTmdbId(type, name, base.year);
+  }
   if (!tmdbId) return base;
   const path = type === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
   const t = await tmdb<TmdbFull>(path, {
