@@ -84,8 +84,17 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     /** A catch-up (archive) recording of a live channel is playing; Live returns to the channel. */
     var catchup by mutableStateOf(false)
         private set
-    /** Seeking is possible: films/episodes/catch-up, and live channels with a window. */
-    val canSeek: Boolean get() = !live || liveSeekable
+    /**
+     * The film / episode can be sought in. Some copies cannot (no index, the sound-fixer route):
+     * ExoPlayer would restart those from the beginning, so seeking is switched off for them.
+     */
+    var vodSeekable by mutableStateOf(false)
+        private set
+    /** Length to show when the stream reports none (TMDB / provider), ms. */
+    var lengthHint by mutableLongStateOf(0L)
+        private set
+    /** Seeking is possible: seekable films/episodes/catch-up, and live channels with a window. */
+    val canSeek: Boolean get() = if (live) liveSeekable else vodSeekable
 
     val player: ExoPlayer
 
@@ -184,6 +193,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     status = null
                     if (playingSince == 0L) playingSince = System.currentTimeMillis()
                     duration = player.duration.coerceAtLeast(0)
+                    vodSeekable = !live && player.isCurrentMediaItemSeekable
                 }
                 if (state == Player.STATE_ENDED) {
                     // A live stream never really ends: the upstream closed the socket. Reopen it.
@@ -236,6 +246,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 delay(1000)
                 position = player.currentPosition.coerceAtLeast(0)
                 if (player.duration > 0) duration = player.duration
+                vodSeekable = !live && player.isCurrentMediaItemSeekable
                 updateLiveWindow()
                 val stalled = player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && item != null && error == null
                 if (stalled) {
@@ -320,6 +331,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         logo = next.logo
         live = next.isLive
         catchup = next.catchupOf != null
+        vodSeekable = false
+        lengthHint = next.lengthMs
         liveSeekable = false
         liveBehind = 0
         error = null
@@ -444,7 +457,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     fun seekBy(ms: Long) {
         if (!canSeek) return
-        val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration else player.duration
+        val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration
+        else player.duration.takeIf { it > 0 } ?: lengthHint
         player.seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
         if (live) updateLiveWindow()
     }

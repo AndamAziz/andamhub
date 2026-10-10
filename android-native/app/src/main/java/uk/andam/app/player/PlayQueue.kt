@@ -31,6 +31,8 @@ data class PlayItem(
     val catchupOf: PlayItem? = null,
     /** Subtitle chosen on the detail page: "" = the viewer's default, "off" = none, else a language. */
     val subLang: String = "",
+    /** Length from TMDB / the provider (ms, 0 = unknown): the timeline uses it when the stream reports none. */
+    val lengthMs: Long = 0,
 ) {
     val isLive: Boolean get() = (kind == Kind.LIVE || kind == Kind.IPTV) && catchupOf == null
     val resumeKey: String get() = "${kind.name}:$source:$id"
