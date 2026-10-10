@@ -275,6 +275,7 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
                 title = "$seriesTitle · S${a.season} E${e.episode}",
                 subtitle = nameOf(e), logo = series.poster, token = e.play, direct = e.direct,
                 tmdb = tmdb, season = a.season, episode = e.episode,
+                lengthMs = durationMs(e.duration).takeIf { it > 0 } ?: ((facts[e.episode]?.runtime ?: 0) * 60_000L),
             )
         }
         // The chosen subtitle is prepared for the episode tapped; later ones in the player.
@@ -360,6 +361,22 @@ private fun SeriesDetail(source: String, series: SeriesItem, onBack: () -> Unit)
     }
     PrepOverlay(prep)
     }
+}
+
+/** Provider episode length: "00:45:12", "45:12", "2712" (seconds) or "45 min" → ms (0 = unknown). */
+private fun durationMs(raw: String): Long {
+    val t = raw.trim()
+    if (t.isEmpty()) return 0
+    if (':' in t) {
+        val parts = t.split(':').map { it.trim().toLongOrNull() ?: return 0 }
+        return when (parts.size) {
+            3 -> (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+            2 -> (parts[0] * 60 + parts[1]) * 1000
+            else -> 0
+        }
+    }
+    return Regex("(\\d+)\\s*min", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)?.toLongOrNull()?.times(60_000)
+        ?: t.toLongOrNull()?.times(1000) ?: 0
 }
 
 /** A provider episode title that says nothing ("Name - S01E03", "Episode 3"): TMDB's name is shown instead. */

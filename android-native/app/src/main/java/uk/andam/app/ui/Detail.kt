@@ -103,6 +103,7 @@ fun MovieDetail(source: String, vod: VodItem, onBack: () -> Unit) {
     val item = PlayItem(
         Kind.VOD, source, vod.id, details?.title?.ifBlank { null } ?: vod.name,
         subtitle = details?.year ?: vod.year, logo = vod.poster, ext = vod.ext, tmdb = details?.tmdbId ?: 0,
+        lengthMs = (details?.runtime ?: 0) * 60_000L,
     )
     var resume by remember(vod.id) { mutableLongStateOf(0L) }
     var length by remember(vod.id) { mutableLongStateOf(0L) }

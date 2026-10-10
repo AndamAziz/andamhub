@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.History
@@ -382,6 +386,8 @@ private fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
+        // Swipe up / down: right side = volume, left side = brightness (phones and tablets).
+        val swipe = rememberSwipeLevels()
         // Tap layer: single tap toggles controls, double tap left/right skips 10 s on VOD.
         Box(
             Modifier
@@ -400,8 +406,12 @@ private fun PlayerScreen(
                             }
                         },
                     )
-                },
+                }
+                .then(if (ui.tv || ui.pip) Modifier else Modifier.swipeLevels(swipe)),
         )
+        swipe.shown?.let { (volume, level) ->
+            LevelBadge(volume, level, Modifier.align(if (volume) Alignment.CenterEnd else Alignment.CenterStart).safeDrawingPadding().padding(horizontal = 28.dp))
+        }
 
         // Loading ring: same inset-aware centre as the controls, so it wraps the play button exactly.
         // The ring only appears when loading lasts (short hiccups stay invisible).
@@ -516,7 +526,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
             horizontalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             if (zappable) RoundIcon(Icons.Filled.SkipPrevious, "Previous") { onZap(-1) }
-            else if (!engine.live) RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
+            else if (!engine.live && engine.canSeek) RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
             val playFocus = remember { FocusRequester() }
             LaunchedEffect(Unit) { if (ui.tv) { delay(60); runCatching { playFocus.requestFocus() } } }
             Box(
@@ -536,7 +546,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 )
             }
             if (zappable) RoundIcon(Icons.Filled.SkipNext, "Next") { onZap(1) }
-            else if (!engine.live) RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
+            else if (!engine.live && engine.canSeek) RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
         }
 
         // Bottom bar: timeline (movies/episodes) and, in the bottom-right corner, channels + settings.
@@ -546,19 +556,8 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
         ) {
             if (engine.live && engine.liveSeekable) {
                 LiveTimeline(engine, ui)
-            } else if (!engine.live && engine.duration > 0) {
-                var dragging by remember { mutableStateOf(false) }
-                var dragValue by remember { mutableFloatStateOf(0f) }
-                val progress = if (dragging) dragValue else (engine.position.toFloat() / engine.duration).coerceIn(0f, 1f)
-                Text(fmt(if (dragging) (dragValue * engine.duration).toLong() else engine.position), color = Color.White, fontSize = 12.sp)
-                Slider(
-                    value = progress,
-                    onValueChange = { dragging = true; dragValue = it; ui.poke() },
-                    onValueChangeFinished = { engine.seekTo((dragValue * engine.duration).toLong()); dragging = false },
-                    colors = SliderDefaults.colors(thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF)),
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                )
-                Text(fmt(engine.duration), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+            } else if (!engine.live) {
+                VodTimeline(engine, ui)
             } else {
                 Spacer(Modifier.weight(1f))
             }
@@ -936,6 +935,128 @@ private fun RoundIcon(icon: ImageVector, label: String, big: Boolean = false, on
         modifier = Modifier.tvRing(CircleShape).size(if (big) 56.dp else 46.dp).clip(CircleShape).background(Color(0x590A0B0F)),
     ) {
         Icon(icon, contentDescription = label, tint = Color.White)
+    }
+}
+
+/**
+ * Timeline for films and episodes. The length comes from the stream, or (when the stream reports
+ * none) from TMDB / the provider so there is always a timeline. Copies that cannot be sought in
+ * show the bar without a thumb, and the ±10 s buttons are hidden, so nothing restarts the film.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
+    val total = if (engine.duration > 0) engine.duration else engine.lengthHint
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableFloatStateOf(0f) }
+    if (total <= 0) {
+        // Length unknown everywhere: at least show how far into the film.
+        Text(fmt(engine.position), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+        Spacer(Modifier.weight(1f))
+        return
+    }
+    val progress = if (dragging) dragValue else (engine.position.toFloat() / total).coerceIn(0f, 1f)
+    Text(fmt(if (dragging) (dragValue * total).toLong() else engine.position), color = Color.White, fontSize = 12.sp)
+    Slider(
+        value = progress,
+        enabled = engine.canSeek,
+        onValueChange = { dragging = true; dragValue = it; ui.poke() },
+        onValueChangeFinished = { engine.seekTo((dragValue * total).toLong()); dragging = false },
+        colors = SliderDefaults.colors(
+            thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF),
+            disabledThumbColor = Color.Transparent, disabledActiveTrackColor = C.Ember.copy(alpha = 0.7f),
+            disabledInactiveTrackColor = Color(0x33FFFFFF),
+        ),
+        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+    )
+    Text(
+        (if (engine.duration <= 0) "~" else "") + fmt(total),
+        color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp),
+    )
+}
+
+/** Volume / brightness swipe state: which one is shown and its level (0..1) while swiping. */
+private class SwipeLevels(val activity: android.app.Activity?) {
+    var shown by mutableStateOf<Pair<Boolean, Float>?>(null)
+    var hideJob: kotlinx.coroutines.Job? = null
+}
+
+@Composable
+private fun rememberSwipeLevels(): SwipeLevels {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    return remember { SwipeLevels(ctx as? android.app.Activity) }
+}
+
+/**
+ * Vertical swipes: right half changes the media volume, left half the screen brightness of this
+ * window (back to the system brightness when the player closes). Swipes starting at the very top
+ * or bottom are left to the system (notification shade, home gesture).
+ */
+private fun Modifier.swipeLevels(state: SwipeLevels): Modifier = composed {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    pointerInput(Unit) {
+        val activity = state.activity ?: return@pointerInput
+        val audio = activity.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val maxVol = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        var volume = false
+        var level = 0f
+        var active = false
+        detectVerticalDragGestures(
+            onDragStart = { o ->
+                active = o.y > size.height * 0.08f && o.y < size.height * 0.92f
+                if (!active) return@detectVerticalDragGestures
+                volume = o.x > size.width / 2f
+                level = if (volume) {
+                    audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / maxVol
+                } else {
+                    val own = activity.window.attributes.screenBrightness
+                    if (own in 0f..1f) own else runCatching {
+                        android.provider.Settings.System.getInt(activity.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS) / 255f
+                    }.getOrDefault(0.5f)
+                }
+                state.hideJob?.cancel()
+                state.shown = volume to level
+            },
+            onDragEnd = {
+                state.hideJob = scope.launch { delay(700); state.shown = null }
+            },
+            onDragCancel = { state.shown = null },
+            onVerticalDrag = { change, dy ->
+                if (!active) return@detectVerticalDragGestures
+                change.consume()
+                // A swipe over ~70% of the screen height goes from 0 to full.
+                level = (level - dy / (size.height * 0.7f)).coerceIn(0f, 1f)
+                if (volume) {
+                    audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, kotlin.math.round(level * maxVol).toInt(), 0)
+                } else {
+                    activity.window.attributes = activity.window.attributes.apply { screenBrightness = level.coerceAtLeast(0.01f) }
+                }
+                state.shown = volume to level
+            },
+        )
+    }
+}
+
+/** The volume / brightness level shown while swiping. */
+@Composable
+private fun LevelBadge(volume: Boolean, level: Float, modifier: Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).background(Color(0xB30A0B0F)).padding(horizontal = 12.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            when {
+                !volume -> Icons.Filled.BrightnessMedium
+                level <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                else -> Icons.AutoMirrored.Filled.VolumeUp
+            },
+            contentDescription = if (volume) "Volume" else "Brightness", tint = Color.White, modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.width(6.dp).height(120.dp).clip(RoundedCornerShape(3.dp)).background(Color(0x40FFFFFF)), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxWidth().fillMaxHeight(level.coerceIn(0f, 1f)).background(if (volume) Color.White else C.Gold))
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("${(level * 100).toInt()}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
