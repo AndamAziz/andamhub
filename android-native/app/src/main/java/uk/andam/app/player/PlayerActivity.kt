@@ -818,6 +818,19 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
                 if (list.subs.isEmpty() && list.kurdishUrl == null) item { Note("No online subtitles found for this title.") }
             }
             online.message?.let { m -> item { Note(m) } }
+            // Subtitle timing: earlier / later in half-second steps when it does not match the picture.
+            if (ext != null) {
+                item { Section("Subtitle timing") }
+                val off = engine.subOffsetMs
+                item {
+                    Option(
+                        "Show earlier (−0.5 s)", false,
+                        hint = if (off != 0L) "Now " + (if (off > 0) "+" else "") + "%.1f s".format(java.util.Locale.US, off / 1000.0) else null,
+                    ) { engine.shiftSubtitle(-500) }
+                }
+                item { Option("Show later (+0.5 s)", false) { engine.shiftSubtitle(500) } }
+                if (off != 0L) item { Option("Reset timing", false) { engine.shiftSubtitle(0) } }
+            }
         }
 
         if (text.isNotEmpty()) {

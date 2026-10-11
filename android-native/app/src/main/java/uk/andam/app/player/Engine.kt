@@ -93,6 +93,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     /** Length to show when the stream reports none (TMDB / provider), ms. */
     var lengthHint by mutableLongStateOf(0L)
         private set
+    /** Subtitle timing shift in ms (positive = later), for the external subtitle in use. */
+    var subOffsetMs by mutableLongStateOf(0L)
+        private set
+    /** After a seek the provider may take a while to answer the jump: no "stalled" reload before this. */
+    private var seekGraceUntil = 0L
+
     /** Seeking is possible: seekable films/episodes/catch-up, and live channels with a window. */
     val canSeek: Boolean get() = if (live) liveSeekable else vodSeekable
 
@@ -249,7 +255,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 vodSeekable = !live && player.isCurrentMediaItemSeekable
                 updateLiveWindow()
                 val stalled = player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && item != null && error == null
-                if (stalled) {
+                if (stalled && System.currentTimeMillis() < seekGraceUntil) {
+                    stallSeconds = 0
+                } else if (stalled) {
                     stallSeconds++
                     // Live gets longer: a slow segment usually arrives on its own, and a
                     // reload throws away what is already buffered.
@@ -258,7 +266,11 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                         stallReloads++
                         // A route that already played keeps being reloaded (slow source, not a dead
                         // one); only a route that never played moves on to the next one.
-                        if (stallReloads >= 3 && attemptIndex != provenIndex) nextAttempt() else reconnect("Reconnecting…", 0)
+                        // Films / episodes: a slow route moves to another picture route (keeping the
+                        // position), never to the sound fixer, which cannot seek.
+                        if (stallReloads >= 3 && attemptIndex != provenIndex) {
+                            if (live) nextAttempt() else if (!tryOtherPictureRoute()) reconnect("Reconnecting…", 0)
+                        } else reconnect("Reconnecting…", 0)
                     }
                 } else {
                     stallSeconds = 0
@@ -315,7 +327,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     fun play(next: PlayItem) {
         saveResume()
         if (next !== item) remints = 0
-        if (next !== item) externalSub = null
+        if (next !== item) { externalSub = null; subOffsetMs = 0 }
         item = next
         // Set before online.onItem, which may switch a subtitle on for this item.
         live = next.isLive
@@ -425,6 +437,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
      */
     fun useSubtitle(sub: ExternalSub?) {
         if (live || item == null) return
+        if (sub?.url != externalSub?.url) subOffsetMs = 0
         externalSub = sub
         val b = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT)
         if (sub == null) b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
@@ -459,14 +472,28 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         if (!canSeek) return
         val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration
         else player.duration.takeIf { it > 0 } ?: lengthHint
-        player.seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
-        if (live) updateLiveWindow()
+        seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
     }
 
     fun seekTo(ms: Long) {
         if (!canSeek) return
         player.seekTo(ms)
+        // The bar shows the new time at once (the heartbeat only refreshes every second), and a
+        // jump into a part not downloaded yet gets time before it counts as a stall.
+        position = ms.coerceAtLeast(0)
+        seekGraceUntil = System.currentTimeMillis() + 30_000
+        stallSeconds = 0
         if (live) updateLiveWindow()
+    }
+
+    /** Shifts the external subtitle's timing (±ms, positive = later) and keeps playing from here. */
+    fun shiftSubtitle(deltaMs: Long) {
+        if (externalSub == null) return
+        subOffsetMs = if (deltaMs == 0L) 0 else (subOffsetMs + deltaMs).coerceIn(-60_000, 60_000)
+        if (attempts.isEmpty()) return
+        val pos = player.currentPosition
+        start(attemptIndex)
+        if (pos > 0) player.seekTo(pos)
     }
 
     /** LIVE: back to the live edge (or from a catch-up recording back to the channel). */
@@ -543,7 +570,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         externalSub?.let { sub ->
             builder.setSubtitleConfigurations(
                 listOf(
-                    MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(sub.url))
+                    MediaItem.SubtitleConfiguration.Builder(
+                        android.net.Uri.parse(if (subOffsetMs != 0L) "${sub.url}&o=$subOffsetMs" else sub.url),
+                    )
                         .setMimeType(MimeTypes.TEXT_VTT)
                         .setLanguage(sub.lang)
                         .setLabel(sub.label)
@@ -586,7 +615,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val next = attemptIndex + 1
         if (next >= attempts.size) fail("This stream is not responding right now.") else {
             status = "Trying another route…"
+            val pos = player.currentPosition
             start(next)
+            if (!live && pos > 0 && !attempts[next].fix) player.seekTo(pos)
         }
     }
 
@@ -596,7 +627,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val next = (attemptIndex + 1 until attempts.size).firstOrNull { !attempts[it].fix && attempts[it].url != cur.url }
             ?: return false
         status = "Trying another route…"
+        val pos = player.currentPosition
         start(next)
+        if (!live && pos > 0) player.seekTo(pos)
         return true
     }
 
