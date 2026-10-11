@@ -29,6 +29,32 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 
+/**
+ * Subtitle timing: `o` shifts every cue by that many milliseconds (positive = later), so the
+ * viewer can line up a subtitle made for a slightly different cut of the film.
+ */
+function shifted(text: string, url: URL): string {
+  const o = Math.round(Number(url.searchParams.get('o') ?? 0));
+  if (!o || !Number.isFinite(o) || Math.abs(o) > 600_000) return text;
+  const fmt = (ms: number) => {
+    const t = Math.max(0, ms);
+    const h = Math.floor(t / 3_600_000), m = Math.floor((t % 3_600_000) / 60_000), sec = Math.floor((t % 60_000) / 1000);
+    const two = (n: number) => String(n).padStart(2, '0');
+    return `${two(h)}:${two(m)}:${two(sec)}.${String(t % 1000).padStart(3, '0')}`;
+  };
+  // Only the timing lines ("00:01:02.345 --> 00:01:04.000"), never the subtitle text.
+  return text
+    .split('\n')
+    .map((line) =>
+      line.includes('-->')
+        ? line.replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})[.,](\d{3})/g, (_all, h, m, sec, ms) =>
+            fmt(((Number(h ?? 0) * 60 + Number(m)) * 60 + Number(sec)) * 1000 + Number(ms) + o),
+          )
+        : line,
+    )
+    .join('\n');
+}
+
 const vtt = (text: string) =>
   new Response(text, {
     status: 200,
@@ -99,14 +125,14 @@ export const Route = createFileRoute('/api/public/subtitles')({
           if (action === 'file') {
             const fileId = await fileOf(url.searchParams.get('t'));
             if (!fileId) return json({ error: 'Invalid subtitle link' }, 404);
-            return vtt(await subs.subtitleVtt(fileId));
+            return vtt(shifted(await subs.subtitleVtt(fileId), url));
           }
 
           if (action === 'kurdish') {
             const fileId = await fileOf(url.searchParams.get('t'));
             if (!fileId) return json({ error: 'Invalid subtitle link' }, 404);
             const { vtt: text, state } = await subs.kurdishState(fileId, subs.kurdishEngine(url.searchParams.get('e')));
-            if (text) return vtt(text);
+            if (text) return vtt(shifted(text, url));
             return json({ preparing: true, ...state }, 202);
           }
 

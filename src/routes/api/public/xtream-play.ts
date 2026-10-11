@@ -475,6 +475,11 @@ export const Route = createFileRoute('/api/public/xtream-play')({
         }
 
         headers.set('Accept-Ranges', 'bytes');
+        // The file size: players need it to seek in films / episodes (MPEG-TS, AVI and MKV
+        // without an index cannot be sought in — nor their length worked out — without it).
+        // Only for media passed through untouched; manifests above are rewritten.
+        const length = res.headers.get('content-length');
+        if (length && /^\d+$/.test(length) && !res.headers.get('content-encoding')) headers.set('Content-Length', length);
         const fixedType = segmentContentType(upstream, res.headers.get('content-type'));
         if (fixedType) headers.set('Content-Type', fixedType);
         return new Response(res.body, { status: res.status, headers });
