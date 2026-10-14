@@ -169,7 +169,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             // Films / episodes: ask for the file the way VLC and browsers do ("Range: bytes=0-").
             // Many panels only send the file size in answer to a range request; without it
             // ExoPlayer cannot learn the length of a .ts / .mkv / .avi film and cannot seek in it.
-            if (spec.position == 0L && spec.length == C.LENGTH_UNSET && rangeUrl.isNotEmpty() &&
+            if (spec.position == 0L && spec.length == C.LENGTH_UNSET.toLong() && rangeUrl.isNotEmpty() &&
                 spec.uri.toString() == rangeUrl && !extra.containsKey("Range")
             ) extra["Range"] = "bytes=0-"
             spec.withAdditionalHeaders(extra)
