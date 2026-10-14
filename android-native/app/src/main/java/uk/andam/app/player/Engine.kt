@@ -45,9 +45,6 @@ import uk.andam.app.net.Api
  * reloaded; a live stream that simply ends is reopened. Only when every attempt is exhausted
  * does the viewer see an error, with a Retry button.
  */
-/** Speed of the emulated seek in files without an index (sound off meanwhile). */
-private const val SOFT_SEEK_SPEED = 8f
-
 @OptIn(UnstableApi::class)
 class Engine(private val context: Context, private val scope: CoroutineScope) {
 
@@ -102,10 +99,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     /** After a seek the provider may take a while to answer the jump: no "stalled" reload before this. */
     private var seekGraceUntil = 0L
 
-    /** Emulated seek in a file ExoPlayer cannot seek in (see [softSeekTo]); -1 = none running. */
-    var softSeekTarget by mutableLongStateOf(-1L)
-        private set
-    private var softSeekJob: Job? = null
+    /** The film / episode file being played (gets "Range: bytes=0-"); empty for live / HLS. */
+    @Volatile private var rangeUrl = ""
 
     /** Seeking is possible: seekable films/episodes/catch-up, and live channels with a window. */
     val canSeek: Boolean get() = if (live) liveSeekable else vodSeekable
@@ -171,6 +166,12 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val http = ResolvingDataSource.Factory(okhttp) { spec ->
             val extra = HashMap(requestHeaders)
             if (!extra.containsKey("User-Agent")) extra["User-Agent"] = Config.USER_AGENT
+            // Films / episodes: ask for the file the way VLC and browsers do ("Range: bytes=0-").
+            // Many panels only send the file size in answer to a range request; without it
+            // ExoPlayer cannot learn the length of a .ts / .mkv / .avi film and cannot seek in it.
+            if (spec.position == 0L && spec.length == C.LENGTH_UNSET && rangeUrl.isNotEmpty() &&
+                spec.uri.toString() == rangeUrl && !extra.containsKey("Range")
+            ) extra["Range"] = "bytes=0-"
             spec.withAdditionalHeaders(extra)
         }
 
@@ -352,7 +353,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         live = next.isLive
         catchup = next.catchupOf != null
         vodSeekable = false
-        endSoftSeek()
         lengthHint = next.lengthMs
         liveSeekable = false
         liveBehind = 0
@@ -454,6 +454,9 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         player.trackSelectionParameters = b.build()
         if (attempts.isEmpty()) return
         val pos = player.currentPosition
+        // A file that cannot be sought would start again from 0:00: the subtitle is used from the
+        // next time it is opened instead of interrupting the film now.
+        if (!vodSeekable && pos > 5_000) return
         start(attemptIndex)
         if (pos > 0) player.seekTo(pos)
     }
@@ -478,33 +481,16 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     }
 
     fun seekBy(ms: Long) {
-        // Films / episodes in a file without an index: the emulated seek.
-        if (!live && !vodSeekable) {
-            val from = if (softSeekTarget >= 0) softSeekTarget else player.currentPosition
-            softSeekTo(from + ms)
-            return
-        }
         if (!canSeek) return
         val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration
         else player.duration.takeIf { it > 0 } ?: lengthHint
         seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
     }
 
-    /** A short-lived message in the status pill. */
-    private fun notice(text: String) {
-        val mine = session
-        status = text
-        scope.launch {
-            delay(4000)
-            if (mine == session && status == text) status = null
-        }
-    }
-
-    /** The ±15 s buttons, double-tap and remote arrows: works on every film and episode. */
+    /** The ±15 s buttons, double-tap and remote arrows (the same jump as the series player). */
     fun skipBy(ms: Long) = seekBy(ms)
 
     fun seekTo(ms: Long) {
-        if (!live && !vodSeekable) { softSeekTo(ms); return }
         if (!canSeek) return
         player.seekTo(ms)
         // The bar shows the new time at once (the heartbeat only refreshes every second), and a
@@ -513,67 +499,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         seekGraceUntil = System.currentTimeMillis() + 30_000
         stallSeconds = 0
         if (live) updateLiveWindow()
-    }
-
-    /**
-     * Seeking in a film / episode the provider sends without an index or length (ExoPlayer turns
-     * every seek in such a file into "back to 0:00"). Forward: the film runs at [SOFT_SEEK_SPEED]
-     * with the sound off until it reaches the target, then plays normally from there. Backward:
-     * the file is opened again from its start and runs forward the same way. Only playback speed
-     * and volume are touched; how the stream is opened or retried stays as it is.
-     */
-    private fun softSeekTo(target: Long) {
-        if (live || item == null || attempts.isEmpty()) return
-        val end = lengthHint.takeIf { it > 0 } ?: Long.MAX_VALUE
-        val to = target.coerceIn(0, maxOf(0, end - 5_000))
-        softSeekJob?.cancel()
-        val now = player.currentPosition
-        if (to < now - 1_000) {
-            // Backward: from the start of the file (this is what ExoPlayer does with seekTo here).
-            player.seekTo(0)
-        } else if (to <= now + 500) {
-            endSoftSeek()
-            return
-        }
-        softSeekTarget = to
-        position = to
-        status = if (to < now) "Rewinding…" else "Skipping…"
-        player.volume = 0f
-        player.setPlaybackSpeed(SOFT_SEEK_SPEED)
-        player.playWhenReady = true
-        val mine = session
-        softSeekJob = scope.launch {
-            var lastPos = -1L
-            var lastMove = System.currentTimeMillis()
-            while (isActive && mine == session) {
-                // The stall guard must not reload the stream while it runs fast.
-                seekGraceUntil = System.currentTimeMillis() + 15_000
-                stallSeconds = 0
-                val pos = player.currentPosition
-                if (pos >= to - 300 || player.playbackState == Player.STATE_ENDED) break
-                if (pos != lastPos) { lastPos = pos; lastMove = System.currentTimeMillis() }
-                // The source cannot deliver faster than real time (some panels throttle): give up
-                // after a minute without progress instead of leaving the film muted.
-                if (System.currentTimeMillis() - lastMove > 60_000) {
-                    endSoftSeek()
-                    notice("This file can only be played forward at normal speed.")
-                    return@launch
-                }
-                delay(120)
-            }
-            if (mine == session) endSoftSeek()
-        }
-    }
-
-    private fun endSoftSeek() {
-        softSeekJob?.cancel()
-        softSeekJob = null
-        if (softSeekTarget >= 0) {
-            softSeekTarget = -1
-            if (status == "Skipping…" || status == "Rewinding…") status = null
-        }
-        if (player.playbackParameters.speed != 1f) player.setPlaybackSpeed(1f)
-        if (player.volume != 1f) player.volume = 1f
     }
 
     /** Shifts the external subtitle's timing (±ms, positive = later) and keeps playing from here. */
@@ -647,6 +572,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         audioChecked = false
         videoChecked = false
         requestHeaders = a.headers
+        rangeUrl = if (!live && !a.hls) a.url else ""
         val builder = MediaItem.Builder().setUri(a.url)
             // Title + logo for the lock screen, notification and Bluetooth displays.
             .setMediaMetadata(
