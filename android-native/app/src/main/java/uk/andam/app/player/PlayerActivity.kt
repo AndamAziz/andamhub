@@ -1090,7 +1090,6 @@ private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
  * none) from TMDB / the provider so there is always a timeline. Copies that cannot be sought in
  * show the bar without a thumb, and the ±15 s buttons are hidden, so nothing restarts the film.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
     val total = if (engine.duration > 0) engine.duration else engine.lengthHint
@@ -1114,22 +1113,12 @@ private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engi
             disabledThumbColor = Color.Transparent, disabledActiveTrackColor = C.Ember.copy(alpha = 0.7f),
             disabledInactiveTrackColor = Color(0x33FFFFFF),
         ),
-        thumb = { TimelineThumb(engine.canSeek) },
         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
     )
     Text(
         (if (engine.duration <= 0) "~" else "") + fmt(total),
         color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp),
     )
-}
-
-/** A white dot with an ember ring: easy to grab, clear against any picture. */
-@Composable
-private fun TimelineThumb(visible: Boolean) {
-    if (!visible) return
-    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(16.dp).clip(CircleShape).background(Color.White).border(3.dp, C.Ember, CircleShape))
-    }
 }
 
 /** Volume / brightness swipe state: which one is shown and its level (0..1) while swiping. */
@@ -1249,7 +1238,6 @@ private fun LivePill(engine: Engine, onAction: () -> Unit) {
 }
 
 /** Timeline for a live channel with a window: drag inside it, and how far behind live (±15 s sit in the centre). */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.LiveTimeline(engine: Engine, ui: PlayerUiState) {
     val span = engine.duration.coerceAtLeast(1)
@@ -1261,7 +1249,6 @@ private fun androidx.compose.foundation.layout.RowScope.LiveTimeline(engine: Eng
         onValueChange = { dragging = true; dragValue = it; ui.poke() },
         onValueChangeFinished = { engine.seekTo((dragValue * span).toLong()); dragging = false },
         colors = SliderDefaults.colors(thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF)),
-        thumb = { TimelineThumb(true) },
         modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
     )
     Text(
