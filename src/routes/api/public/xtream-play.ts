@@ -466,10 +466,26 @@ export const Route = createFileRoute('/api/public/xtream-play')({
         }
 
         if (!res.ok) {
-          console.error('[xtream-play] relay responded', res.status, res.statusText);
+          // A provider that resets the connection usually has its single allowed
+          // connection busy elsewhere; say so instead of a bare relay status.
+          let detail = '';
+          try {
+            detail = (await res.text()).slice(0, 300);
+          } catch {
+            /* body already gone */
+          }
+          const busy = /ECONNRESET|socket hang up/i.test(detail);
+          console.error('[xtream-play] relay responded', res.status, busy ? '(provider reset connection)' : res.statusText);
           return new Response(
-            res.status === 404 ? 'Stream not found' : `Stream unavailable (relay ${res.status})`,
-            { status: res.status === 404 ? 404 : 502, headers: { 'Access-Control-Allow-Origin': '*' } },
+            res.status === 404
+              ? 'Stream not found'
+              : busy
+                ? 'Provider refused the connection (account may be in use on another device)'
+                : `Stream unavailable (relay ${res.status})`,
+            {
+              status: res.status === 404 ? 404 : busy ? 503 : 502,
+              headers: { 'Access-Control-Allow-Origin': '*', ...(busy ? { 'Retry-After': '30' } : {}) },
+            },
           );
         }
 
