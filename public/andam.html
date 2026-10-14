@@ -3491,10 +3491,16 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     return true;
   }
 
+  /* File types no browser plays natively (films / episodes): straight to the relay's transcoder
+     instead of a black screen. MP4 / MKV / WebM / MOV start natively and fall back on error. */
+  var NO_NATIVE=/^(avi|ts|m2ts|mts|flv|wmv|asf|mpg|mpeg|vob|3gp|divx|xvid|rmvb|rm|ogm)$/;
+  var nextExt='';
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
+    var ext=String(nextExt||'').toLowerCase(); nextExt='';
     if(!tc&&!deskBypass&&deskApi()){
       if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
     }
+    if(!tc&&!isHls&&kind!=='iptv'&&!/live/i.test(sub||'')&&NO_NATIVE.test(ext)) tc=true;
     var s=surf(kind),
         src='/api/public/xtream-play?t='+encodeURIComponent(token)+(tc?'&tc=1':''),
         liveish=/live/i.test(sub||'');
@@ -3659,9 +3665,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     /* A relay segment can legitimately take longer than 15s to buffer. The old
        watchdog covered the still-active player with a false failure while HLS
        was continuing to download. Engine errors below remain authoritative. */
+    /* Films / episodes that send nothing in 20 s move on (transcoder) instead of a long black screen. */
     timer=setTimeout(function(){
       if(alive()&&!ok&&s.video.currentTime===0&&s.video.readyState<1) retryable('Stream failed to load');
-    },60000);
+    },liveish?60000:20000);
 
 
     function native(streamIsHls){
@@ -3839,7 +3846,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
     if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 
@@ -4138,6 +4145,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       playWithSub(eq,ltv.cc,function(sub){
         pendSub=sub;
         deskNextDirect={link:ep.getAttribute('data-direct')||null,src:ltv.prov};
+        nextExt=ep.getAttribute('data-ext')||'';
         playToken(ep.getAttribute('data-play'),ep.getAttribute('data-title'),'Episode · provider series',false);
       });
       return
@@ -4512,7 +4520,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
             document.getElementById('srEps').innerHTML=s.episodes.map(function(ep){
               var e=fx[ep.episode]||{}, name=(e.name&&generic(ep.title))?e.name:(ep.title||('Episode '+ep.episode));
               var still=e.still||ep.image||'';
-              return '<button class="epirow dpep" type="button" data-play="'+esc(ep.play)+'" '+(ep.direct?'data-direct="'+esc(ep.direct)+'" ':'')+
+              return '<button class="epirow dpep" type="button" data-play="'+esc(ep.play)+'" data-ext="'+esc(ep.ext||'')+'" '+(ep.direct?'data-direct="'+esc(ep.direct)+'" ':'')+
                 'data-tmdb="'+tmdb+'" data-season="'+s.season+'" data-episode="'+ep.episode+'" '+
                 'data-title="'+esc(showTitle+' · S'+s.season+'E'+ep.episode)+'">'+
                 '<span class="epthumb">'+(still?'<img loading="lazy" src="'+esc(still)+'" alt="">':'')+'<i>E'+ep.episode+'</i></span>'+
