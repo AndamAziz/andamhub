@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -385,7 +387,16 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit, onAdmin: 
             Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 BrandMark(34)
                 Text("Andam", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
-                Text("Version ${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}", color = C.Faint, fontSize = 12.sp)
+                Text(
+                    "Version ${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}", color = C.Faint, fontSize = 12.sp,
+                    // Hidden switch for the "why did this title match" view (long-press a title on its page).
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = {
+                            Api.debugMatch = !Api.debugMatch
+                            android.widget.Toast.makeText(context, if (Api.debugMatch) "Match debug on" else "Match debug off", android.widget.Toast.LENGTH_SHORT).show()
+                        })
+                    },
+                )
             }
         }
     }
