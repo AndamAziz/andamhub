@@ -1345,7 +1345,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   background:rgba(14,15,20,.55)!important;border:1px solid rgba(255,255,255,.16)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   box-shadow:0 4px 16px rgba(0,0,0,.35);transition:transform .15s ease,background .15s ease,opacity .15s ease}
 .lvcontrols .ctrlskipbtn{padding:10px;display:none}
-.lvstage.is-seekable .lvcontrols .ctrlskipbtn{display:inline-flex}
+/* films and series: always there (dimmed when the file cannot be sought); live TV and IPTV: never */
+#ltv[data-tab="movies"] .lvcontrols .ctrlskipbtn,#ltv[data-tab="series"] .lvcontrols .ctrlskipbtn{display:inline-flex}
+.lvcontrols .ctrlskipbtn:disabled{opacity:.3;pointer-events:none}
 .lvcontrols .ctrlnav:hover,.lvcontrols .ctrlskipbtn:hover{background:rgba(255,255,255,.2)!important;transform:scale(1.07)}
 .lvcontrols .ctrlnav:active,.lvcontrols .ctrlskipbtn:active{transform:scale(.93)}
 .lvcontrols .ctrlnav:disabled{opacity:.3;pointer-events:none}
@@ -2886,6 +2888,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     /* Series: previous / next episode instead of channels; the "Next episode" pill near the end. */
     var ep=!!(s.last&&/^Episode/i.test(s.last.sub||''));
     s.stage.classList.toggle('is-episode',ep);
+    [].forEach.call(s.controls.querySelectorAll('.ctrlskipbtn'),function(b){ b.disabled=!seekable });
     var hasPrev=ep&&stepEpisode(s,-1,true), hasNext=ep&&stepEpisode(s,1,true);
     var pb=s.controls.querySelector('[data-ui="prev"]'), nb=s.controls.querySelector('[data-ui="next"]');
     if(ep){ if(pb) pb.disabled=!hasPrev; if(nb) nb.disabled=!hasNext }
