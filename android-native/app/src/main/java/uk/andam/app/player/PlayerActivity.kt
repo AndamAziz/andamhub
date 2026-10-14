@@ -215,8 +215,8 @@ class PlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
                 engine.togglePlay(); ui.poke(); return true
             }
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (engine.canSeek) { engine.seekBy(30_000); ui.poke(); return true }
-            KeyEvent.KEYCODE_MEDIA_REWIND -> if (engine.canSeek) { engine.seekBy(-30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (engine.canSeek || !live) { engine.seekBy(30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> if (engine.canSeek || !live) { engine.seekBy(-30_000); ui.poke(); return true }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
                 ui.panel = false; ui.settings = !ui.settings; return true
             }
@@ -1091,8 +1091,8 @@ private fun SkipButton(forward: Boolean, enabled: Boolean = true, onClick: () ->
 
 /**
  * Timeline for films and episodes. The length comes from the stream, or (when the stream reports
- * none) from TMDB / the provider so there is always a timeline. Copies that cannot be sought in
- * show the bar without a thumb, and the ±15 s buttons are hidden, so nothing restarts the film.
+ * none) from TMDB / the provider so there is always a timeline. It can always be dragged: copies
+ * without an index use the engine's emulated seek (fast-forward / reopen + fast-forward).
  */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
@@ -1109,7 +1109,8 @@ private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engi
     Text(fmt(if (dragging) (dragValue * total).toLong() else engine.position), color = Color.White, fontSize = 12.sp)
     Slider(
         value = progress,
-        enabled = engine.canSeek,
+        // Films / episodes can always be dragged; files without an index use the emulated seek.
+        enabled = !engine.live,
         onValueChange = { dragging = true; dragValue = it; ui.poke() },
         onValueChangeFinished = { engine.seekTo((dragValue * total).toLong()); dragging = false },
         colors = SliderDefaults.colors(

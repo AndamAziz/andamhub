@@ -115,14 +115,28 @@ export function queryVariants(title: string, max = 8): string[] {
   const out: string[] = [];
   const add = (q: string) => {
     const v = q.replace(/\s+/g, ' ').trim();
-    if (v && !out.some((o) => norm(o) === norm(v) && o === v)) out.push(v);
+    if (v && !out.includes(v)) out.push(v);
   };
-  add(base);
   if (ARABIC_SCRIPT.test(base)) {
-    add(base.replace(/ی/g, 'ي').replace(/ک/g, 'ك'));
-    add(base.replace(/\s+/g, ''));
+    // TMDB matches the letters as written: search with آ kept (unify folds it into ا for
+    // comparing only), then with آ restored where a playlist dropped it ("اتش بس" → "آتش بس").
+    const asWritten = (title ?? '')
+      .replace(/[\u064B-\u065F\u0670\u0640\u200e\u200f]/g, '')
+      .replace(/[يى]/g, 'ی')
+      .replace(/ك/g, 'ک')
+      .replace(/\u200c/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    add(asWritten);
+    const words = asWritten.split(' ');
+    if (/^ا/.test(words[0] ?? '')) add([words[0]!.replace(/^ا/, 'آ'), ...words.slice(1)].join(' '));
+    if (words.some((w) => /^ا/.test(w))) add(words.map((w) => w.replace(/^ا/, 'آ')).join(' '));
+    add(base);
+    add(asWritten.replace(/ی/g, 'ي').replace(/ک/g, 'ك'));
+    add(asWritten.replace(/\s+/g, ''));
     return out.slice(0, max);
   }
+  add(base);
   const noArticle = base.replace(/^(?:the|a|an)\s+/i, '');
   add(noArticle);
   const dehyphen = noArticle.replace(/[-–_:]+/g, ' ');

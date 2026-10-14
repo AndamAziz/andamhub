@@ -66,6 +66,7 @@ describe('movies', () => {
     ['Marmoulak', 75404],
     ['The Lizard (2004)', 75404],
     ['آتش بس', 44074],
+    ['اتش بس', 44074], // playlist without the madda
     ['Cease Fire (2006)', 44074],
     ['بگذار زندگی کنم', 553972],
     ['Let Me Live (1986)', 553972],
