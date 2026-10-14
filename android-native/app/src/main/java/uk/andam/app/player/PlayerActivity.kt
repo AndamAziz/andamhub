@@ -599,7 +599,8 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
         //   [previous] [-15 s] ( play / pause ) [+15 s] [next]
         // previous / next = channel (live) or episode (series); ±15 s wherever the stream can be sought.
         val episode = PlayQueue.current()?.kind == Kind.EPISODE
-        val showSkip = engine.canSeek && (!engine.live || engine.liveSeekable)
+        // Films and episodes always show ±15 s (dimmed for a copy that cannot be sought); live TV never does.
+        val showSkip = !engine.live
         Row(
             Modifier.align(Alignment.Center),
             verticalAlignment = Alignment.CenterVertically,
@@ -609,7 +610,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 val canPrev = !episode || PlayQueue.index > 0
                 NavButton(Icons.Filled.SkipPrevious, if (episode) "Previous episode" else "Previous channel", canPrev) { onZap(-1) }
             }
-            if (showSkip) SkipButton(forward = false) { engine.seekBy(-SKIP_MS); ui.flash(-1); ui.poke() }
+            if (showSkip) SkipButton(forward = false, enabled = engine.canSeek) { engine.seekBy(-SKIP_MS); ui.flash(-1); ui.poke() }
             val playFocus = remember { FocusRequester() }
             LaunchedEffect(Unit) { if (ui.tv) { delay(60); runCatching { playFocus.requestFocus() } } }
             Box(
@@ -627,7 +628,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                     contentDescription = "Play or pause", tint = Color(0xFF0A0B0F), modifier = Modifier.size(42.dp),
                 )
             }
-            if (showSkip) SkipButton(forward = true) { engine.seekBy(SKIP_MS); ui.flash(1); ui.poke() }
+            if (showSkip) SkipButton(forward = true, enabled = engine.canSeek) { engine.seekBy(SKIP_MS); ui.flash(1); ui.poke() }
             if (zappable) {
                 val canNext = !episode || PlayQueue.index < PlayQueue.items.size - 1
                 NavButton(Icons.Filled.SkipNext, if (episode) "Next episode" else "Next channel", canNext) { onZap(1) }
@@ -1067,9 +1068,11 @@ private fun SkipGlyph(forward: Boolean, modifier: Modifier = Modifier) {
 
 /** -15 s / +15 s: a glass circle with the skip glyph. */
 @Composable
-private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
+private fun SkipButton(forward: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    val tint = Color.White.copy(alpha = if (enabled) 1f else 0.3f)
     IconButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier
             .tvRing(CircleShape)
             .size(54.dp)
@@ -1079,9 +1082,9 @@ private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
     ) {
         Icon(
             Icons.Filled.Replay, contentDescription = if (forward) "Forward ${SKIP_MS / 1000} seconds" else "Back ${SKIP_MS / 1000} seconds",
-            tint = Color.White, modifier = Modifier.size(32.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
+            tint = tint, modifier = Modifier.size(32.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
         )
-        Text("${SKIP_MS / 1000}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 2.dp))
+        Text("${SKIP_MS / 1000}", color = tint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
