@@ -25,10 +25,10 @@ import { Route as AuthenticatedAdminProvidersRouteImport } from './routes/_authe
 import { Route as AuthenticatedAdminSubmissionsRouteImport } from './routes/_authenticated/admin/submissions'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as ApiPublicAccessRouteImport } from './routes/api/public/access'
-import { Route as ApiPublicDownloadRouteImport } from './routes/api/public/download'
-import { Route as ApiPublicSubtitlesRouteImport } from './routes/api/public/subtitles'
 import { Route as ApiPublicAdminRouteImport } from './routes/api/public/admin'
+import { Route as ApiPublicDownloadRouteImport } from './routes/api/public/download'
 import { Route as ApiPublicIptvRouteImport } from './routes/api/public/iptv'
+import { Route as ApiPublicSubtitlesRouteImport } from './routes/api/public/subtitles'
 import { Route as ApiPublicTmdbDiscoverRouteImport } from './routes/api/public/tmdb-discover'
 import { Route as ApiPublicWatchProgressRouteImport } from './routes/api/public/watch-progress'
 import { Route as ApiPublicXtreamRouteImport } from './routes/api/public/xtream'
@@ -118,24 +118,24 @@ const ApiPublicAccessRoute = ApiPublicAccessRouteImport.update({
   path: '/api/public/access',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicDownloadRoute = ApiPublicDownloadRouteImport.update({
-  id: '/api/public/download',
-  path: '/api/public/download',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicSubtitlesRoute = ApiPublicSubtitlesRouteImport.update({
-  id: '/api/public/subtitles',
-  path: '/api/public/subtitles',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicAdminRoute = ApiPublicAdminRouteImport.update({
   id: '/api/public/admin',
   path: '/api/public/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDownloadRoute = ApiPublicDownloadRouteImport.update({
+  id: '/api/public/download',
+  path: '/api/public/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicIptvRoute = ApiPublicIptvRouteImport.update({
   id: '/api/public/iptv',
   path: '/api/public/iptv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSubtitlesRoute = ApiPublicSubtitlesRouteImport.update({
+  id: '/api/public/subtitles',
+  path: '/api/public/subtitles',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTmdbDiscoverRoute = ApiPublicTmdbDiscoverRouteImport.update({
@@ -174,10 +174,10 @@ export interface FileRoutesByFullPath {
   '/admin/submissions': typeof AuthenticatedAdminSubmissionsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
-  '/api/public/download': typeof ApiPublicDownloadRoute
-  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -198,10 +198,10 @@ export interface FileRoutesByTo {
   '/admin/submissions': typeof AuthenticatedAdminSubmissionsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
-  '/api/public/download': typeof ApiPublicDownloadRoute
-  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -225,10 +225,10 @@ export interface FileRoutesById {
   '/_authenticated/admin/submissions': typeof AuthenticatedAdminSubmissionsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/access': typeof ApiPublicAccessRoute
-  '/api/public/download': typeof ApiPublicDownloadRoute
-  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
+  '/api/public/download': typeof ApiPublicDownloadRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
+  '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
   '/api/public/watch-progress': typeof ApiPublicWatchProgressRoute
   '/api/public/xtream': typeof ApiPublicXtreamRoute
@@ -252,10 +252,10 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/users'
     | '/api/public/access'
-    | '/api/public/download'
-    | '/api/public/subtitles'
     | '/api/public/admin'
+    | '/api/public/download'
     | '/api/public/iptv'
+    | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -276,10 +276,10 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/users'
     | '/api/public/access'
-    | '/api/public/download'
-    | '/api/public/subtitles'
     | '/api/public/admin'
+    | '/api/public/download'
     | '/api/public/iptv'
+    | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -302,10 +302,10 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/submissions'
     | '/_authenticated/admin/users'
     | '/api/public/access'
-    | '/api/public/download'
-    | '/api/public/subtitles'
     | '/api/public/admin'
+    | '/api/public/download'
     | '/api/public/iptv'
+    | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
     | '/api/public/watch-progress'
     | '/api/public/xtream'
@@ -320,10 +320,10 @@ export interface RootRouteChildren {
   ProviderPortalRoute: typeof ProviderPortalRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicAccessRoute: typeof ApiPublicAccessRoute
-  ApiPublicDownloadRoute: typeof ApiPublicDownloadRoute
-  ApiPublicSubtitlesRoute: typeof ApiPublicSubtitlesRoute
   ApiPublicAdminRoute: typeof ApiPublicAdminRoute
+  ApiPublicDownloadRoute: typeof ApiPublicDownloadRoute
   ApiPublicIptvRoute: typeof ApiPublicIptvRoute
+  ApiPublicSubtitlesRoute: typeof ApiPublicSubtitlesRoute
   ApiPublicTmdbDiscoverRoute: typeof ApiPublicTmdbDiscoverRoute
   ApiPublicWatchProgressRoute: typeof ApiPublicWatchProgressRoute
   ApiPublicXtreamRoute: typeof ApiPublicXtreamRoute
@@ -444,20 +444,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/download': {
-      id: '/api/public/download'
-      path: '/api/public/download'
-      fullPath: '/api/public/download'
-      preLoaderRoute: typeof ApiPublicDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/subtitles': {
-      id: '/api/public/subtitles'
-      path: '/api/public/subtitles'
-      fullPath: '/api/public/subtitles'
-      preLoaderRoute: typeof ApiPublicSubtitlesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/admin': {
       id: '/api/public/admin'
       path: '/api/public/admin'
@@ -465,11 +451,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/download': {
+      id: '/api/public/download'
+      path: '/api/public/download'
+      fullPath: '/api/public/download'
+      preLoaderRoute: typeof ApiPublicDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/iptv': {
       id: '/api/public/iptv'
       path: '/api/public/iptv'
       fullPath: '/api/public/iptv'
       preLoaderRoute: typeof ApiPublicIptvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/subtitles': {
+      id: '/api/public/subtitles'
+      path: '/api/public/subtitles'
+      fullPath: '/api/public/subtitles'
+      preLoaderRoute: typeof ApiPublicSubtitlesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tmdb-discover': {
@@ -551,10 +551,10 @@ const rootRouteChildren: RootRouteChildren = {
   ProviderPortalRoute: ProviderPortalRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicAccessRoute: ApiPublicAccessRoute,
-  ApiPublicDownloadRoute: ApiPublicDownloadRoute,
-  ApiPublicSubtitlesRoute: ApiPublicSubtitlesRoute,
   ApiPublicAdminRoute: ApiPublicAdminRoute,
+  ApiPublicDownloadRoute: ApiPublicDownloadRoute,
   ApiPublicIptvRoute: ApiPublicIptvRoute,
+  ApiPublicSubtitlesRoute: ApiPublicSubtitlesRoute,
   ApiPublicTmdbDiscoverRoute: ApiPublicTmdbDiscoverRoute,
   ApiPublicWatchProgressRoute: ApiPublicWatchProgressRoute,
   ApiPublicXtreamRoute: ApiPublicXtreamRoute,
