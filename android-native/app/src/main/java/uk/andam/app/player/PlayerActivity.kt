@@ -851,6 +851,20 @@ private fun SettingsPanel(engine: Engine, ui: PlayerUiState) {
     ) {
         item { Text("Player settings", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 4.dp)) }
 
+        // Films / episodes: what the provider sends and how it plays (for troubleshooting a film
+        // that cannot be sought — a screenshot of this line says why).
+        if (!engine.live) {
+            item { Section("Stream") }
+            item {
+                val len = if (engine.duration > 0) "length known" else "length unknown"
+                val seek = if (engine.canSeek) "seek: yes" else "seek: no"
+                Text(
+                    listOf(engine.routeLabel, engine.streamInfo, len, seek).filter { it.isNotBlank() }.joinToString(" · "),
+                    color = C.Muted, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+        }
+
         // Quality: always shown. Auto adapts to the connection; a fixed choice locks that resolution.
         item { Section("Video quality") }
         item {
