@@ -33,6 +33,7 @@ function AccountPage() {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState('');
   const [codeOk, setCodeOk] = useState(false);
+  const [cacheMsg, setCacheMsg] = useState('');
 
   const account = useQuery({
     queryKey: ['my-account'],
@@ -71,6 +72,18 @@ function AccountPage() {
       setPassword('');
       setMessage('Password updated.');
     }
+  }
+
+  /** Forgets only what can be fetched again: film / series facts (TMDB posters, story, cast). The sign-in,
+   *  favourites, watch progress ("Resume") and subtitle settings are other keys and stay untouched. */
+  function clearCache() {
+    try {
+      localStorage.removeItem('andam.facts.v1');
+      localStorage.setItem('andam.cacheClearedAt', String(Date.now()));
+    } catch {
+      /* storage blocked: nothing was cached there */
+    }
+    setCacheMsg('Cache cleared');
   }
 
   async function signOut() {
@@ -139,6 +152,19 @@ function AccountPage() {
               Redeem code
             </Button>
           </form>
+        </section>
+
+        <section className="mt-10 rounded-lg border border-border p-4">
+          <h2 className="text-base font-semibold">Storage</h2>
+          <Button type="button" variant="secondary" className="mt-3 min-h-11" onClick={clearCache}>
+            Clear cache
+          </Button>
+          {cacheMsg && (
+            <p role="status" className="mt-2 text-sm text-accent">
+              {cacheMsg}
+            </p>
+          )}
+          <p className="mt-2 text-sm text-muted-foreground">Fixes wrong posters or movie info</p>
         </section>
 
         <Button variant="secondary" className="mt-8 min-h-11 w-full" onClick={signOut}>

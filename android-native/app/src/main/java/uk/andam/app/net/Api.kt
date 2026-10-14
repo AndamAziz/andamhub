@@ -53,6 +53,21 @@ object Api {
 
     fun clearCache() = memo.clear()
 
+    /** Set by [clearAppCache]: film / series details ask the server to skip answers it remembered before this time. */
+    @Volatile private var clearedAt = 0L
+
+    /**
+     * Settings → Clear cache. Drops only what the app can fetch again: the in-memory lists, the TMDB
+     * facts kept on disk (posters, backdrops, story, cast, seasons) and the HTTP response cache.
+     * Sign-in, favourites, watch progress and player / subtitle settings live elsewhere and stay.
+     */
+    fun clearAppCache() {
+        memo.clear()
+        runCatching { facts.listFiles()?.forEach { it.delete() } }
+        runCatching { http.cache?.evictAll() }
+        clearedAt = System.currentTimeMillis()
+    }
+
     /** Drop cached answers whose key starts with [prefix] so the next call fetches fresh data. */
     fun forget(prefix: String) {
         memo.keys.filter { it.startsWith(prefix) }.forEach { memo.remove(it) }
@@ -190,12 +205,17 @@ object Api {
         return SeriesInfo(j.str("title"), j.str("cover"), j.str("plot"), j.str("genre"), j.str("rating"), seasons)
     }
 
+    /** Cache key of a details answer: a renamed item or a changed year is looked up again. */
+    private fun detailsKey(source: String, type: String, id: String, lang: String, name: String, year: String) =
+        "details:$source:$type:$id:$lang:${name.lowercase().filter { it.isLetterOrDigit() }}:${year.filter { it.isDigit() }}"
+
     /** Film or series details for the detail page. type = movie | series */
     /** [name] / [year] are what the list shows: the server searches TMDB with them when the provider's info has none. */
-    suspend fun details(source: String, type: String, id: String, lang: String = "en", name: String = "", year: String = ""): MediaDetails = cached("details:$source:$type:$id:$lang") {
+    suspend fun details(source: String, type: String, id: String, lang: String = "en", name: String = "", year: String = ""): MediaDetails = cached(detailsKey(source, type, id, lang, name, year)) {
         // Only matched titles are kept for 7 days; the others are asked again next time.
-        val j = factsCached("details:$source:$type:$id:$lang", keep = { it.optInt("tmdbId") > 0 }) {
-            get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang, "name" to name, "year" to year))
+        val j = factsCached(detailsKey(source, type, id, lang, name, year), keep = { it.optInt("tmdbId") > 0 }) {
+            val refresh = if (clearedAt > 0) clearedAt.toString() else ""
+            get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang, "name" to name, "year" to year, "refresh" to refresh))
         }
         MediaDetails(
             title = j.str("title"),

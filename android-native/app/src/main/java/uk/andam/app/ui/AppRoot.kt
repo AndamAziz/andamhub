@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
@@ -308,6 +309,7 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit, onAdmin: 
     val scope = rememberCoroutineScope()
     val access = Store.access
     var confirmOut by remember { mutableStateOf(false) }
+    var cacheNote by remember { mutableStateOf<String?>(null) }
     fun open(intent: android.content.Intent) {
         runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
@@ -353,6 +355,22 @@ private fun AccountScreen(onSignIn: () -> Unit, onChanged: () -> Unit, onAdmin: 
 
             PlaybackSettings()
             UpdateSettings()
+            SettingsGroup(
+                "Storage",
+                footer = "Fixes wrong posters or movie info",
+            ) {
+                SettingsRow(
+                    Icons.Filled.DeleteSweep, Sky, "Clear cache",
+                    subtitle = cacheNote ?: "Posters, movie info and lists are downloaded again. You stay signed in.",
+                    chevron = false,
+                    onClick = {
+                        Api.clearAppCache()
+                        cacheNote = "Cache cleared"
+                        android.widget.Toast.makeText(context, "Cache cleared", android.widget.Toast.LENGTH_SHORT).show()
+                        onChanged()
+                    },
+                )
+            }
             DiagnosticsSettings()
 
             SettingsGroup("Help & contact") {

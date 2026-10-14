@@ -514,6 +514,8 @@ export const Route = createFileRoute('/api/public/xtream')({
             const hint = {
               name: (url.searchParams.get('name') ?? '').slice(0, 200),
               year: (url.searchParams.get('year') ?? '').slice(0, 10),
+              group: (url.searchParams.get('group') ?? '').slice(0, 100),
+              refreshedAt: Math.min(Date.now(), num(url.searchParams.get('refresh'))),
             };
             return json(await mediaDetails(source, type, id, langOf(url.searchParams.get('lang')), hint));
           }
