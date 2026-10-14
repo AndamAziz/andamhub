@@ -99,6 +99,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     /** After a seek the provider may take a while to answer the jump: no "stalled" reload before this. */
     private var seekGraceUntil = 0L
 
+    /** A skip waiting for the film to reload on a seekable route (see [skipBy]); -1 = none. */
+    private var pendingSkipTo = -1L
+    private var triedSeekableRoute = false
+
     /** Seeking is possible: seekable films/episodes/catch-up, and live channels with a window. */
     val canSeek: Boolean get() = if (live) liveSeekable else vodSeekable
 
@@ -200,6 +204,13 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                     if (playingSince == 0L) playingSince = System.currentTimeMillis()
                     duration = player.duration.coerceAtLeast(0)
                     vodSeekable = !live && player.isCurrentMediaItemSeekable
+                    // A skip that waited for a seekable route: do it now, or say it cannot be done.
+                    if (pendingSkipTo >= 0) {
+                        val to = pendingSkipTo
+                        pendingSkipTo = -1
+                        if (vodSeekable) seekTo(to.coerceIn(0, maxOf(0, player.duration.takeIf { it > 0 } ?: lengthHint)))
+                        else notice("This file cannot be skipped — the provider sends it without an index.")
+                    }
                 }
                 if (state == Player.STATE_ENDED) {
                     // A live stream never really ends: the upstream closed the socket. Reopen it.
@@ -344,6 +355,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         live = next.isLive
         catchup = next.catchupOf != null
         vodSeekable = false
+        pendingSkipTo = -1
+        triedSeekableRoute = false
         lengthHint = next.lengthMs
         liveSeekable = false
         liveBehind = 0
@@ -473,6 +486,38 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val end = if (live) window.defaultPositionMs.takeIf { it > 0 } ?: player.duration
         else player.duration.takeIf { it > 0 } ?: lengthHint
         seekTo((player.currentPosition + ms).coerceIn(0, maxOf(0, end)))
+    }
+
+    /** A short-lived message in the status pill. */
+    private fun notice(text: String) {
+        val mine = session
+        status = text
+        scope.launch {
+            delay(4000)
+            if (mine == session && status == text) status = null
+        }
+    }
+
+    /**
+     * The ±15 s buttons of films and episodes. When this route cannot be sought in (the provider's
+     * own link often comes without a length, so ExoPlayer cannot jump inside it), the film reloads
+     * once through the Andam relay, which passes the file size on, and then makes the jump from
+     * the same second. If that route cannot be sought either, the viewer is told why.
+     */
+    fun skipBy(ms: Long) {
+        if (live) { seekBy(ms); return }
+        if (canSeek) { seekBy(ms); return }
+        if (item == null || attempts.isEmpty()) return
+        val cur = attempts.getOrNull(attemptIndex)
+        val alt = attempts.indices.firstOrNull { !attempts[it].direct && !attempts[it].fix && attempts[it].url != cur?.url }
+        if (triedSeekableRoute || alt == null || cur?.direct != true) {
+            notice("This file cannot be skipped — the provider sends it without an index.")
+            return
+        }
+        triedSeekableRoute = true
+        pendingSkipTo = (player.currentPosition + ms).coerceAtLeast(0)
+        status = "Making this film skippable…"
+        start(alt)
     }
 
     fun seekTo(ms: Long) {
