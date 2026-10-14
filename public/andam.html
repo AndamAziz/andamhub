@@ -2823,14 +2823,36 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       return b-a>20?{start:a,end:b}:null;
     }catch(_){ return null }
   }
-  function canSeek(s){ var d=s.video.duration; return (isFinite(d)&&d>0)||!!liveRange(s) }
+  /* Films / episodes (the Movies and Series tabs), as opposed to live TV and IPTV. */
+  function isVod(s){ return !!s&&s.kind!=='iptv'&&(ltv.tab==='movies'||ltv.tab==='series') }
+  function canSeek(s){ var d=s.video.duration; return (isFinite(d)&&d>0)||!!liveRange(s)||isVod(s) }
+  /* A film the provider sends without a length / index cannot be jumped in: forward skips run the
+     film fast with the sound off until it reaches the target (presentation only — the stream
+     itself is opened exactly as before). */
+  function stopFF(s){
+    if(!s||!s.ffTimer) return;
+    clearInterval(s.ffTimer); s.ffTimer=null;
+    try{ s.video.playbackRate=s.ffRate||1; s.video.muted=!!s.ffMuted }catch(_){}
+  }
+  function softForward(s,target){
+    var v=s.video, started=Date.now(), last=v.currentTime, moved=Date.now();
+    if(!s.ffTimer){ s.ffRate=v.playbackRate||1; s.ffMuted=v.muted }
+    clearInterval(s.ffTimer);
+    try{ v.muted=true; v.playbackRate=8 }catch(_){}
+    v.play().catch(function(){});
+    s.ffTimer=setInterval(function(){
+      if(v.currentTime!==last){ last=v.currentTime; moved=Date.now() }
+      if(v.currentTime>=target-0.3||v.ended||Date.now()-moved>60000||Date.now()-started>600000) stopFF(s);
+    },150);
+  }
   /* ±seconds inside the film, or inside the live window (never past the live edge). */
   function seekBy(s,sec){
     var v=s.video,d=v.duration;
     flashSkip(s,sec);
     try{
       if(isFinite(d)&&d>0){ v.currentTime=Math.max(0,Math.min(d,v.currentTime+sec)); return }
-      var r=liveRange(s); if(!r) return;
+      var r=liveRange(s);
+      if(!r){ if(isVod(s)&&sec>0) softForward(s,v.currentTime+sec); return }
       v.currentTime=Math.max(r.start+0.5,Math.min(r.end-1.5,v.currentTime+sec));
     }catch(_){}
   }
@@ -2888,7 +2910,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     /* Series: previous / next episode instead of channels; the "Next episode" pill near the end. */
     var ep=!!(s.last&&/^Episode/i.test(s.last.sub||''));
     s.stage.classList.toggle('is-episode',ep);
-    [].forEach.call(s.controls.querySelectorAll('.ctrlskipbtn'),function(b){ b.disabled=!seekable });
+    [].forEach.call(s.controls.querySelectorAll('.ctrlskipbtn'),function(b){ b.disabled=!seekable&&!isVod(s) });
     var hasPrev=ep&&stepEpisode(s,-1,true), hasNext=ep&&stepEpisode(s,1,true);
     var pb=s.controls.querySelector('[data-ui="prev"]'), nb=s.controls.querySelector('[data-ui="next"]');
     if(ep){ if(pb) pb.disabled=!hasPrev; if(nb) nb.disabled=!hasNext }
@@ -3183,7 +3205,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       hls:null,session:0,last:null};
     installControls(s);
     s.err.addEventListener('click',function(){ if(s.last) lvPlay(kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,null,s.last.tc) });
-    s.video.addEventListener('ended',function(){ nextEpisode(s) });
+    s.video.addEventListener('ended',function(){ stopFF(s); nextEpisode(s) });
+    s.video.addEventListener('loadstart',function(){ stopFF(s) });
     s.err.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' ') s.err.click() });
     s.stage.addEventListener('touchstart',function(){ s.lastTouch=Date.now() },{passive:true});
     s.stage.addEventListener('dblclick',function(e){

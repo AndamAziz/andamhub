@@ -1,6 +1,5 @@
 /** A small fake TMDB (search + details + alternative titles) for the offline matcher tests. */
 import type { SearchHit } from '../src/lib/tmdb-match';
-import { unify } from '../src/lib/tmdb-match';
 
 type Row = SearchHit & { kind: 'movie' | 'series'; aliases?: string[]; overview?: string };
 const m = (id: number, title: string, original: string, lang: string, date: string, pop: number, votes: number, aliases: string[] = []): Row => ({
@@ -35,7 +34,8 @@ export const DB: Row[] = [
   t(31598, 'The Return of Iljimae', '일지매', 'ko', '2009-01-01', 6, 30),
 ];
 
-const words = (s: string) => unify(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+// Like TMDB: letters are matched as written (آ and ا are different), only case is ignored.
+const words = (s: string) => s.replace(/\u200c/g, ' ').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
 /** Like TMDB search: every query word is in one of the title's / original title's / alias' words. */
 export function makeFakeTmdb(log: string[] = []) {
