@@ -110,8 +110,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             }
         } ?: ""
 
-    /** The film / episode file being played (gets "Range: bytes=0-"); empty for live / HLS. */
-    @Volatile private var rangeUrl = ""
 
     /** Seeking is possible: seekable films/episodes/catch-up, and live channels with a window. */
     val canSeek: Boolean get() = if (live) liveSeekable else vodSeekable
@@ -177,12 +175,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val http = ResolvingDataSource.Factory(okhttp) { spec ->
             val extra = HashMap(requestHeaders)
             if (!extra.containsKey("User-Agent")) extra["User-Agent"] = Config.USER_AGENT
-            // Films / episodes: ask for the file the way VLC and browsers do ("Range: bytes=0-").
-            // Many panels only send the file size in answer to a range request; without it
-            // ExoPlayer cannot learn the length of a .ts / .mkv / .avi film and cannot seek in it.
-            if (spec.position == 0L && spec.length == C.LENGTH_UNSET.toLong() && rangeUrl.isNotEmpty() &&
-                spec.uri.toString() == rangeUrl && !extra.containsKey("Range")
-            ) extra["Range"] = "bytes=0-"
             spec.withAdditionalHeaders(extra)
         }
 
@@ -583,7 +575,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         audioChecked = false
         videoChecked = false
         requestHeaders = a.headers
-        rangeUrl = if (!live && !a.hls) a.url else ""
         val builder = MediaItem.Builder().setUri(a.url)
             // Title + logo for the lock screen, notification and Bluetooth displays.
             .setMediaMetadata(
