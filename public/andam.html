@@ -4089,11 +4089,13 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function facts(type,id,name,year){
     /* name + year are part of the key: a renamed item or a changed year is looked up again. */
     var k=ltv.prov+'|'+type+'|'+id+'|en|'+String(name||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'')+'|'+String(year||'').replace(/\D/g,''), hit=factsGet(k);
-    if(hit) return Promise.resolve(hit);
+    /* Hidden diagnostics: localStorage.setItem('andam.debug','1'), then open a title and read the console. */
+    function why(d){ try{ if(d&&localStorage.getItem('andam.debug')==='1') console.info('[andam match]',type,id,name,d.match||'no TMDB match (provider info shown)') }catch(_){} return d }
+    if(hit) return Promise.resolve(why(hit));
     var fresh=''; try{ fresh=localStorage.getItem('andam.cacheClearedAt')||'' }catch(_){}
     /* The list's name / year help the server find the title when the provider's info has none. */
     return api({action:'details',source:ltv.prov,type:type,id:id,lang:'en',name:name||'',year:year||'',refresh:fresh})
-      .then(function(d){ if(d&&d.tmdbId) factsPut(k,d); return d }).catch(function(){ return null });
+      .then(function(d){ if(d&&d.tmdbId) factsPut(k,d); return why(d) }).catch(function(){ return null });
   }
   function seasonFacts(tmdb,season){
     if(!tmdb) return Promise.resolve({});

@@ -131,6 +131,8 @@ data class MediaDetails(
     val tmdbId: Int,
     val seasons: Int,
     val episodes: Int,
+    /** Why TMDB picked this title (hidden debug view only). */
+    val matchInfo: String = "",
 )
 
 /** One episode's facts from TMDB (still, real name, summary). */

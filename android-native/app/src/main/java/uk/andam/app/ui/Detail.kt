@@ -60,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -333,9 +335,20 @@ fun MediaHero(
                     }
                     Column(Modifier.padding(start = 14.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         val title = d?.title?.ifBlank { null } ?: fallbackTitle
+                        val dbgContext = LocalContext.current
                         Text(
                             title, color = C.Text, fontSize = if (wide) 28.sp else 19.sp, fontWeight = FontWeight.Bold,
                             lineHeight = if (wide) 32.sp else 23.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                            // Hidden: only after the debug switch in Account (long-press on the version text).
+                            modifier = Modifier.pointerInput(d?.matchInfo) {
+                                detectTapGestures(onLongPress = {
+                                    if (uk.andam.app.net.Api.debugMatch) {
+                                        val info = d?.matchInfo?.ifBlank { null } ?: "no TMDB match (provider info shown)"
+                                        android.util.Log.d("AndamMatch", info)
+                                        android.widget.Toast.makeText(dbgContext, info, android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                })
+                            },
                         )
                         // Original / translated title, only when it really differs (year ignored).
                         val original = d?.originalTitle.orEmpty()

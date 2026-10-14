@@ -10,6 +10,24 @@
  * the gaps); an English TMDB story never replaces the provider's story on a non-English page.
  */
 import { playerApi, type Source } from '@/lib/xtream';
+import {
+  ARABIC_SCRIPT,
+  extractTmdbId,
+  MIN_CONFIDENCE,
+  norm,
+  pickBest,
+  queryVariants,
+  scoreCandidate,
+  STRONG_CONFIDENCE,
+  unify,
+  type Candidate,
+  type ExplicitId,
+  type SearchHit,
+  type Want,
+} from '@/lib/tmdb-match';
+
+export { MIN_CONFIDENCE, STRONG_CONFIDENCE };
+export type { SearchHit };
 
 const TMDB = 'https://api.themoviedb.org/3';
 const IMG = 'https://image.tmdb.org/t/p';
@@ -44,10 +62,25 @@ export type MediaDetails = {
   imdbId: string;
   seasons: number;
   episodes: number;
+  /** Why this title was chosen (debug only; the apps never show it). */
+  match?: MatchInfo;
+};
+
+export type MatchInfo = {
+  how: 'tmdb id' | 'search';
+  id: number;
+  type: 'movie' | 'series';
+  score: number;
+  strong: boolean;
+  /** The search text that found it, and the number of the search call (1 = the first). */
+  query: string;
+  pass: number;
+  reason: string;
 };
 
 const cache = new Map<string, { at: number; ttl: number; value: MediaDetails }>();
-const TTL = 6 * 60 * 60 * 1000;
+/** A matched title is kept for 7 days. */
+const TTL = 7 * 24 * 60 * 60 * 1000;
 /** A title TMDB has no confident match for is asked again after a day (a changed name / year has its own key). */
 const MISS_TTL = 24 * 60 * 60 * 1000;
 /** TMDB itself failing (down, slow, rate-limited) is retried soon. */
@@ -91,8 +124,10 @@ const QUALITY =
  * quality words and " - S01E01" are removed; a name written in two scripts
  * ("پێغەمبەر یوسف - Prophet Joseph") keeps its Latin part.
  */
-export function cleanTitle(raw: string): { title: string; year: string } {
-  let t = (raw ?? '').replace(/[\u200e\u200f\u202a-\u202e]/g, ' ');
+export function cleanTitle(raw: string): { title: string; year: string; tmdb?: ExplicitId } {
+  // An explicit TMDB id ("tmdb:75404", "{tmdb-75404}", tmdb-id="75404", "tmdb:tv/94146") is taken out first.
+  const ex = extractTmdbId(raw ?? '');
+  let t = unify(ex.rest).replace(/[\u200e\u200f\u202a-\u202e]/g, ' ');
   const maxYear = new Date().getFullYear() + 1;
   const isYear = (y: string | undefined) => !!y && Number(y) >= 1900 && Number(y) <= maxYear;
   const bracketed = /[([]\s*((?:19|20)\d{2})\s*[)\]]/.exec(t)?.[1];
@@ -124,16 +159,8 @@ export function cleanTitle(raw: string): { title: string; year: string } {
     .replace(/^\s*[-_|:–]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  return { title: t, year };
+  return { title: t, year, ...(ex.explicit ? { tmdb: ex.explicit } : {}) };
 }
-
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/&/g, 'and')
-    .replace(/[^\p{L}\p{N}]+/gu, '');
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -173,136 +200,164 @@ type TmdbFull = {
   external_ids?: { imdb_id?: string | null };
   credits?: { cast?: TmdbCredit[]; crew?: TmdbCredit[] };
   created_by?: Array<{ name?: string }>;
+  images?: { posters?: Array<{ file_path?: string }>; backdrops?: Array<{ file_path?: string }> };
+  translations?: { translations?: Array<{ iso_639_1?: string; data?: { overview?: string; title?: string; name?: string } }> };
   videos?: { results?: Array<{ site?: string; type?: string; key?: string; official?: boolean }> };
   release_dates?: { results?: Array<{ iso_3166_1?: string; release_dates?: Array<{ certification?: string }> }> };
   content_ratings?: { results?: Array<{ iso_3166_1?: string; rating?: string }> };
 };
 
-export type SearchHit = {
-  id?: number;
-  title?: string;
-  name?: string;
-  original_title?: string;
-  original_name?: string;
-  original_language?: string;
-  release_date?: string;
-  first_air_date?: string;
-  popularity?: number;
-  vote_count?: number;
+export type Match = {
+  id: number;
+  type: 'movie' | 'series';
+  score: number;
+  strong: boolean;
+  query: string;
+  pass: number;
+  reason: string;
 };
-
-/** A candidate needs at least this score, otherwise the provider's own info is shown instead. */
-export const MIN_CONFIDENCE = 60;
-/** From this score on the match is certain enough to use TMDB's poster / backdrop over the provider's. */
-export const STRONG_CONFIDENCE = 120;
-
-const ARABIC_SCRIPT = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;
-/** Languages written in Arabic script, ranked by how likely a Persian / Kurdish / Arabic name is theirs. */
-const SIBLINGS = new Set(['ku', 'ckb', 'ar', 'tr', 'ps', 'ur']);
-
-/** Does the playlist group / category look Persian, Kurdish or Arabic? */
-export function groupLanguage(group: string): 'fa' | 'ku' | 'ar' | 'tr' | '' {
-  const g = group.toLowerCase();
-  if (/persian|farsi|iran|پارسی|فارسی|ایران/.test(g)) return 'fa';
-  if (/kurd|kurdi|sorani|کورد|کوردی/.test(g)) return 'ku';
-  if (/arab|عرب/.test(g)) return 'ar';
-  if (/turk|türk/.test(g)) return 'tr';
-  return '';
-}
-
-/**
- * How well one TMDB search result fits the name (and year) of a playlist item.
- * Exact title / original-title matches dominate, a matching year (±1) and the right language add to
- * it, popularity only breaks ties. `rank` is TMDB's own position for the query (0 = first).
- */
-export function scoreHit(
-  hit: SearchHit,
-  want: { title: string; year: string; group?: string },
-  rank: number,
-): number {
-  const wanted = norm(want.title);
-  if (!wanted) return 0;
-  const names = [hit.title, hit.name].filter(Boolean).map((n) => norm(n as string));
-  const originals = [hit.original_title, hit.original_name].filter(Boolean).map((n) => norm(n as string));
-  let s = 0;
-  if (originals.includes(wanted)) s += 100;
-  else if (names.includes(wanted)) s += 90;
-  else if (wanted.length >= 4 && [...names, ...originals].some((n) => n.length >= 4 && (n.startsWith(wanted) || wanted.startsWith(n)))) s += 20;
-
-  const nonLatin = ARABIC_SCRIPT.test(want.title) || !/[A-Za-z]/.test(want.title);
-  // A title written in another script can only be found through TMDB's own translations: its ranking counts.
-  s += nonLatin ? [25, 15, 8][rank] ?? 0 : [8, 4, 2][rank] ?? 0;
-
-  const hitYear = Number((hit.release_date || hit.first_air_date || '').slice(0, 4));
-  const wantYear = Number(want.year);
-  if (wantYear && hitYear) {
-    const d = Math.abs(hitYear - wantYear);
-    s += d === 0 ? 60 : d === 1 ? 45 : -25;
-  }
-
-  const lang = (hit.original_language ?? '').toLowerCase();
-  const gl = want.group ? groupLanguage(want.group) : '';
-  const hint = nonLatin ? gl || 'fa' : gl; // Arabic-script names are Persian unless the group says otherwise
-  if (lang && hint) {
-    if (lang === hint || (hint === 'ku' && lang === 'ckb')) s += 40;
-    else if (SIBLINGS.has(lang) || lang === 'fa') s += nonLatin ? 15 : 5;
-    else s -= nonLatin ? 25 : 15;
-  }
-
-  // Tie-breakers only.
-  s += Math.min(5, Math.log10(1 + (hit.popularity ?? 0)) * 2) + Math.min(3, Math.log10(1 + (hit.vote_count ?? 0)));
-  return s;
-}
-
-export function pickBest(
-  hits: SearchHit[],
-  want: { title: string; year: string; group?: string },
-): { id: number; score: number } | null {
-  let best: { id: number; score: number } | null = null;
-  hits.slice(0, 10).forEach((h, i) => {
-    if (!h.id) return;
-    const score = scoreHit(h, want, i);
-    if (!best || score > best.score) best = { id: h.id, score };
-  });
-  return best;
-}
-
-export type Match = { id: number; type: 'movie' | 'series'; score: number; strong: boolean };
 export type Lookup = { match: Match | null; /** TMDB did not answer (so "no match" is not final). */ failed: boolean };
+type Fetcher = typeof tmdb;
+type Cand = Candidate & { type: 'movie' | 'series'; query: string; pass: number };
+
+/** Most TMDB calls one lookup may make (searches + alternative-title checks). */
+const MAX_CALLS = 20;
 
 /**
- * Finds the TMDB title for a playlist name: with the year first, then without, then the other media
- * type as a last resort (only on a near-certain exact match). Candidates are scored, never just taken
- * from the top of the list; below MIN_CONFIDENCE there is no match.
+ * Finds the TMDB title for a playlist name, never just results[0]:
+ *  1. the cleaned name, then its spelling variants (articles, hyphens, joined words, Persian
+ *     transliteration swaps); each with the year, then without; Arabic-script names also with
+ *     language=fa-IR; always include_adult=false;
+ *  2. TMDB's alternative titles / translations of the best few candidates (a Latin spelling such as
+ *     "Marmoulak" is only an alias of "The Lizard" / مارمولک);
+ *  3. the other media type as a last resort (exact title only).
+ * Candidates are merged by id and scored (tmdb-match.ts); below MIN_CONFIDENCE there is no match.
  */
 export async function findTmdb(
   type: 'movie' | 'series',
   title: string,
   year: string,
   group = '',
-  fetcher: typeof tmdb = tmdb,
+  fetcher: Fetcher = tmdb,
 ): Promise<Lookup> {
   let failed = false;
   if (!norm(title)) return { match: null, failed };
-  const search = async (t: 'movie' | 'series', withYear: boolean) => {
+  const variants = queryVariants(title);
+  const want: Want = { title: unify(title).trim(), variants, year, group };
+  const cands = new Map<string, Cand>();
+  const aliased = new Set<string>();
+  let calls = 0;
+  let pass = 0;
+
+  const search = async (t: 'movie' | 'series', q: string, withYear: boolean, language = '') => {
+    if (calls >= MAX_CALLS) return;
+    calls += 1;
+    pass += 1;
     const path = t === 'movie' ? '/search/movie' : '/search/tv';
     const yearKey = t === 'movie' ? 'year' : 'first_air_date_year';
-    const res = await fetcher<{ results?: SearchHit[] }>(path, withYear ? { query: title, [yearKey]: year } : { query: title });
-    if (!res) failed = true;
-    return pickBest(res?.results ?? [], { title, year, group });
+    const res = await fetcher<{ results?: SearchHit[] }>(path, {
+      query: q,
+      include_adult: 'false',
+      ...(withYear ? { [yearKey]: year } : {}),
+      ...(language ? { language } : {}),
+    });
+    if (!res) {
+      failed = true;
+      return;
+    }
+    const list = res.results ?? [];
+    list.slice(0, 10).forEach((hit, rank) => {
+      if (!hit.id) return;
+      const k = `${t}:${hit.id}`;
+      const old = cands.get(k);
+      if (old) {
+        if (rank < old.rank) {
+          old.rank = rank;
+          old.total = list.length;
+        }
+      } else cands.set(k, { hit, rank, total: list.length, type: t, query: q, pass });
+    });
   };
-  const done = (t: 'movie' | 'series', b: { id: number; score: number }): Lookup => ({
-    match: { id: b.id, type: t, score: b.score, strong: b.score >= STRONG_CONFIDENCE },
+
+  const of = (t: 'movie' | 'series') => [...cands.values()].filter((c) => c.type === t);
+  const best = (t: 'movie' | 'series') => {
+    const b = pickBest(of(t), want);
+    return b ? { ...b, cand: b.cand as Cand } : null;
+  };
+  const accepted = (t: 'movie' | 'series', min = MIN_CONFIDENCE) => {
+    const b = best(t);
+    return b && b.score >= min ? b : null;
+  };
+
+  /** Alternative titles + translations of the best few candidates still without them. */
+  const addAliases = async (t: 'movie' | 'series') => {
+    const todo = of(t)
+      .map((c) => ({ c, s: scoreCandidate(c, want).score }))
+      .sort((a, b) => b.s - a.s)
+      .map((x) => x.c)
+      .filter((c) => !aliased.has(`${t}:${c.hit.id}`))
+      .slice(0, 4);
+    for (const c of todo) {
+      if (calls >= MAX_CALLS) return;
+      calls += 1;
+      aliased.add(`${t}:${c.hit.id}`);
+      const r = await fetcher<{
+        alternative_titles?: { titles?: Array<{ title?: string }>; results?: Array<{ title?: string }> };
+        translations?: { translations?: Array<{ data?: { title?: string; name?: string } }> };
+      }>(`${t === 'movie' ? '/movie' : '/tv'}/${c.hit.id}`, { append_to_response: 'alternative_titles,translations' });
+      if (!r) {
+        failed = true;
+        continue;
+      }
+      c.aliases = [
+        ...(r.alternative_titles?.titles ?? r.alternative_titles?.results ?? []).map((a) => a.title ?? ''),
+        ...(r.translations?.translations ?? []).map((x) => x.data?.title || x.data?.name || ''),
+      ].filter(Boolean);
+    }
+  };
+
+  const done = (b: NonNullable<ReturnType<typeof best>>, t: 'movie' | 'series'): Lookup => ({
+    match: {
+      id: b.id,
+      type: t,
+      score: b.score,
+      strong: b.score >= STRONG_CONFIDENCE,
+      query: b.cand.query,
+      pass: b.cand.pass,
+      reason: b.reason,
+    },
     failed,
   });
-  for (const withYear of year ? [true, false] : [false]) {
-    const b = await search(type, withYear);
-    if (b && b.score >= MIN_CONFIDENCE) return done(type, b);
+
+  const years = year ? [true, false] : [false];
+  for (const [qi, q] of variants.entries()) {
+    for (const withYear of years) {
+      await search(type, q, withYear);
+      if (ARABIC_SCRIPT.test(q)) await search(type, q, withYear, 'fa-IR');
+      const hit = accepted(type);
+      if (hit) return done(hit, type);
+    }
+    // After the first spelling: look at what TMDB calls the candidates before trying odder spellings.
+    if (qi === 0 && cands.size) {
+      await addAliases(type);
+      const hit = accepted(type);
+      if (hit) return done(hit, type);
+    }
   }
+  if (of(type).length) {
+    await addAliases(type);
+    const hit = accepted(type);
+    if (hit) return done(hit, type);
+  }
+
+  // Last resort: the other media type, on an exact title only.
   const other = type === 'movie' ? 'series' : 'movie';
-  for (const withYear of year ? [true, false] : [false]) {
-    const b = await search(other, withYear);
-    if (b && b.score >= 100) return done(other, b);
+  for (const q of variants.slice(0, 3)) {
+    for (const withYear of years) {
+      await search(other, q, withYear);
+      const hit = accepted(other, 100);
+      if (hit) return done(hit, other);
+    }
   }
   return { match: null, failed };
 }
@@ -317,7 +372,7 @@ export async function mediaDetails(
 ): Promise<MediaDetails> {
   // The cleaned name + year are part of the key: renaming an item in the playlist fetches fresh data.
   const listName = cleanTitle(str(hint.name));
-  const cacheKey = `${source.id}|${type}|${id}|${lang}|${norm(listName.title)}|${listName.year || str(hint.year)}`;
+  const cacheKey = `${source.id}|${type}|${id}|${lang}|${norm(listName.title)}|${listName.year || str(hint.year)}|${listName.tmdb?.id ?? ''}`;
   const hit = cache.get(cacheKey);
   // "Clear cache" sends the time it was pressed: answers remembered before that are asked again.
   if (hit && hit.at > (hint.refreshedAt ?? 0) && Date.now() - hit.at < hit.ttl) return hit.value;
@@ -336,6 +391,19 @@ export async function mediaDetails(
     cleaned.year ||
     /\b(19|20)\d{2}\b/.exec(str(hint.year))?.[0] ||
     '';
+  // An explicit TMDB id wins over any search: in the name, the list name, the original name or an
+  // Xtream field ("tmdb_id", "tmdb", "tmdb-id").
+  const explicitIds: ExplicitId[] = [
+    cleaned.tmdb,
+    listName.tmdb,
+    cleanTitle(str(info['o_name'])).tmdb,
+    cleanTitle(str(info['original_name'])).tmdb,
+    ...['tmdb_id', 'tmdb', 'tmdb-id', 'tmdbid'].map((k) => {
+      const v = str(info[k]) || str(movieData[k]);
+      return /^\d+$/.test(v) && Number(v) > 0 ? ({ id: Number(v) } as ExplicitId) : (extractTmdbId(`tmdb:${v}`).explicit ?? undefined);
+    }),
+  ].filter((x): x is ExplicitId => !!x);
+  const explicit = explicitIds[0];
   // Other names to search with when the first finds nothing (list name, original name).
   const altNames = [str(hint.name), str(info['o_name']), str(info['original_name'])]
     .map((n) => cleanTitle(n).title)
@@ -368,7 +436,8 @@ export async function mediaDetails(
     poster: str(info['movie_image']) || str(info['cover']) || str(info['cover_big']),
     backdrop: firstOf(info['backdrop_path']),
     trailer: youtubeKey(str(info['youtube_trailer'])),
-    tmdbId: num(info['tmdb_id'] || info['tmdb']),
+    // Without TMDB the provider's / playlist's own id still lets the apps ask for subtitles and seasons.
+    tmdbId: explicit?.id ?? 0,
     imdbId: '',
     seasons: Array.isArray(raw?.['seasons']) ? (raw?.['seasons'] as unknown[]).length : 0,
     episodes: Object.values((raw?.['episodes'] as Record<string, unknown[]> | undefined) ?? {}).reduce(
@@ -382,7 +451,7 @@ export async function mediaDetails(
   let ttl = TTL;
   if (key()) {
     try {
-      const r = await enrich(base, type, lang, altNames, str(hint.group));
+      const r = await enrich(base, type, lang, altNames, str(hint.group), explicit);
       details = r.details;
       ttl = r.details.tmdbId ? TTL : r.failed ? ERROR_TTL : MISS_TTL;
     } catch (err) {
@@ -402,12 +471,43 @@ async function enrich(
   lang: Lang,
   altNames: string[] = [],
   group = '',
+  explicit?: ExplicitId,
 ): Promise<{ details: MediaDetails; failed: boolean }> {
-  let tmdbId = base.tmdbId;
+  let tmdbId = 0;
   let mtype = type;
-  // A provider-supplied tmdb id is trusted; a name search is only trusted above the confidence bar.
-  let strong = tmdbId > 0;
+  let strong = false;
   let failed = false;
+  let match: MatchInfo | undefined;
+  const append = (t: 'movie' | 'series') =>
+    t === 'movie' ? 'credits,videos,release_dates,images,translations' : 'credits,videos,external_ids,content_ratings,images,translations';
+  const fetchFull = (id: number, t: 'movie' | 'series') =>
+    tmdb<TmdbFull>(t === 'movie' ? `/movie/${id}` : `/tv/${id}`, {
+      language: tmdbLang(lang),
+      append_to_response: append(t),
+      include_video_language: lang === 'en' ? 'en,null' : `${lang},en,null`,
+      include_image_language: 'en,fa,null',
+    });
+  let t: TmdbFull | null = null;
+
+  // 1. An explicit id needs no search (the tab's media type unless the id names one).
+  if (explicit) {
+    const first = explicit.type ?? type;
+    t = await fetchFull(explicit.id, first);
+    mtype = first;
+    if (!t?.id && !explicit.type) {
+      const other = first === 'movie' ? 'series' : 'movie';
+      const t2 = await fetchFull(explicit.id, other);
+      if (t2?.id) ({ t, mtype } = { t: t2, mtype: other });
+    }
+    if (t?.id) {
+      tmdbId = t.id;
+      strong = true;
+      match = { how: 'tmdb id', id: t.id, type: mtype, score: 1000, strong: true, query: `tmdb:${explicit.id}`, pass: 0, reason: 'explicit TMDB id' };
+    } else if (!t) failed = true;
+    t = t?.id ? t : null;
+  }
+
+  // 2. Otherwise a scored search; only a confident candidate is trusted.
   if (!tmdbId) {
     // "Dune: Part Two - Extended" → "Dune: Part Two"; then the list / original names.
     const shorter = base.title.split(/\s[-–|]\s/)[0]?.trim() ?? '';
@@ -415,24 +515,24 @@ async function enrich(
       if (tmdbId || !name) continue;
       const r = await findTmdb(type, name, base.year, group);
       failed ||= r.failed;
-      if (r.match) ({ id: tmdbId, type: mtype, strong } = r.match);
+      if (r.match) {
+        ({ id: tmdbId, type: mtype, strong } = r.match);
+        match = { how: 'search', ...r.match };
+      }
     }
+    // No confident match: the provider's own title, poster and facts stay; nothing from another film.
+    if (!tmdbId) return { details: base, failed };
+    t = await fetchFull(tmdbId, mtype);
   }
-  // No confident match: the provider's own title, poster and facts stay; nothing from another film.
-  if (!tmdbId) return { details: base, failed };
-  const path = mtype === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
-  const t = await tmdb<TmdbFull>(path, {
-    language: tmdbLang(lang),
-    append_to_response: mtype === 'movie' ? 'credits,videos,release_dates' : 'credits,videos,external_ids,content_ratings',
-    include_video_language: lang === 'en' ? 'en,null' : `${lang},en,null`,
-  });
   if (!t?.id) return { details: base, failed: true };
-  // No story (or genres) in the page's language: TMDB's English ones.
-  let enOverview = '';
+  const path = mtype === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
+  // No story (or genres) in the page's language: TMDB's English ones (translations first, then one call).
+  const enTrans = t.translations?.translations?.find((x) => x.iso_639_1 === 'en')?.data;
+  let enOverview = enTrans?.overview ?? '';
   let enGenres: string[] = [];
-  if (lang !== 'en' && (!t.overview || !(t.genres ?? []).length)) {
+  if (lang !== 'en' && ((!t.overview && !enOverview) || !(t.genres ?? []).length)) {
     const en = await tmdb<TmdbFull>(path);
-    enOverview = en?.overview ?? '';
+    enOverview = enOverview || (en?.overview ?? '');
     enGenres = (en?.genres ?? []).map((g) => g.name ?? '').filter(Boolean);
   }
   const crew = t.credits?.crew ?? [];
@@ -456,19 +556,21 @@ async function enrich(
   // Story: TMDB's in the page's language; otherwise the provider's; English TMDB last.
   const overview =
     lang === 'en'
-      ? base.overview || t.overview || ''
+      ? base.overview || t.overview || enOverview
       : t.overview || base.overview || enOverview;
   // Poster and backdrop always come from the same title. A certain match uses TMDB's poster and
   // w1280 backdrop (large poster as the backdrop when it has none); a weaker match keeps the
   // provider's own artwork, and TMDB's is only used when the provider has no poster at all.
-  const tmdbPoster = t.poster_path ? `${IMG}/w500${t.poster_path}` : '';
+  const posterPath = t.poster_path || t.images?.posters?.[0]?.file_path || '';
+  const backdropPath = t.backdrop_path || t.images?.backdrops?.[0]?.file_path || '';
+  const tmdbPoster = posterPath ? `${IMG}/w500${posterPath}` : '';
   const useTmdbArt = strong || !base.poster;
   const poster = useTmdbArt ? tmdbPoster || base.poster : base.poster;
   const backdrop = useTmdbArt
-    ? t.backdrop_path
-      ? `${IMG}/w1280${t.backdrop_path}`
-      : t.poster_path
-        ? `${IMG}/w780${t.poster_path}`
+    ? backdropPath
+      ? `${IMG}/w1280${backdropPath}`
+      : posterPath
+        ? `${IMG}/w780${posterPath}`
         : base.backdrop
     : base.backdrop;
   const details: MediaDetails = {
@@ -503,6 +605,7 @@ async function enrich(
     imdbId: t.imdb_id || t.external_ids?.imdb_id || '',
     seasons: t.number_of_seasons || base.seasons,
     episodes: t.number_of_episodes || base.episodes,
+    ...(match ? { match: { ...match, strong } } : {}),
   };
   return { details, failed };
 }

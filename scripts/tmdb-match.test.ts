@@ -1,97 +1,126 @@
-// Offline checks of the TMDB matcher with hand-made search results (no network, no key):
+// Offline checks of the TMDB matcher against a fake TMDB (no network, no key):
 //   bun test scripts/tmdb-match.test.ts
 // The real-data run is scripts/tmdb-check.ts.
 import { describe, expect, test } from 'bun:test';
-import { cleanTitle, findTmdb, MIN_CONFIDENCE, type SearchHit } from '../src/lib/tmdb.server';
+import { cleanTitle, findTmdb } from '../src/lib/tmdb.server';
+import { extractTmdbId, norm, queryVariants, unify } from '../src/lib/tmdb-match';
+import { makeFakeTmdb } from './tmdb-fake';
 
-type Fetcher = Parameters<typeof findTmdb>[4];
-/** A fake TMDB: answers by media type, honouring the year filter like the real API. */
-const fake = (db: { movie?: SearchHit[]; tv?: SearchHit[] }): { f: Fetcher; calls: string[] } => {
-  const calls: string[] = [];
-  const f = (async (path: string, q: Record<string, string> = {}) => {
-    calls.push(`${path}?${new URLSearchParams(q)}`);
-    const list = (path.includes('/movie') ? db.movie : db.tv) ?? [];
-    const y = q['year'] ?? q['first_air_date_year'];
-    return { results: y ? list.filter((h) => (h.release_date || h.first_air_date || '').startsWith(y)) : list };
-  }) as unknown as Fetcher;
-  return { f, calls };
+const find = async (type: 'movie' | 'series', raw: string, group = '') => {
+  const c = cleanTitle(raw);
+  if (c.tmdb) return { id: c.tmdb.id, via: 'id' as const, calls: 0 };
+  const log: string[] = [];
+  const r = await findTmdb(type, c.title, c.year, group, makeFakeTmdb(log));
+  return { id: r.match?.id ?? 0, via: 'search' as const, calls: log.length, match: r.match };
 };
 
-const ceaseFire85: SearchHit = { id: 1, title: 'Cease Fire', original_title: 'Cease Fire', original_language: 'en', release_date: '1985-09-01', popularity: 40, vote_count: 80 };
-const ceaseFire06: SearchHit = { id: 44074, title: 'Cease Fire', original_title: 'آتش بس', original_language: 'fa', release_date: '2006-01-01', popularity: 2, vote_count: 5 };
-const lizardShort: SearchHit = { id: 2, title: 'The Lizard', original_title: 'Le Lézard', original_language: 'fr', release_date: '2016-01-01', popularity: 5, vote_count: 3 };
-const lizard72: SearchHit = { id: 3, title: 'The Lizard', original_title: '蜥蜴', original_language: 'zh', release_date: '1972-01-01', popularity: 4, vote_count: 3 };
-const lizard04: SearchHit = { id: 75404, title: 'The Lizard', original_title: 'مارمولک', original_language: 'fa', release_date: '2004-01-01', popularity: 3, vote_count: 9 };
+describe('explicit TMDB ids', () => {
+  test.each([
+    ['Cease Fire tmdb:44074', 44074, undefined, 'Cease Fire'],
+    ['Cease Fire tmdbid=44074', 44074, undefined, 'Cease Fire'],
+    ['Cease Fire {tmdb-44074}', 44074, undefined, 'Cease Fire'],
+    ['Cease Fire [tmdb=44074]', 44074, undefined, 'Cease Fire'],
+    ['Cease Fire tmdb-id="44074"', 44074, undefined, 'Cease Fire'],
+    ['Setayesh tmdb:tv/94146', 94146, 'series', 'Setayesh'],
+    ['Cease Fire (2006) {TMDB-44074}', 44074, undefined, 'Cease Fire'],
+  ])('%s', (raw, id, type, title) => {
+    const e = extractTmdbId(raw);
+    expect(e.explicit?.id).toBe(id);
+    expect(e.explicit?.type).toBe(type);
+    const c = cleanTitle(raw);
+    expect(c.tmdb?.id).toBe(id);
+    expect(c.title).toBe(title);
+  });
+  test('no id → null, digits in a title are kept', () => {
+    expect(extractTmdbId('Blade Runner 2049').explicit).toBeNull();
+    expect(cleanTitle('Blade Runner 2049').title).toBe('Blade Runner 2049');
+  });
+});
 
-describe('year in the name', () => {
-  test('parsed and removed', () => {
-    expect(cleanTitle('Cease Fire (2006)')).toEqual({ title: 'Cease Fire', year: '2006' });
-    expect(cleanTitle('The Lizard [2004]')).toEqual({ title: 'The Lizard', year: '2004' });
-    expect(cleanTitle('The Lizard 2004')).toEqual({ title: 'The Lizard', year: '2004' });
+describe('cleaning and normalising', () => {
+  test('quality tags, brackets, year', () => {
+    expect(cleanTitle('The Lizard (2004) 1080p WEB-DL [HD]')).toMatchObject({ title: 'The Lizard', year: '2004' });
+    expect(cleanTitle('The Lizard [2004]')).toMatchObject({ title: 'The Lizard', year: '2004' });
+    expect(cleanTitle('The Lizard 2004')).toMatchObject({ title: 'The Lizard', year: '2004' });
     expect(cleanTitle('Setayesh - S01E01').title).toBe('Setayesh');
+    expect(cleanTitle('Setayesh S01E01 Dubbed').title).toBe('Setayesh');
   });
-  test('the year picks the Persian film even though the US one is far more popular', async () => {
-    const { f } = fake({ movie: [ceaseFire85, ceaseFire06] });
-    expect((await findTmdb('movie', 'Cease Fire', '2006', '', f)).match?.id).toBe(44074);
-    const lz = fake({ movie: [lizardShort, lizard72, lizard04] });
-    expect((await findTmdb('movie', 'The Lizard', '2004', '', lz.f)).match?.id).toBe(75404);
+  test('Persian / Arabic letters and digits are unified', () => {
+    expect(norm('مارمولك')).toBe(norm('مارمولک'));
+    expect(norm('آتش بس')).toBe(norm('اتش بس'));
+    expect(norm('بي‌خانمان')).toBe(norm('بیخانمان'));
+    expect(unify('فیلم ۲۰۰۴ ٢٠٠٤')).toBe('فیلم 2004 2004');
+    expect(cleanTitle('مارمولک (۲۰۰۴)')).toMatchObject({ title: 'مارمولک', year: '2004' });
   });
-});
-
-describe('no year', () => {
-  test('Persian group prefers original_language fa over a more popular US film', async () => {
-    const { f } = fake({ movie: [ceaseFire85, ceaseFire06] });
-    expect((await findTmdb('movie', 'Cease Fire', '', 'Persian Movies', f)).match?.id).toBe(44074);
-  });
-  test('Persian script is matched through the original title', async () => {
-    const { f } = fake({ movie: [ceaseFire85, ceaseFire06] });
-    const r = await findTmdb('movie', 'آتش بس', '', '', f);
-    expect(r.match?.id).toBe(44074);
-  });
-  test('Persian script: TMDB found it by translation, original is fa → accepted; unrelated language is not', async () => {
-    const fa: SearchHit = { id: 553972, title: 'Let Me Live', original_title: 'Bezar Zendegi Konam', original_language: 'fa', release_date: '1986-01-01' };
-    const en: SearchHit = { id: 9, title: 'Let Me Live', original_title: 'Let Me Live', original_language: 'en', release_date: '1939-01-01' };
-    expect((await findTmdb('movie', 'بگذار زندگی کنم', '', '', fake({ movie: [fa] }).f)).match?.id).toBe(553972);
-    expect((await findTmdb('movie', 'بگذار زندگی کنم', '', '', fake({ movie: [en] }).f)).match).toBeNull();
+  test('variants: article, hyphen, joined, transliteration', () => {
+    const v = queryVariants('The Night-Bus');
+    expect(v).toContain('Night-Bus');
+    expect(v).toContain('Night Bus');
+    expect(queryVariants('Marmoulak').map((x) => x.toLowerCase())).toEqual(expect.arrayContaining(['marmulak', 'marmoolak', 'marmolak']));
   });
 });
 
-describe('low confidence', () => {
-  test('an unrelated result is never shown', async () => {
-    const other: SearchHit = { id: 7, title: 'Totally Different', original_title: 'Totally Different', original_language: 'en', release_date: '2010-01-01', popularity: 90, vote_count: 9000 };
-    const { f } = fake({ movie: [other] });
-    const r = await findTmdb('movie', 'Marmoulak', '', '', f);
-    expect(r.match).toBeNull();
-    expect(r.failed).toBe(false);
+describe('movies', () => {
+  test.each([
+    ['مارمولک', 75404],
+    ['Marmoulak', 75404],
+    ['The Lizard (2004)', 75404],
+    ['آتش بس', 44074],
+    ['Cease Fire (2006)', 44074],
+    ['بگذار زندگی کنم', 553972],
+    ['Let Me Live (1986)', 553972],
+    ['به من نگاه کن', 1045181],
+    ['اتوبوس شب', 363946],
+    ['Night Bus (2007)', 363946],
+    ['Wedding Dinner', 871708],
+    ['Cease Fire tmdb:44074', 44074],
+  ])('%s → %d', async (raw, id) => {
+    expect((await find('movie', raw)).id).toBe(id);
   });
-  test('wrong year only (exact name, 20 years off) stays under the bar', async () => {
-    const { f } = fake({ movie: [ceaseFire85] });
-    const r = await findTmdb('movie', 'Cease Fire', '2006', '', f);
-    expect(r.match === null || r.match.score >= MIN_CONFIDENCE).toBe(true);
-    expect(r.match?.strong ?? false).toBe(false);
+  test('"The Lizard" alone is not the 2016 French short nor the 1972 Chinese film', async () => {
+    const r = await find('movie', 'The Lizard');
+    expect(r.id).toBe(75404);
   });
-  test('TMDB errors are reported as failed, not as a final "no match"', async () => {
-    const r = await findTmdb('movie', 'Anything', '', '', (async () => null) as unknown as Fetcher);
+  test('"Marmoulak" is found through the alternative title, with a reason', async () => {
+    const r = await find('movie', 'Marmoulak');
+    expect(r.match?.reason).toContain('exact alternative title');
+  });
+  test('a misspelled Latin name still finds it through a spelling variant', async () => {
+    expect((await find('movie', 'Marmulak')).id).toBe(75404);
+  });
+});
+
+describe('series', () => {
+  test.each([
+    ['Setayesh', 94146],
+    ['Prophet Joseph', 70802],
+    ['Lighter Than Darkness', 58247],
+    ['Homeless', 228743],
+    ['Bachelors', 293151],
+    ['The Return of Iljimae', 31598],
+    ['Setayesh - S01E01', 94146],
+  ])('%s → %d', async (raw, id) => {
+    expect((await find('series', raw)).id).toBe(id);
+  });
+});
+
+describe('no wrong film', () => {
+  test('nothing similar → no match', async () => {
+    expect((await find('movie', 'Zxqwv Unknown Title')).id).toBe(0);
+  });
+  test('a wrong-year exact title does not beat the right one, and fails alone in a Persian group', async () => {
+    const r = await find('movie', 'The Lizard King (1999)');
+    expect(r.match?.id ?? 0).not.toBe(75404);
+  });
+  test('TMDB errors → failed, not a final "no match"', async () => {
+    const r = await findTmdb('movie', 'Anything', '', '', (async () => null) as never);
     expect(r).toEqual({ match: null, failed: true });
   });
-});
-
-describe('retries', () => {
-  test('without the year when the year finds nothing', async () => {
-    const wrongYear = { ...ceaseFire06, release_date: '2007-01-01' };
-    const { f, calls } = fake({ movie: [wrongYear] });
-    expect((await findTmdb('movie', 'Cease Fire', '2006', 'Persian', f)).match?.id).toBe(44074);
-    expect(calls.length).toBe(2);
-    expect(calls[0]).toContain('year=2006');
-    expect(calls[1]).not.toContain('year=');
-  });
-  test('series use first_air_date_year, and the other media type is the last resort (exact only)', async () => {
-    const show: SearchHit = { id: 94146, name: 'Setayesh', original_name: 'Setayesh', original_language: 'fa', first_air_date: '2020-01-01' };
-    const a = fake({ tv: [show] });
-    expect((await findTmdb('series', 'Setayesh', '2020', '', a.f)).match?.id).toBe(94146);
-    expect(a.calls[0]).toContain('first_air_date_year=2020');
-    const b = fake({ tv: [show] }); // listed as a movie but TMDB only has the series
-    const r = await findTmdb('movie', 'Setayesh', '', '', b.f);
+  test('the other media type is the last resort, exact only', async () => {
+    const r = await findTmdb('movie', 'Setayesh', '', '', makeFakeTmdb());
     expect(r.match).toMatchObject({ id: 94146, type: 'series' });
+  });
+  test('year → no year retry (a wrong provider year still finds the film)', async () => {
+    expect((await find('movie', 'Cease Fire (2010)', 'Persian')).id).toBe(44074);
   });
 });

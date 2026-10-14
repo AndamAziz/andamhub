@@ -56,6 +56,9 @@ object Api {
     /** Set by [clearAppCache]: film / series details ask the server to skip answers it remembered before this time. */
     @Volatile private var clearedAt = 0L
 
+    /** Hidden match debugging: long-press the version text in Account, then a title on its page. */
+    @Volatile var debugMatch = false
+
     /**
      * Settings → Clear cache. Drops only what the app can fetch again: the in-memory lists, the TMDB
      * facts kept on disk (posters, backdrops, story, cast, seasons) and the HTTP response cache.
@@ -238,6 +241,10 @@ object Api {
             tmdbId = j.optInt("tmdbId"),
             seasons = j.optInt("seasons"),
             episodes = j.optInt("episodes"),
+            matchInfo = j.optJSONObject("match")?.let { m ->
+                "${m.optString("how")} · id ${m.optInt("id")} (${m.optString("type")}) · score ${m.optDouble("score")} · " +
+                    "pass ${m.optInt("pass")} · \"${m.optString("query")}\" · ${m.optString("reason")}"
+            }.orEmpty(),
         )
     }
 
