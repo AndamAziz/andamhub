@@ -280,7 +280,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                         // one); only a route that never played moves on to the next one.
                         // Films / episodes: a slow route moves to another picture route (keeping the
                         // position), never to the sound fixer, which cannot seek.
-                        if (stallReloads >= 3 && attemptIndex != provenIndex) {
+                        // Films / episodes: a route that never played moves on after its first stall
+                        // (12 s) instead of three, so a provider route that hangs is left quickly.
+                        val limit = if (!live && attemptIndex != provenIndex) 1 else 3
+                        if (stallReloads >= limit && attemptIndex != provenIndex) {
                             if (live) nextAttempt() else if (!tryOtherPictureRoute()) reconnect("Reconnecting…", 0)
                         } else reconnect("Reconnecting…", 0)
                     }

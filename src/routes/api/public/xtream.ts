@@ -482,6 +482,7 @@ export const Route = createFileRoute('/api/public/xtream')({
                     image: ep.info?.movie_image || '',
                     plot: ep.info?.plot || '',
                     duration: ep.info?.duration || '',
+                    ext: ep.container_extension || 'mp4',
                     play: await sealUrl(
                       tagRelay(
                         seriesStreamUrl(source, ep.id, ep.container_extension || 'mp4'),
