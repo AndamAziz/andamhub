@@ -99,13 +99,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
     /** After a seek the provider may take a while to answer the jump: no "stalled" reload before this. */
     private var seekGraceUntil = 0L
 
-    /**
-     * What the provider sends for this film / episode (status, size, type, range support, whether a
-     * .m3u8 version exists). Shown under "Stream" in the player settings, for troubleshooting.
-     */
-    var streamInfo by mutableStateOf("")
-        private set
-
     /** Which route is playing now, for the "Stream" line. */
     val routeLabel: String
         get() = attempts.getOrNull(attemptIndex)?.let {
@@ -371,7 +364,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         live = next.isLive
         catchup = next.catchupOf != null
         vodSeekable = false
-        streamInfo = ""
         lengthHint = next.lengthMs
         liveSeekable = false
         liveBehind = 0
@@ -430,27 +422,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 // (with its token) for the whole session. Otherwise every jump inside the file —
                 // frequent with badly interleaved MP4s — went back through the redirect and could
                 // land on a different, cold edge server: picture and sound stuttered.
-                val providerOriginal = providerDirect
                 if (providerDirect != null && !next.isLive) providerDirect = resolveRedirects(providerDirect!!)
                 if (mine != session) return@launch
-                // Films / episodes: ask the provider what it sends. A file without a size cannot be
-                // sought by ExoPlayer; the panel's .m3u8 version of the same film (HLS, which can
-                // always be sought) is then played first, when the panel has one.
-                var vodHls: String? = null
-                if (providerDirect != null && providerOriginal != null && !next.isLive && next.catchupOf == null &&
-                    !providerDirect!!.contains(".m3u8", true)
-                ) {
-                    val probe = probeFile(providerDirect!!)
-                    var info = probe.describe()
-                    if (!probe.sizeKnown) {
-                        val m3u8 = providerOriginal.replace(Regex("\\.[A-Za-z0-9]{2,4}(\\?.*)?$"), ".m3u8$1")
-                        val ok = m3u8 != providerOriginal && probeHls(m3u8)
-                        info += if (ok) " · .m3u8: yes" else " · .m3u8: no"
-                        if (ok) vodHls = m3u8
-                    }
-                    if (mine != session) return@launch
-                    streamInfo = info
-                }
                 // Ask the provider like a normal player app would (some panels refuse unknown agents).
                 val direct = providerDirect?.let {
                     Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true,
@@ -463,7 +436,6 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 providerDirectHls?.let {
                     list.add(Attempt(it, hls = true, fix = false, direct = true, headers = mapOf("User-Agent" to PLAYER_AGENT)))
                 }
-                vodHls?.let { list.add(Attempt(it, hls = true, fix = false, direct = true, headers = mapOf("User-Agent" to PLAYER_AGENT))) }
                 if (direct != null) list.add(direct)
                 list.addAll(relayRoutes)
                 if (tokens.isNotEmpty()) list.add(Attempt(Api.streamUrl(tokens[0], fix = true), hls = false, fix = true))
@@ -806,65 +778,6 @@ object DirectRoute {
 private const val PLAYER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
 
 /** Follows a provider link's redirects (without downloading the file) and returns the final URL. */
-/** What a provider answered for the first two bytes of a film. */
-private data class FileProbe(
-    val status: Int,
-    val total: Long,
-    val type: String,
-    val ranges: String,
-    val ext: String,
-) {
-    /** ExoPlayer can only seek in a progressive file whose size it learns. */
-    val sizeKnown: Boolean get() = total > 0
-
-    fun describe(): String {
-        val size = if (total > 0) "%.2f GB".format(total / 1_073_741_824.0) else "size unknown"
-        val r = when {
-            status == 206 -> "ranges: yes"
-            ranges.isNotBlank() -> "ranges: $ranges"
-            else -> "ranges: no"
-        }
-        return listOf(ext.ifBlank { "?" }, if (status > 0) "HTTP $status" else "no answer", size, type.ifBlank { "type ?" }, r)
-            .joinToString(" · ")
-    }
-}
-
-/** Asks for bytes 0-1 like VLC does; reads only the headers. Never throws. */
-private suspend fun probeFile(url: String): FileProbe = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    val ext = url.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "").take(5)
-    runCatching {
-        val client = uk.andam.app.net.Api.media.newBuilder().callTimeout(4, java.util.concurrent.TimeUnit.SECONDS).build()
-        val req = okhttp3.Request.Builder().url(url)
-            .header("User-Agent", PLAYER_AGENT)
-            .header("Range", "bytes=0-1")
-            .build()
-        client.newCall(req).execute().use { res ->
-            val cr = res.header("Content-Range").orEmpty()
-            val totalFromRange = Regex("/(\\d+)").find(cr)?.groupValues?.get(1)?.toLongOrNull() ?: -1L
-            val len = res.header("Content-Length")?.toLongOrNull() ?: -1L
-            val total = when {
-                totalFromRange > 0 -> totalFromRange
-                res.code == 200 && len > 2 -> len
-                else -> -1L
-            }
-            FileProbe(res.code, total, res.header("Content-Type").orEmpty().substringBefore(';'), res.header("Accept-Ranges").orEmpty(), ext)
-        }
-    }.getOrElse { FileProbe(0, -1, "", "", ext) }
-}
-
-/** True when the URL answers with an HLS playlist (#EXTM3U). */
-private suspend fun probeHls(url: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    runCatching {
-        val client = uk.andam.app.net.Api.media.newBuilder().callTimeout(4, java.util.concurrent.TimeUnit.SECONDS).build()
-        val req = okhttp3.Request.Builder().url(url).header("User-Agent", PLAYER_AGENT).build()
-        client.newCall(req).execute().use { res ->
-            if (!res.isSuccessful) return@use false
-            val head = res.body?.source()?.let { src -> src.request(64); src.buffer.snapshot().utf8() }.orEmpty()
-            head.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")
-        }
-    }.getOrDefault(false)
-}
-
 private suspend fun resolveRedirects(url: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     runCatching {
         val client = uk.andam.app.net.Api.media.newBuilder().followRedirects(false).followSslRedirects(false).build()
