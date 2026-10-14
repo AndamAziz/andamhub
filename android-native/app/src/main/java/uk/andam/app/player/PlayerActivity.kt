@@ -1090,6 +1090,7 @@ private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
  * none) from TMDB / the provider so there is always a timeline. Copies that cannot be sought in
  * show the bar without a thumb, and the ±15 s buttons are hidden, so nothing restarts the film.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
     val total = if (engine.duration > 0) engine.duration else engine.lengthHint
@@ -1248,6 +1249,7 @@ private fun LivePill(engine: Engine, onAction: () -> Unit) {
 }
 
 /** Timeline for a live channel with a window: drag inside it, and how far behind live (±15 s sit in the centre). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.LiveTimeline(engine: Engine, ui: PlayerUiState) {
     val span = engine.duration.coerceAtLeast(1)
