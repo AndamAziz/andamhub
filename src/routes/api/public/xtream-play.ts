@@ -286,6 +286,34 @@ async function fetchUpstream(
     await new Promise((r) => setTimeout(r, 350));
     res = await fetchRelay(upstream, request, relay, streamHeaders);
   }
+  // Films / episodes: some panels refuse a request that carries a Range header (404 / 416 /
+  // 5xx) while they serve the same file fine without one — live TV never sends Range, so only
+  // films broke. Browsers always send Range for media, so ask once more without it; providers
+  // that answer ranges never get here.
+  const range = request.headers.get('range');
+  if (!res.ok && res.status !== 206 && range && !fromManifest) {
+    const plainHeaders = new Headers(request.headers);
+    plainHeaders.delete('range');
+    const plain = new Request(request.url, { method: 'GET', headers: plainHeaders });
+    try {
+      const again = await fetchRelay(upstream, plain, relay, streamHeaders);
+      if (again.ok) {
+        try {
+          await res.body?.cancel();
+        } catch {
+          /* nothing to drain */
+        }
+        return again;
+      }
+      try {
+        await again.body?.cancel();
+      } catch {
+        /* nothing to drain */
+      }
+    } catch {
+      /* keep the first answer */
+    }
+  }
   // Relay still failing (e.g. 502 when its upstream link dropped): try the host directly.
   if (!res.ok && res.status >= 500 && !protectedStream) {
     const direct = await fetchDirectSegment(upstream, request, streamHeaders);
