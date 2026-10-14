@@ -286,6 +286,18 @@ async function fetchUpstream(
     await new Promise((r) => setTimeout(r, 350));
     res = await fetchRelay(upstream, request, relay, streamHeaders);
   }
+  // Relay still failing (e.g. 502 when its upstream link dropped): try the host directly.
+  if (!res.ok && res.status >= 500 && !protectedStream) {
+    const direct = await fetchDirectSegment(upstream, request, streamHeaders);
+    if (direct) {
+      try {
+        await res.body?.cancel();
+      } catch {
+        /* nothing to drain */
+      }
+      return direct;
+    }
+  }
   return res;
 }
 
