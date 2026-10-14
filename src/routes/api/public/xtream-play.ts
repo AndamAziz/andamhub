@@ -248,7 +248,34 @@ async function fetchUpstream(
     const direct = await fetchDirectSegment(upstream, request, streamHeaders);
     if (direct) return direct;
   }
-  let res = await fetchRelay(upstream, request, relay, streamHeaders);
+  let res: Response;
+  try {
+    res = await fetchRelay(upstream, request, relay, streamHeaders);
+  } catch (err) {
+    // Relay gave up waiting: try the provider directly once before failing.
+    const ac = new AbortController();
+    const guard = setTimeout(() => ac.abort(), 10_000);
+    try {
+      const headers = new Headers();
+      headers.set('User-Agent', streamHeaders.userAgent || 'VLC/3.0.20 LibVLC/3.0.20');
+      if (streamHeaders.referer) headers.set('Referer', streamHeaders.referer);
+      if (streamHeaders.origin) headers.set('Origin', streamHeaders.origin);
+      const range = request.headers.get('range');
+      if (range) headers.set('Range', range);
+      const direct = await fetch(upstream, { headers, redirect: 'follow', signal: ac.signal });
+      if (direct.ok) return direct;
+      try {
+        await direct.body?.cancel();
+      } catch {
+        /* nothing to drain */
+      }
+    } catch {
+      /* direct attempt failed too */
+    } finally {
+      clearTimeout(guard);
+    }
+    throw err;
+  }
   // 403/411/5xx from the relay are usually transient — retry once.
   if (!res.ok && (res.status === 403 || res.status === 411 || res.status >= 500)) {
     try {

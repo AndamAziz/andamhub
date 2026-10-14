@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_authenticated/admin')({
     <div className="dark flex min-h-screen items-center justify-center bg-background p-6 text-center text-foreground">
       <div>
         <h1 className="text-xl font-semibold">Admin panel unavailable</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{error instanceof Error ? error.message : String(error)}</p>
       </div>
     </div>
   ),
