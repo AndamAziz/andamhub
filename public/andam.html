@@ -1122,7 +1122,7 @@ h1,h2,h3{letter-spacing:-.3px}
 .lvcontrols .ctrlrow .ctrlbtn{width:40px;height:40px;min-width:40px;min-height:40px;font-size:18px}
 .lvcontrols{background:linear-gradient(180deg,rgba(0,0,0,.55) 0,transparent 30%,transparent 60%,rgba(0,0,0,.75) 100%)!important}
 /* Movies / Series: previous/next channel makes no sense there */
-#ltv[data-tab="movies"] .ctrlnav,#ltv[data-tab="series"] .ctrlnav{visibility:hidden}
+#ltv[data-tab="movies"] .ctrlnav,#ltv[data-tab="series"] .lvstage:not(.is-episode) .ctrlnav{display:none!important}
 /* the category drawer opens from the bottom on phones, like the other sheets */
 @media (max-width:719px){
   .catdrawer{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-height:75dvh;
@@ -1333,6 +1333,48 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 .deskpill{position:absolute;top:12px;right:12px;z-index:5;border:1px solid rgba(255,255,255,.18);background:rgba(10,11,15,.72);color:#F4F5F7;border-radius:999px;padding:7px 14px;font:600 12px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
 .deskpill:hover{border-color:#FF3B4E}
 .epirow.on{border-color:#FF3B4E !important;background:rgba(255,59,78,.12) !important}
+
+/* ---------- player v3: one modern control set for Live TV, films and series ---------- */
+.lvcontrols .ctrlcenter{gap:clamp(10px,3vw,26px)}
+.lvcontrols .ctrlbtn svg{width:100%;height:100%;display:block}
+.lvcontrols .ctrlbtn.primary{width:68px;height:68px;padding:19px;background:rgba(255,255,255,.96)!important;color:#0A0B0F!important;border:0!important;
+  box-shadow:0 8px 28px rgba(0,0,0,.45),0 0 0 6px rgba(255,255,255,.12);transition:transform .15s ease,box-shadow .15s ease}
+.lvcontrols .ctrlbtn.primary:hover{transform:scale(1.06)}
+.lvcontrols .ctrlbtn.primary:active{transform:scale(.95)}
+.lvcontrols .ctrlnav,.lvcontrols .ctrlskipbtn{width:50px;height:50px;min-width:50px;min-height:50px;padding:12px;color:#fff;
+  background:rgba(14,15,20,.55)!important;border:1px solid rgba(255,255,255,.16)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 16px rgba(0,0,0,.35);transition:transform .15s ease,background .15s ease,opacity .15s ease}
+.lvcontrols .ctrlskipbtn{padding:10px;display:none}
+.lvstage.is-seekable .lvcontrols .ctrlskipbtn{display:inline-flex}
+.lvcontrols .ctrlnav:hover,.lvcontrols .ctrlskipbtn:hover{background:rgba(255,255,255,.2)!important;transform:scale(1.07)}
+.lvcontrols .ctrlnav:active,.lvcontrols .ctrlskipbtn:active{transform:scale(.93)}
+.lvcontrols .ctrlnav:disabled{opacity:.3;pointer-events:none}
+.lvcontrols .ctrlbtn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+/* timeline: slim ember track that fills as it plays, thumb on hover / drag */
+.lvcontrols .ctrlrange{height:5px;border-radius:99px;
+  background:linear-gradient(to right,var(--ember) var(--p,0%),rgba(255,255,255,.28) var(--p,0%))!important;transition:height .12s ease}
+.lvcontrols .ctrlrange:hover,.lvcontrols .ctrlrange:active{height:7px}
+.lvcontrols .ctrlrange::-webkit-slider-thumb{width:15px!important;height:15px!important;background:#fff;box-shadow:0 0 0 3px rgba(255,59,78,.55),0 2px 6px rgba(0,0,0,.5)}
+.lvcontrols .ctrlrange::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,59,78,.55)}
+.lvcontrols .ctrltime{font:600 12px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+/* double-tap / key feedback */
+.seekflash{position:absolute;top:50%;z-index:14;padding:10px 16px;border-radius:999px;background:rgba(10,11,15,.72);color:#fff;
+  font:700 14px/1 Inter,sans-serif;opacity:0;pointer-events:none;transform:translateY(-50%) scale(.9);transition:opacity .15s ease,transform .15s ease}
+.seekflash.l{left:12%}.seekflash.r{right:12%}
+.seekflash.on{opacity:1;transform:translateY(-50%) scale(1)}
+/* next episode, near the end of an episode */
+.nextpill{position:absolute;right:16px;bottom:74px;z-index:14;display:none;align-items:center;gap:8px;min-height:44px;padding:0 16px 0 18px;border:1px solid rgba(255,255,255,.3);
+  border-radius:999px;background:rgba(255,255,255,.95);color:#0A0B0F;font:700 13px/1 Inter,sans-serif;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.nextpill svg{width:18px;height:18px}
+.nextpill.on{display:inline-flex;animation:npIn .25s ease}
+@keyframes npIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width:640px){
+  .lvcontrols .ctrlcenter{gap:8px}
+  .lvcontrols .ctrlnav,.lvcontrols .ctrlskipbtn{width:42px;height:42px;min-width:42px;min-height:42px;padding:9px}
+  .lvcontrols .ctrlskipbtn{padding:7px}
+  .lvcontrols .ctrlbtn.primary{width:58px;height:58px;padding:16px}
+  .nextpill{right:10px;bottom:62px}
+}
 </style>
 
 </head>
@@ -2725,14 +2767,25 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     n=Math.floor(n); var h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;
     return (h?h+':':'')+(h&&m<10?'0':'')+m+':'+(s<10?'0':'')+s;
   }
+  /* Player icons (inline SVG, they follow the text colour). */
+  var SKIP=15;
+  var ICO={
+    play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z" fill="currentColor"/></svg>',
+    pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.2" fill="currentColor"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2" fill="currentColor"/></svg>',
+    prev:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="2.4" height="13" rx="1.1" fill="currentColor"/><path d="M19 6.4v11.2a.7.7 0 0 1-1.1.6L9.6 12.6a.7.7 0 0 1 0-1.2l8.3-5.6a.7.7 0 0 1 1.1.6z" fill="currentColor"/></svg>',
+    next:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="16.1" y="5.5" width="2.4" height="13" rx="1.1" fill="currentColor"/><path d="M5 6.4v11.2a.7.7 0 0 0 1.1.6l8.3-5.6a.7.7 0 0 0 0-1.2L6.1 5.8A.7.7 0 0 0 5 6.4z" fill="currentColor"/></svg>',
+    back:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2V1.6a.5.5 0 0 0-.8-.4L7.4 4.4a.5.5 0 0 0 0 .8l3.8 3.2a.5.5 0 0 0 .8-.4V5.8a6.6 6.6 0 1 1-6.6 6.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><text x="12" y="16.4" text-anchor="middle" font-size="8.4" font-weight="700" font-family="Inter,sans-serif" fill="currentColor">'+SKIP+'</text></svg>',
+    fwd:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2V1.6a.5.5 0 0 1 .8-.4l3.8 3.2a.5.5 0 0 1 0 .8l-3.8 3.2a.5.5 0 0 1-.8-.4V5.8a6.6 6.6 0 1 0 6.6 6.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><text x="12" y="16.4" text-anchor="middle" font-size="8.4" font-weight="700" font-family="Inter,sans-serif" fill="currentColor">'+SKIP+'</text></svg>'
+  };
   function controlsMarkup(){
     return '<button class="ctrlbtn ctrlexit" data-control="fullscreen" type="button" aria-label="Exit fullscreen">✕</button>'+
-      '<div class="ctrlcenter"><button class="ctrlbtn ctrlnav" data-ui="prev" type="button" aria-label="Previous channel">⏮</button>'+
-      '<button class="ctrlbtn primary" data-control="play" type="button" aria-label="Play or pause">▶</button>'+
-      '<button class="ctrlbtn ctrlnav" data-ui="next" type="button" aria-label="Next channel">⏭</button></div>'+
-      '<div class="ctrlbottom"><div class="ctrlseek"><button class="ctrlbtn ctrlskip" data-control="back" type="button" aria-label="Rewind 10 seconds">-10</button>'+
-      '<span class="ctrltime" data-current>0:00</span><input class="ctrlrange" data-seek type="range" min="0" max="1000" value="0" aria-label="Playback position"><span class="ctrltime" data-duration>0:00</span>'+
-      '<button class="ctrlbtn ctrlskip" data-control="forward" type="button" aria-label="Forward 10 seconds">+10</button></div>'+
+      '<div class="ctrlcenter"><button class="ctrlbtn ctrlnav" data-ui="prev" type="button" aria-label="Previous">'+ICO.prev+'</button>'+
+      '<button class="ctrlbtn ctrlskipbtn" data-control="back" type="button" aria-label="Back '+SKIP+' seconds">'+ICO.back+'</button>'+
+      '<button class="ctrlbtn primary" data-control="play" type="button" aria-label="Play or pause">'+ICO.play+'</button>'+
+      '<button class="ctrlbtn ctrlskipbtn" data-control="forward" type="button" aria-label="Forward '+SKIP+' seconds">'+ICO.fwd+'</button>'+
+      '<button class="ctrlbtn ctrlnav" data-ui="next" type="button" aria-label="Next">'+ICO.next+'</button></div>'+
+      '<div class="ctrlbottom"><div class="ctrlseek">'+
+      '<span class="ctrltime" data-current>0:00</span><input class="ctrlrange" data-seek type="range" min="0" max="1000" value="0" aria-label="Playback position"><span class="ctrltime" data-duration>0:00</span></div>'+
       '<div class="ctrlrow"><button class="livepill" data-ui="liveedge" type="button" aria-label="Jump to live"><i></i>LIVE</button>'+
       '<span class="ctrllabel" data-title dir="auto">Andam</span><span class="ctrlspacer"></span>'+
       '<button class="ctrlbtn" data-ui="list" type="button" aria-label="Channel list">☰</button>'+
@@ -2772,11 +2825,19 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* ±seconds inside the film, or inside the live window (never past the live edge). */
   function seekBy(s,sec){
     var v=s.video,d=v.duration;
+    flashSkip(s,sec);
     try{
       if(isFinite(d)&&d>0){ v.currentTime=Math.max(0,Math.min(d,v.currentTime+sec)); return }
       var r=liveRange(s); if(!r) return;
       v.currentTime=Math.max(r.start+0.5,Math.min(r.end-1.5,v.currentTime+sec));
     }catch(_){}
+  }
+  /* Brief "-15 s / +15 s" feedback on the side that was tapped / pressed. */
+  function flashSkip(s,sec){
+    var f=s&&s.flash; if(!f) return;
+    f.textContent=sec<0?'⏪ '+Math.abs(sec)+' s':Math.abs(sec)+' s ⏩';
+    f.className='seekflash '+(sec<0?'l':'r'); void f.offsetWidth; f.classList.add('on');
+    clearTimeout(s.flashTimer); s.flashTimer=setTimeout(function(){ f.classList.remove('on') },650);
   }
   function goLiveEdge(s){
     var v=s.video, r=liveRange(s);
@@ -2794,7 +2855,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(el.closest('.fsnav,.ctrlsettings,input,select')) return false;
     var s=null; for(var k in SURF){ if(SURF[k].stage===stage) s=SURF[k] }
     if(!s||!canSeek(s)) return false;
-    seekBy(s,key==='ArrowLeft'?-10:10); updateControls(s); showControls(s); return true;
+    seekBy(s,key==='ArrowLeft'?-SKIP:SKIP); updateControls(s); showControls(s); return true;
   };
   function updateControls(s){
     if(!s||!s.controls||s.scrubbing) return;
@@ -2820,7 +2881,19 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       s.duration.textContent=finite?timeText(d):'';
       s.seek.disabled=!finite; s.seek.value=finite?String(Math.round((v.currentTime/d)*1000)):'1000';
     }
-    s.playBtn.textContent=v.paused?'▶':'❚❚';
+    var pp=v.paused?'play':'pause';
+    if(s._pp!==pp){ s._pp=pp; s.playBtn.innerHTML=ICO[pp] }
+    /* Series: previous / next episode instead of channels; the "Next episode" pill near the end. */
+    var ep=!!(s.last&&/^Episode/i.test(s.last.sub||''));
+    s.stage.classList.toggle('is-episode',ep);
+    var hasPrev=ep&&stepEpisode(s,-1,true), hasNext=ep&&stepEpisode(s,1,true);
+    var pb=s.controls.querySelector('[data-ui="prev"]'), nb=s.controls.querySelector('[data-ui="next"]');
+    if(ep){ if(pb) pb.disabled=!hasPrev; if(nb) nb.disabled=!hasNext }
+    else { if(pb) pb.disabled=false; if(nb) nb.disabled=false }
+    if(pb) pb.setAttribute('aria-label',ep?'Previous episode':'Previous channel');
+    if(nb) nb.setAttribute('aria-label',ep?'Next episode':'Next channel');
+    if(s.nextPill) s.nextPill.classList.toggle('on',!!(ep&&hasNext&&finite&&d-v.currentTime<45&&v.currentTime>5));
+    if(s.seek){ var pr=Number(s.seek.value)/10; s.seek.style.setProperty('--p',pr+'%') }
     s.muteBtn.textContent=(v.muted||v.volume===0)?'🔇':'🔊';
     var ml=s.controls.querySelector('[data-mutelbl]'); if(ml) ml.textContent=(v.muted||v.volume===0)?'Muted':'On';
   }
@@ -3002,11 +3075,15 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.duration=s.controls.querySelector('[data-duration]'); s.playBtn=s.controls.querySelector('[data-control="play"]');
     s.muteBtn=s.controls.querySelector('[data-control="mute"]'); s.fitBtn=s.controls.querySelector('[data-control="fit"]');
     s.titleCtl=s.controls.querySelector('[data-title]'); s.settings=s.controls.querySelector('[data-settings]');
+    s.flash=document.createElement('div'); s.flash.className='seekflash'; s.flash.setAttribute('aria-hidden','true'); s.stage.appendChild(s.flash);
+    s.nextPill=document.createElement('button'); s.nextPill.type='button'; s.nextPill.className='nextpill';
+    s.nextPill.innerHTML='<span>Next episode</span>'+ICO.next; s.nextPill.addEventListener('click',function(e){ e.stopPropagation(); stepEpisode(s,1) });
+    s.stage.appendChild(s.nextPill);
     s.controls.addEventListener('click',function(e){
       var b=e.target.closest('[data-control]'); if(!b) return; e.stopPropagation(); var a=b.getAttribute('data-control'),v=s.video;
       if(a==='play'){ if(v.paused) v.play().catch(function(){}); else v.pause() }
-      else if(a==='back') seekBy(s,-10);
-      else if(a==='forward') seekBy(s,10);
+      else if(a==='back') seekBy(s,-SKIP);
+      else if(a==='forward') seekBy(s,SKIP);
       else if(a==='mute') v.muted=!v.muted;
       else if(a==='fit'){ s.fit=(s.fit+1)%3; v.style.objectFit=['contain','cover','fill'][s.fit]; b.textContent=['Fit','Fill','Wide'][s.fit] }
       else if(a==='settings') s.settings.hidden=!s.settings.hidden;
@@ -3033,7 +3110,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       if(u==='settings-close'){ s.settings.hidden=true; showControls(s); return }
       if(u==='mute'){ v.muted=!v.muted; updateControls(s) }
       else if(u==='liveedge') goLiveEdge(s);
-      else if(u==='prev'||u==='next') stepChannel(s,u==='next'?1:-1);
+      else if(u==='prev'||u==='next'){ if(s.stage.classList.contains('is-episode')) stepEpisode(s,u==='next'?1:-1); else stepChannel(s,u==='next'?1:-1) }
       else if(u==='list'){
         if(s.kind==='live'&&ltv.tab!=='direct'){ if(isStageFullscreen(s)) toggleStageFullscreen(s); openCatDrawer('live') }
         else window.AndamSheet&&window.AndamSheet.open(s.kind);
@@ -3051,6 +3128,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     }
     s.seek.addEventListener('input',function(e){
       e.stopPropagation(); s.scrubbing=true; showControls(s,true);
+      s.seek.style.setProperty('--p',(Number(s.seek.value)/10)+'%');
       var t=seekTarget(); if(t!=null&&isFinite(s.video.duration)) s.current.textContent=timeText(t);
     });
     s.seek.addEventListener('change',function(e){
@@ -3107,9 +3185,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.stage.addEventListener('touchstart',function(){ s.lastTouch=Date.now() },{passive:true});
     s.stage.addEventListener('dblclick',function(e){
       if(e.target.closest('.fsnav')) return;
-      /* Phones: double-tap the left / right half skips 10 s (films, and live with a window). */
+      /* Phones: double-tap the left / right half skips 15 s (films, and live with a window). */
       if(Date.now()-(s.lastTouch||0)<900&&canSeek(s)&&!e.target.closest('.lvcontrols button,.lvcontrols input')){
-        var rc=s.stage.getBoundingClientRect(); seekBy(s,e.clientX<rc.left+rc.width/2?-10:10); updateControls(s); showControls(s); return;
+        var rc=s.stage.getBoundingClientRect(); seekBy(s,e.clientX<rc.left+rc.width/2?-SKIP:SKIP); updateControls(s); showControls(s); return;
       }
       toggleStageFullscreen(s);
     });
@@ -3305,15 +3383,17 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   /* Series: when an episode finishes, go on to the next one (and on into the next season). */
   function nextEpisode(s){ return stepEpisode(s,1) }
-  function stepEpisode(s,dir){
+  /* dry=true only answers "is there a previous / next episode?" without playing it. */
+  function stepEpisode(s,dir,dry){
     if(!s||!s.last||!/^Episode/i.test(s.last.sub||'')) return false;
     var list=document.getElementById('srEps'); if(!list) return false;
     var rows=[].slice.call(list.querySelectorAll('.epirow'));
     var i=-1; rows.forEach(function(r,k){ if(r.getAttribute('data-play')===s.last.token||r.getAttribute('data-title')===s.last.title) i=k });
-    if(dir<0){ if(i>0){ rows[i-1].click(); return true } return false }
-    if(i>=0&&i+1<rows.length){ rows[i+1].click(); return true }
+    if(dir<0){ if(i>0){ if(!dry) rows[i-1].click(); return true } return false }
+    if(i>=0&&i+1<rows.length){ if(!dry) rows[i+1].click(); return true }
     var sel=document.getElementById('srSeason');
     if(i>=0&&sel&&sel.selectedIndex+1<sel.options.length){
+      if(dry) return true;
       sel.selectedIndex++; sel.dispatchEvent(new Event('change'));
       var first=document.querySelector('#srEps .epirow'); if(first){ first.click(); return true }
     }
