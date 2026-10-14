@@ -73,7 +73,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
 
     /**
      * Live stream whose own window can be sought in (HLS live playlists keep the last minutes):
-     * the player shows a timeline, ±10 s and a LIVE pill. Progressive MPEG-TS live has no window
+     * the player shows a timeline, ±15 s and a LIVE pill. Progressive MPEG-TS live has no window
      * (ExoPlayer cannot seek in it), so it keeps the plain live view.
      */
     var liveSeekable by mutableStateOf(false)

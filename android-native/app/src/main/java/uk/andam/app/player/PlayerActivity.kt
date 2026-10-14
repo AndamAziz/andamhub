@@ -18,6 +18,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,11 +52,10 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
@@ -99,6 +99,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uk.andam.app.ui.AndamTheme
 import uk.andam.app.ui.C
+
+/** One skip step for every player gesture and button (films, episodes, live windows). */
+private const val SKIP_MS = 15_000L
 
 @OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
@@ -170,9 +173,24 @@ class PlayerActivity : ComponentActivity() {
         ui.poke()
     }
 
+    /** Skip back / forward one step, with feedback. */
+    private fun skip(dir: Int) {
+        if (engine.canSeek) {
+            engine.seekBy(dir * SKIP_MS)
+            ui.flash(dir)
+        }
+        ui.poke()
+    }
+
     private fun zap(dir: Int) {
         val items = PlayQueue.items
         if (items.size < 2) return
+        // Episodes: previous / next in order, never wrapping round from the last to the first.
+        if (PlayQueue.current()?.kind == Kind.EPISODE) {
+            val target = PlayQueue.index + dir
+            if (target in items.indices) pick(target)
+            return
+        }
         // Stay inside the category the viewer is browsing, when there is one.
         val group = ui.panelGroup
         val pool = items.indices.filter { group.isEmpty() || items[it].group == group }.ifEmpty { items.indices.toList() }
@@ -215,9 +233,9 @@ class PlayerActivity : ComponentActivity() {
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> { if (live) zap(-1) else ui.poke(); return true }
                 KeyEvent.KEYCODE_DPAD_DOWN -> { if (live) zap(1) else ui.poke(); return true }
-                // Films, and live channels whose stream keeps a window: ±10 s.
-                KeyEvent.KEYCODE_DPAD_LEFT -> { if (engine.canSeek) engine.seekBy(-10_000); ui.poke(); return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> { if (engine.canSeek) engine.seekBy(10_000); ui.poke(); return true }
+                // Films, episodes, and live channels whose stream keeps a window: ±15 s.
+                KeyEvent.KEYCODE_DPAD_LEFT -> { skip(-1); return true }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> { skip(1); return true }
             }
         } else if (ui.controls) {
             ui.keep()
@@ -305,6 +323,15 @@ class PlayerUiState {
     /** Set by the activity: starts / cancels the sleep timer (minutes, 0 = off). */
     var onSleep: (Int) -> Unit = {}
 
+    /** Brief "15 s" feedback after a skip: -1 = back, +1 = forward; the counter restarts it on repeats. */
+    var skipFlash by mutableIntStateOf(0)
+    var skipFlashAt by mutableIntStateOf(0)
+
+    fun flash(dir: Int) {
+        skipFlash = dir
+        skipFlashAt++
+    }
+
     fun poke() {
         controls = true
         pokes++
@@ -388,7 +415,7 @@ private fun PlayerScreen(
 
         // Swipe up / down: right side = volume, left side = brightness (phones and tablets).
         val swipe = rememberSwipeLevels()
-        // Tap layer: single tap toggles controls, double tap left/right skips 10 s on VOD.
+        // Tap layer: single tap toggles controls, double tap left/right skips 15 s.
         Box(
             Modifier
                 .fillMaxSize()
@@ -401,7 +428,9 @@ private fun PlayerScreen(
                         },
                         onDoubleTap = { o ->
                             if (engine.canSeek) {
-                                engine.seekBy(if (o.x < size.width / 2f) -10_000L else 10_000L)
+                                val dir = if (o.x < size.width / 2f) -1 else 1
+                                engine.seekBy(dir * SKIP_MS)
+                                ui.flash(dir)
                                 ui.poke()
                             }
                         },
@@ -455,6 +484,53 @@ private fun PlayerScreen(
                     if (zappable) TextButton(onClick = { onZap(1) }) { Text("Next channel", color = C.Text) }
                     TextButton(onClick = onBack) { Text("Close", color = C.Muted) }
                 }
+            }
+        }
+
+        // "15 s" feedback on the side that was double-tapped / pressed.
+        var flashOn by remember { mutableStateOf(false) }
+        LaunchedEffect(ui.skipFlashAt) {
+            if (ui.skipFlashAt > 0) { flashOn = true; delay(650); flashOn = false }
+        }
+        AnimatedVisibility(
+            visible = flashOn && !ui.pip,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(if (ui.skipFlash < 0) Alignment.CenterStart else Alignment.CenterEnd).safeDrawingPadding().padding(horizontal = 56.dp),
+        ) {
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(Color(0xB30A0B0F)).padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (ui.skipFlash < 0) SkipGlyph(false, Modifier.size(22.dp))
+                Text("${SKIP_MS / 1000} s", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (ui.skipFlash > 0) SkipGlyph(true, Modifier.size(22.dp))
+            }
+        }
+
+        // Series: "Next episode" shows up near the end of an episode, controls or not.
+        val episodeNow = PlayQueue.current()?.kind == Kind.EPISODE
+        val nearEnd = episodeNow && PlayQueue.index < PlayQueue.items.size - 1 && engine.duration > 0 &&
+            engine.position > 5_000 && engine.duration - engine.position < 45_000
+        AnimatedVisibility(
+            visible = nearEnd && !ui.panel && !ui.settings && !ui.pip,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomEnd).safeDrawingPadding().padding(end = 20.dp, bottom = 84.dp),
+        ) {
+            Row(
+                Modifier
+                    .tvRing(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xF2FFFFFF))
+                    .clickable { onZap(1) }
+                    .padding(start = 20.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Next episode", color = Color(0xFF0A0B0F), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Icon(Icons.Filled.SkipNext, null, tint = Color(0xFF0A0B0F), modifier = Modifier.size(22.dp))
             }
         }
 
@@ -519,34 +595,43 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
             if (engine.live || engine.catchup) LivePill(engine) { ui.poke() }
         }
 
-        // Centre: previous / play-pause / next.
+        // Centre, the same for live TV, films and series:
+        //   [previous] [-15 s] ( play / pause ) [+15 s] [next]
+        // previous / next = channel (live) or episode (series); ±15 s wherever the stream can be sought.
+        val episode = PlayQueue.current()?.kind == Kind.EPISODE
+        val showSkip = engine.canSeek && (!engine.live || engine.liveSeekable)
         Row(
             Modifier.align(Alignment.Center),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            if (zappable) RoundIcon(Icons.Filled.SkipPrevious, "Previous") { onZap(-1) }
-            else if (!engine.live && engine.canSeek) RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
+            if (zappable) {
+                val canPrev = !episode || PlayQueue.index > 0
+                NavButton(Icons.Filled.SkipPrevious, if (episode) "Previous episode" else "Previous channel", canPrev) { onZap(-1) }
+            }
+            if (showSkip) SkipButton(forward = false) { engine.seekBy(-SKIP_MS); ui.flash(-1); ui.poke() }
             val playFocus = remember { FocusRequester() }
             LaunchedEffect(Unit) { if (ui.tv) { delay(60); runCatching { playFocus.requestFocus() } } }
             Box(
                 Modifier
                     .focusRequester(playFocus)
                     .tvRing(CircleShape)
-                    .size(68.dp)
+                    .size(74.dp)
                     .clip(CircleShape)
-                    .background(Color(0x8C0A0B0F))
-                    .border(1.dp, Color(0x38FFFFFF), CircleShape)
+                    .background(Color(0xF5FFFFFF))
                     .clickable { engine.togglePlay(); ui.poke() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     if (engine.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Play or pause", tint = Color.White, modifier = Modifier.size(36.dp),
+                    contentDescription = "Play or pause", tint = Color(0xFF0A0B0F), modifier = Modifier.size(42.dp),
                 )
             }
-            if (zappable) RoundIcon(Icons.Filled.SkipNext, "Next") { onZap(1) }
-            else if (!engine.live && engine.canSeek) RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
+            if (showSkip) SkipButton(forward = true) { engine.seekBy(SKIP_MS); ui.flash(1); ui.poke() }
+            if (zappable) {
+                val canNext = !episode || PlayQueue.index < PlayQueue.items.size - 1
+                NavButton(Icons.Filled.SkipNext, if (episode) "Next episode" else "Next channel", canNext) { onZap(1) }
+            }
         }
 
         // Bottom bar: timeline (movies/episodes) and, in the bottom-right corner, channels + settings.
@@ -951,10 +1036,59 @@ private fun RoundIcon(icon: ImageVector, label: String, big: Boolean = false, on
     }
 }
 
+/** Previous / next (channel or episode): a glass circle, dimmed and inert when there is nothing there. */
+@Composable
+private fun NavButton(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .tvRing(CircleShape)
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Color(0x990A0B0F))
+            .border(1.dp, Color(0x29FFFFFF), CircleShape),
+    ) {
+        Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = if (enabled) 1f else 0.3f), modifier = Modifier.size(26.dp))
+    }
+}
+
+/** The circular-arrow skip icon with the number of seconds inside it (flipped for forward). */
+@Composable
+private fun SkipGlyph(forward: Boolean, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.Filled.Replay, contentDescription = null, tint = Color.White,
+            modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = if (forward) -1f else 1f },
+        )
+        Text("${SKIP_MS / 1000}", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 1.dp))
+    }
+}
+
+/** -15 s / +15 s: a glass circle with the skip glyph. */
+@Composable
+private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .tvRing(CircleShape)
+            .size(54.dp)
+            .clip(CircleShape)
+            .background(Color(0x990A0B0F))
+            .border(1.dp, Color(0x29FFFFFF), CircleShape),
+    ) {
+        Icon(
+            Icons.Filled.Replay, contentDescription = if (forward) "Forward ${SKIP_MS / 1000} seconds" else "Back ${SKIP_MS / 1000} seconds",
+            tint = Color.White, modifier = Modifier.size(32.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
+        )
+        Text("${SKIP_MS / 1000}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
 /**
  * Timeline for films and episodes. The length comes from the stream, or (when the stream reports
  * none) from TMDB / the provider so there is always a timeline. Copies that cannot be sought in
- * show the bar without a thumb, and the ±10 s buttons are hidden, so nothing restarts the film.
+ * show the bar without a thumb, and the ±15 s buttons are hidden, so nothing restarts the film.
  */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
@@ -979,12 +1113,22 @@ private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engi
             disabledThumbColor = Color.Transparent, disabledActiveTrackColor = C.Ember.copy(alpha = 0.7f),
             disabledInactiveTrackColor = Color(0x33FFFFFF),
         ),
+        thumb = { TimelineThumb(engine.canSeek) },
         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
     )
     Text(
         (if (engine.duration <= 0) "~" else "") + fmt(total),
         color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp),
     )
+}
+
+/** A white dot with an ember ring: easy to grab, clear against any picture. */
+@Composable
+private fun TimelineThumb(visible: Boolean) {
+    if (!visible) return
+    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(16.dp).clip(CircleShape).background(Color.White).border(3.dp, C.Ember, CircleShape))
+    }
 }
 
 /** Volume / brightness swipe state: which one is shown and its level (0..1) while swiping. */
@@ -1103,22 +1247,21 @@ private fun LivePill(engine: Engine, onAction: () -> Unit) {
     }
 }
 
-/** Timeline for a live channel with a window: drag inside it, ±10 s, and how far behind live. */
+/** Timeline for a live channel with a window: drag inside it, and how far behind live (±15 s sit in the centre). */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.LiveTimeline(engine: Engine, ui: PlayerUiState) {
     val span = engine.duration.coerceAtLeast(1)
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(1f) }
     val progress = if (dragging) dragValue else (engine.position.toFloat() / span).coerceIn(0f, 1f)
-    RoundIcon(Icons.Filled.Replay10, "Back 10 seconds") { engine.seekBy(-10_000); ui.poke() }
     Slider(
         value = progress,
         onValueChange = { dragging = true; dragValue = it; ui.poke() },
         onValueChangeFinished = { engine.seekTo((dragValue * span).toLong()); dragging = false },
         colors = SliderDefaults.colors(thumbColor = C.Ember, activeTrackColor = C.Ember, inactiveTrackColor = Color(0x4DFFFFFF)),
+        thumb = { TimelineThumb(true) },
         modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
     )
-    RoundIcon(Icons.Filled.Forward10, "Forward 10 seconds") { engine.seekBy(10_000); ui.poke() }
     Text(
         if (engine.liveBehind >= 6_000) "-${fmt(engine.liveBehind)}" else "LIVE",
         color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp, end = 8.dp),
