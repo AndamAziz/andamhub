@@ -175,8 +175,7 @@ class PlayerActivity : ComponentActivity() {
 
     /** Skip back / forward one step, with feedback. */
     private fun skip(dir: Int) {
-        val live = PlayQueue.current()?.isLive == true
-        if (engine.canSeek || !live) {
+        if (engine.canSeek) {
             engine.skipBy(dir * SKIP_MS)
             ui.flash(dir)
         }
@@ -215,8 +214,8 @@ class PlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> {
                 engine.togglePlay(); ui.poke(); return true
             }
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (engine.canSeek || !live) { engine.seekBy(30_000); ui.poke(); return true }
-            KeyEvent.KEYCODE_MEDIA_REWIND -> if (engine.canSeek || !live) { engine.seekBy(-30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (engine.canSeek) { engine.seekBy(30_000); ui.poke(); return true }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> if (engine.canSeek) { engine.seekBy(-30_000); ui.poke(); return true }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> {
                 ui.panel = false; ui.settings = !ui.settings; return true
             }
@@ -428,7 +427,7 @@ private fun PlayerScreen(
                             } else if (ui.controls) ui.controls = false else ui.poke()
                         },
                         onDoubleTap = { o ->
-                            if (engine.canSeek || !engine.live) {
+                            if (engine.canSeek) {
                                 val dir = if (o.x < size.width / 2f) -1 else 1
                                 engine.skipBy(dir * SKIP_MS)
                                 ui.flash(dir)
@@ -464,8 +463,9 @@ private fun PlayerScreen(
         engine.online.kurdishProgress?.let { p ->
             if (!ui.pip) Pill("Preparing Kurdish subtitles · ${(p * 100).toInt()}%", Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp))
         }
+        // Live TV only: films and episodes recover quietly ("Reconnecting…" etc. are not shown).
         engine.status?.let {
-            if (engine.error == null && !ui.pip) Pill(it, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
+            if (engine.error == null && !ui.pip && engine.live) Pill(it, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
         }
 
         engine.error?.let { msg ->
@@ -600,7 +600,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
         //   [previous] [-15 s] ( play / pause ) [+15 s] [next]
         // previous / next = channel (live) or episode (series); ±15 s wherever the stream can be sought.
         val episode = PlayQueue.current()?.kind == Kind.EPISODE
-        // Films and episodes always show ±15 s and always work (Engine.skipBy finds a seekable route); live TV never shows them.
+        // Films and episodes always show ±15 s, exactly like series (dimmed only if the file cannot be sought); live TV never shows them.
         val showSkip = !engine.live
         Row(
             Modifier.align(Alignment.Center),
@@ -611,7 +611,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                 val canPrev = !episode || PlayQueue.index > 0
                 NavButton(Icons.Filled.SkipPrevious, if (episode) "Previous episode" else "Previous channel", canPrev) { onZap(-1) }
             }
-            if (showSkip) SkipButton(forward = false) { engine.skipBy(-SKIP_MS); ui.flash(-1); ui.poke() }
+            if (showSkip) SkipButton(forward = false, enabled = engine.canSeek) { engine.skipBy(-SKIP_MS); ui.flash(-1); ui.poke() }
             val playFocus = remember { FocusRequester() }
             LaunchedEffect(Unit) { if (ui.tv) { delay(60); runCatching { playFocus.requestFocus() } } }
             Box(
@@ -629,7 +629,7 @@ private fun Controls(engine: Engine, ui: PlayerUiState, zappable: Boolean, onBac
                     contentDescription = "Play or pause", tint = Color(0xFF0A0B0F), modifier = Modifier.size(42.dp),
                 )
             }
-            if (showSkip) SkipButton(forward = true) { engine.skipBy(SKIP_MS); ui.flash(1); ui.poke() }
+            if (showSkip) SkipButton(forward = true, enabled = engine.canSeek) { engine.skipBy(SKIP_MS); ui.flash(1); ui.poke() }
             if (zappable) {
                 val canNext = !episode || PlayQueue.index < PlayQueue.items.size - 1
                 NavButton(Icons.Filled.SkipNext, if (episode) "Next episode" else "Next channel", canNext) { onZap(1) }
@@ -1091,8 +1091,8 @@ private fun SkipButton(forward: Boolean, enabled: Boolean = true, onClick: () ->
 
 /**
  * Timeline for films and episodes. The length comes from the stream, or (when the stream reports
- * none) from TMDB / the provider so there is always a timeline. It can always be dragged: copies
- * without an index use the engine's emulated seek (fast-forward / reopen + fast-forward).
+ * none) from TMDB / the provider so there is always a timeline. A copy that cannot be sought in
+ * keeps the bar without a thumb (a jump would restart it from 0:00).
  */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engine, ui: PlayerUiState) {
@@ -1109,8 +1109,7 @@ private fun androidx.compose.foundation.layout.RowScope.VodTimeline(engine: Engi
     Text(fmt(if (dragging) (dragValue * total).toLong() else engine.position), color = Color.White, fontSize = 12.sp)
     Slider(
         value = progress,
-        // Films / episodes can always be dragged; files without an index use the emulated seek.
-        enabled = !engine.live,
+        enabled = engine.canSeek,
         onValueChange = { dragging = true; dragValue = it; ui.poke() },
         onValueChangeFinished = { engine.seekTo((dragValue * total).toLong()); dragging = false },
         colors = SliderDefaults.colors(
