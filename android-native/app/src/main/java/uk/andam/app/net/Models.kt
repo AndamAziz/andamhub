@@ -29,6 +29,8 @@ data class VodItem(
     val ext: String,
     /** Unix seconds the provider added it (0 when unknown). */
     val added: Long = 0,
+    /** The provider's name as written (may carry a "{tmdb-…}" id): sent to the details lookup only. */
+    val lookup: String = name,
 )
 
 data class SeriesItem(
@@ -41,6 +43,8 @@ data class SeriesItem(
     val categoryId: String,
     /** Unix seconds of the last new episode (0 when unknown). */
     val updated: Long = 0,
+    /** The provider's name as written (may carry a "{tmdb-…}" id): sent to the details lookup only. */
+    val lookup: String = name,
 )
 
 data class Episode(

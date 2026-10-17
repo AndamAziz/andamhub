@@ -132,6 +132,33 @@ object Api {
 
     private fun JSONObject.str(k: String) = if (isNull(k)) "" else optString(k, "")
 
+    /** Text as people read it: HTML entities some providers leave in ("&amp;", "&#39;") decoded. */
+    private fun JSONObject.text(k: String) = unescape(str(k))
+
+    private val ENTITY = Regex("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|amp|lt|gt|quot|apos|nbsp);")
+    internal fun unescape(s: String): String {
+        if (!s.contains('&')) return s
+        var out = s
+        // Twice, for providers that escaped the text twice ("&amp;amp;").
+        repeat(2) {
+            out = ENTITY.replace(out) { m ->
+                when (val e = m.groupValues[1]) {
+                    "amp" -> "&"; "lt" -> "<"; "gt" -> ">"; "quot" -> "\""; "apos" -> "'"; "nbsp" -> " "
+                    else -> {
+                        val code = if (e[1] == 'x' || e[1] == 'X') e.substring(2).toIntOrNull(16) else e.substring(1).toIntOrNull()
+                        if (code != null && code in 1..0x10FFFF) String(Character.toChars(code)) else m.value
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /** A list name without the "{tmdb-75404}" / "tmdb:75404" id some playlists add for matching. */
+    private val TMDB_TAG = Regex("[\\[{(]?\\s*\\btmdb(?:[-_ ]?id)?\\s*[:=-]\\s*[\"']?(?:(?:tv|movie|series)\\s*[/:]\\s*)?\\d{1,9}[\"']?\\s*[\\]})]?", RegexOption.IGNORE_CASE)
+    internal fun displayName(raw: String): String =
+        unescape(raw).replace(TMDB_TAG, " ").replace(Regex("\\s{2,}"), " ").trim().trimEnd('_', '-', '|', ' ').ifBlank { raw }
+
     // ---------------- access ----------------
 
     suspend fun access(): Access {
@@ -181,9 +208,10 @@ object Api {
     suspend fun vod(source: String, category: String): List<VodItem> = cached("vod:$source:$category") {
         get(X, mapOf("action" to "vod", "source" to source, "category_id" to category)).optJSONArray("items").mapObjects {
             VodItem(
-                it.str("id"), it.str("name"), it.str("poster"), it.str("rating"), it.str("year"),
+                it.str("id"), displayName(it.str("name")), it.str("poster"), it.str("rating"), it.str("year"),
                 it.str("genre"), it.str("categoryId"), it.str("ext").ifBlank { "mp4" },
                 it.str("added").toLongOrNull() ?: 0L,
+                lookup = it.str("name"),
             )
         }
     }
@@ -191,8 +219,9 @@ object Api {
     suspend fun series(source: String, category: String): List<SeriesItem> = cached("series:$source:$category") {
         get(X, mapOf("action" to "series", "source" to source, "category_id" to category)).optJSONArray("items").mapObjects {
             SeriesItem(
-                it.str("id"), it.str("name"), it.str("poster"), it.str("rating"), it.str("year"), it.str("genre"), it.str("categoryId"),
+                it.str("id"), displayName(it.str("name")), it.str("poster"), it.str("rating"), it.str("year"), it.str("genre"), it.str("categoryId"),
                 it.str("lastModified").toLongOrNull() ?: 0L,
+                lookup = it.str("name"),
             )
         }
     }
@@ -202,10 +231,10 @@ object Api {
         val j = get(X, mapOf("action" to "series_info", "source" to source, "series_id" to id, "device" to "1"))
         val seasons = j.optJSONArray("seasons").mapObjects { s ->
             Season(s.optInt("season"), s.optJSONArray("episodes").mapObjects { e ->
-                Episode(e.str("id"), e.optInt("episode"), e.str("title"), e.str("image"), e.str("plot"), e.str("duration"), e.str("play"), e.str("direct").ifBlank { null })
+                Episode(e.str("id"), e.optInt("episode"), e.text("title"), e.str("image"), e.text("plot"), e.str("duration"), e.str("play"), e.str("direct").ifBlank { null })
             })
         }
-        return SeriesInfo(j.str("title"), j.str("cover"), j.str("plot"), j.str("genre"), j.str("rating"), seasons)
+        return SeriesInfo(displayName(j.str("title")), j.str("cover"), j.text("plot"), j.str("genre"), j.str("rating"), seasons)
     }
 
     /** Cache key of a details answer: a renamed item or a changed year is looked up again. */
@@ -221,10 +250,10 @@ object Api {
             get(X, mapOf("action" to "details", "source" to source, "type" to type, "id" to id, "lang" to lang, "name" to name, "year" to year, "refresh" to refresh))
         }
         MediaDetails(
-            title = j.str("title"),
-            originalTitle = j.str("originalTitle"),
-            tagline = j.str("tagline"),
-            overview = j.str("overview"),
+            title = j.text("title"),
+            originalTitle = j.text("originalTitle"),
+            tagline = j.text("tagline"),
+            overview = j.text("overview"),
             year = j.str("year"),
             runtime = j.optInt("runtime"),
             rating = j.optDouble("rating", 0.0).takeIf { !it.isNaN() } ?: 0.0,
@@ -254,7 +283,7 @@ object Api {
             get(X, mapOf("action" to "season", "source" to source, "tmdb" to tmdb.toString(), "season" to season.toString(), "lang" to lang))
         }
         j.optJSONArray("episodes").mapObjects {
-            EpisodeFacts(it.optInt("episode"), it.str("name"), it.str("overview"), it.str("still"), it.optInt("runtime"))
+            EpisodeFacts(it.optInt("episode"), it.text("name"), it.text("overview"), it.str("still"), it.optInt("runtime"))
         }
     }
 
