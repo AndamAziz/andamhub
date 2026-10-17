@@ -12,6 +12,7 @@ import {
   type XtreamKind,
 } from '@/lib/xtream';
 import { applyOverrides, loadOverrides } from '@/lib/overrides.server';
+import { memoStore } from '@/lib/memo.server';
 
 /**
  * Metadata proxy for the Live TV section.
@@ -80,7 +81,32 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 
-async function loadSources(): Promise<Source[]> {
+const memo = memoStore();
+
+/** The provider rows, remembered for 30 s (they are read on every request). */
+function loadSources(): Promise<Source[]> {
+  return memo.get('sources', 30_000, loadSourcesFresh);
+}
+
+/**
+ * Category and channel / film / series lists from the provider, remembered for 5 minutes per
+ * provider: switching sections no longer waits for the provider to send the whole list again,
+ * and the provider gets fewer requests. Very large lists are not kept (memory).
+ */
+const LIST_ACTIONS = /^get_(live|vod|series)(_categories|_streams)?$|^get_series$/;
+function listApi<T>(source: Source, params: Record<string, string>): Promise<T> {
+  if (!LIST_ACTIONS.test(params['action'] ?? '')) return playerApi<T>(source, params);
+  const key = `list:${source.id}:${JSON.stringify(params)}`;
+  const value = memo.get(key, 5 * 60_000, () => playerApi<T>(source, params));
+  value
+    .then((v) => {
+      if (Array.isArray(v) && v.length > 20_000) memo.delete(key);
+    })
+    .catch(() => {});
+  return value;
+}
+
+async function loadSourcesFresh(): Promise<Source[]> {
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
   const { data, error } = await supabaseAdmin
     .from('sources')
@@ -178,7 +204,7 @@ export const Route = createFileRoute('/api/public/xtream')({
         try {
           // Live TV is gated: locked viewers get no providers, categories or
           // channel data at all — not just a hidden UI.
-          const { canOpen, lockedResponse, resolveAccess } = await import('@/lib/access.server');
+          const { canOpen, lockedResponse, resolveAccessCached: resolveAccess } = await import('@/lib/access.server');
           const access = await resolveAccess(request);
           if (!canOpen(access, 'live')) return lockedResponse('live');
           const granted = access.liveSources;
@@ -258,7 +284,7 @@ export const Route = createFileRoute('/api/public/xtream')({
             };
             // The provider's own categories, exactly as it lists them. A stored channel list
             // (curated / imported) is only used when the provider itself gives no live list.
-            const own = await playerApi<Category[]>(source, { action: map[kind] }).catch(() => null);
+            const own = await listApi<Category[]>(source, { action: map[kind] }).catch(() => null);
             if (kind === 'live' && !(Array.isArray(own) && own.length > 0)) {
               const curated = await curatedChannels(source.id);
               if (curated.length > 0) {
@@ -287,7 +313,7 @@ export const Route = createFileRoute('/api/public/xtream')({
 
             // The provider's own live list, in full. A stored channel list (curated or
             // imported from a provider submission) is only used when the provider gives none.
-            const streams = await playerApi<LiveStream[]>(source, {
+            const streams = await listApi<LiveStream[]>(source, {
               action: 'get_live_streams',
               ...(categoryId ? { category_id: categoryId } : {}),
             }).catch(() => null);
@@ -336,7 +362,7 @@ export const Route = createFileRoute('/api/public/xtream')({
 
           if (action === 'vod') {
             const categoryId = url.searchParams.get('category_id') ?? '';
-            const streams = await playerApi<VodStream[]>(source, {
+            const streams = await listApi<VodStream[]>(source, {
               action: 'get_vod_streams',
               ...(categoryId ? { category_id: categoryId } : {}),
             });
@@ -359,7 +385,7 @@ export const Route = createFileRoute('/api/public/xtream')({
 
           if (action === 'series') {
             const categoryId = url.searchParams.get('category_id') ?? '';
-            const list = await playerApi<SeriesItem[]>(source, {
+            const list = await listApi<SeriesItem[]>(source, {
               action: 'get_series',
               ...(categoryId ? { category_id: categoryId } : {}),
             });

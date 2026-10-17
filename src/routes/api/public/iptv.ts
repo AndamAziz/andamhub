@@ -24,9 +24,22 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 
+/** Granted private playlists per sign-in token, remembered for 20 s (only when there are some). */
+const grantCache = new Map<string, { at: number; ids: Set<string> }>();
 async function grantedSourceIds(request: Request): Promise<Set<string> | null> {
   const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   if (!token) return null;
+  const hit = grantCache.get(token);
+  if (hit && Date.now() - hit.at < 20_000) return new Set(hit.ids);
+  const ids = await grantedSourceIdsFresh(token);
+  if (ids && ids.size > 0) {
+    grantCache.set(token, { at: Date.now(), ids: new Set(ids) });
+    if (grantCache.size > 500) grantCache.delete(grantCache.keys().next().value as string);
+  }
+  return ids;
+}
+
+async function grantedSourceIdsFresh(token: string): Promise<Set<string> | null> {
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
   const { data: userData } = await supabaseAdmin.auth.getUser(token);
   const userId = userData?.user?.id;

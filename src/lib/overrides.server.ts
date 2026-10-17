@@ -5,6 +5,7 @@
  * public API applies those rules before anything reaches a viewer.
  */
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { memoStore } from '@/lib/memo.server';
 
 export type OverrideKind = 'live' | 'vod' | 'series' | 'category';
 
@@ -16,7 +17,25 @@ export type OverrideRule = {
 
 export type OverrideMap = Map<string, OverrideRule>;
 
+const memo = memoStore();
+
+/**
+ * The admin rules for one provider and kind, remembered for 30 s: every list request reads them,
+ * so a channel list or section switch no longer waits for these rows each time. A fresh copy is
+ * handed out, so callers may change it.
+ */
 export async function loadOverrides(sourceId: string, kind: OverrideKind): Promise<OverrideMap> {
+  try {
+    const cached = await memo.get(`${sourceId}:${kind}`, 30_000, () => loadOverridesFresh(sourceId, kind));
+    return new Map([...cached].map(([id, rule]) => [id, { ...rule }]));
+  } catch (err) {
+    // A failed read is not remembered; this request simply goes without rules.
+    console.error('[overrides]', err instanceof Error ? err.message : err);
+    return new Map();
+  }
+}
+
+async function loadOverridesFresh(sourceId: string, kind: OverrideKind): Promise<OverrideMap> {
   // Paged: the database answers at most 1000 rows per request.
   const PAGE = 1000;
   const data: Array<{ item_id: unknown; hidden: unknown; sort_order: number | null; logo_url: string | null }> = [];
@@ -28,10 +47,7 @@ export async function loadOverrides(sourceId: string, kind: OverrideKind): Promi
       .eq('kind', kind)
       .order('item_id', { ascending: true })
       .range(from, from + PAGE - 1);
-    if (error) {
-      console.error('[overrides]', error.message);
-      return new Map();
-    }
+    if (error) throw new Error(error.message);
     data.push(...((rows ?? []) as typeof data));
     if (!rows || rows.length < PAGE) break;
   }
