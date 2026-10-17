@@ -471,9 +471,13 @@ export const Route = createFileRoute('/api/public/xtream')({
               // "411 invalid data" and the channel never starts. The `.ts`
               // endpoint has no such token and streams fine. `fallback` keeps
               // HLS available for providers that only publish playlists.
+              // Panels whose list gives a playlist for the channel (website passes kind=hls):
+              // their live link redirects to that playlist, so the website plays the .m3u8 link,
+              // whose redirect is followed before its relative segment paths are resolved.
+              const hlsFirst = url.searchParams.get('kind') === 'hls';
               return json({
-                play: await sealUrl(tagRelay(liveStreamUrl(source, id, 'ts'), source)),
-                fallback: await sealUrl(tagRelay(liveStreamUrl(source, id, 'm3u8'), source)),
+                play: await sealUrl(tagRelay(liveStreamUrl(source, id, hlsFirst ? 'm3u8' : 'ts'), source)),
+                fallback: await sealUrl(tagRelay(liveStreamUrl(source, id, hlsFirst ? 'ts' : 'm3u8'), source)),
                 // Device route: the playlist (HLS) version rides out network hiccups without a
                 // visible reconnect; the progressive .ts link stays as its fallback.
                 ...(device
