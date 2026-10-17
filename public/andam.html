@@ -3802,6 +3802,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
            are broadcast in H.265). Retrying the HLS url cannot help, so say
            what is wrong instead of looping. */
         var media=(''+t).toLowerCase().indexOf('media')>=0||(''+d).toLowerCase().indexOf('codec')>=0;
+        /* Nothing played yet and a playlist route exists: the link may not be MPEG-TS at all
+           (some panels redirect it to a playlist), so try that route before the transcoder. */
+        if(media&&!ok&&alt){ retryable('Stream failed to load'); return }
         if(media){
           alt=null;
           /* Codec this decoder refuses → re-run it through the transcoder once
@@ -3881,6 +3884,17 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* Backwards-compatible entry point used by home rows and replay. */
   function playToken(token,title,sub,isHls,kind){ lvPlay(kind||activeKind(),token,title,sub,isHls) }
 
+  /* 'ts' / 'hls' as the provider's own list tells it (server `kind`); '' when unknown → probe. */
+  function liveKindOf(id){
+    var lists=[ltv.channels||[]];
+    // Home rows and the hero come from the same cached `live` answers.
+    Object.keys(lcache).forEach(function(k){ if(/^action=live&/.test(k)&&lcache[k].v&&lcache[k].v.items) lists.push(lcache[k].v.items) });
+    for(var j=0;j<lists.length;j++){
+      var l=lists[j];
+      for(var i=0;i<l.length;i++){ if(String(l[i].id)===String(id)) return l[i].kind==='hls'||l[i].kind==='ts'?l[i].kind:'' }
+    }
+    return '';
+  }
   function playById(type,id,ext,title,sub,isHls,kind){
     var k=kind||activeKind(), s=surf(k);
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
@@ -3888,7 +3902,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
     if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?'ts':''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?liveKindOf(id):''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 

@@ -33,7 +33,23 @@ type LiveStream = {
   tv_archive?: number | string;
   tv_archive_duration?: number | string;
   category_id?: string;
+  direct_source?: string | null;
 };
+
+/**
+ * What a provider's live link sends, read from its own list (no request to the provider):
+ * panels that list a playlist (`direct_source` …m3u8) redirect their live link to it ('hls');
+ * classic panels list nothing and send MPEG-TS ('ts'); anything else is left for the player
+ * to find out (''). The website starts the right engine at once with this.
+ */
+function liveKind(s: LiveStream): 'ts' | 'hls' | '' {
+  const src = String(s.direct_source ?? '').trim();
+  if (!src) return 'ts';
+  const path = (src.split(/[?#]/)[0] ?? '').toLowerCase();
+  if (/\.m3u8?$/.test(path)) return 'hls';
+  if (/\.ts$/.test(path)) return 'ts';
+  return '';
+}
 
 type VodStream = {
   stream_id: number;
@@ -348,6 +364,7 @@ export const Route = createFileRoute('/api/public/xtream')({
               archive: num(s.tv_archive) === 1,
               archiveDays: num(s.tv_archive_duration),
               categoryId: s.category_id ? String(s.category_id) : '',
+              kind: liveKind(s),
             }));
             const visibleItems = applyOverrides(
               items,
