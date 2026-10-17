@@ -144,6 +144,33 @@ export async function resolveAccess(request: Request): Promise<Access> {
 }
 
 
+/**
+ * resolveAccess for the hot paths (every list, play and detail request): an unlocked viewer's
+ * entitlements are remembered for 20 s per sign-in token, so the four database reads behind them
+ * are not repeated on each click. Locked answers are never remembered, so redeeming a code
+ * unlocks at once; a revoked grant stops working within 20 s.
+ */
+const ACCESS_TTL_MS = 20_000;
+const accessCache = new Map<string, { at: number; access: Access }>();
+export async function resolveAccessCached(request: Request): Promise<Access> {
+  const token = bearer(request);
+  if (!token) return { ...LOCKED };
+  const hit = accessCache.get(token);
+  if (hit && Date.now() - hit.at < ACCESS_TTL_MS) return copyAccess(hit.access);
+  const access = await resolveAccess(request);
+  if (access.signedIn && (access.admin || access.sections.length > 0)) {
+    accessCache.set(token, { at: Date.now(), access: copyAccess(access) });
+    if (accessCache.size > 500) accessCache.delete(accessCache.keys().next().value as string);
+  } else {
+    accessCache.delete(token);
+  }
+  return access;
+}
+
+function copyAccess(a: Access): Access {
+  return { ...a, sections: [...a.sections], liveSources: a.liveSources === 'all' ? 'all' : [...a.liveSources] };
+}
+
 export function canOpen(access: Access, section: Section): boolean {
   return access.admin || access.sections.includes(section);
 }

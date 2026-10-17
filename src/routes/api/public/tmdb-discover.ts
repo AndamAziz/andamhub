@@ -74,7 +74,7 @@ async function handle(request: Request) {
   const { kind, page, q, sort, genre, id, season } = parsed.data;
 
   // Movies / Shows are activation-gated: a locked viewer gets no catalog data.
-  const { canOpen, lockedResponse, resolveAccess } = await import("@/lib/access.server");
+  const { canOpen, lockedResponse, resolveAccessCached: resolveAccess } = await import("@/lib/access.server");
   const access = await resolveAccess(request);
   const wants =
     kind === "movies"

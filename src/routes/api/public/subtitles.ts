@@ -72,7 +72,7 @@ async function fileOf(token: string | null): Promise<number> {
 }
 
 async function viewer(request: Request): Promise<boolean> {
-  const { resolveAccess, canOpen } = await import('@/lib/access.server');
+  const { resolveAccessCached: resolveAccess, canOpen } = await import('@/lib/access.server');
   const access = await resolveAccess(request);
   return access.signedIn && (canOpen(access, 'live') || canOpen(access, 'movies') || canOpen(access, 'series'));
 }

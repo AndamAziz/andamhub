@@ -9,6 +9,7 @@
  * /api/public/xtream-play.
  */
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { memoStore } from '@/lib/memo.server';
 
 export type M3uHeaders = { referer?: string; origin?: string; userAgent?: string };
 
@@ -109,7 +110,14 @@ export function parseM3u(text: string): M3uChannel[] {
   return channels;
 }
 
-export async function loadPlaylistSources(): Promise<PlaylistSource[]> {
+const memo = memoStore();
+
+/** Playlist rows, remembered for 30 s (read on every IPTV request). */
+export function loadPlaylistSources(): Promise<PlaylistSource[]> {
+  return memo.get('sources', 30_000, loadPlaylistSourcesFresh);
+}
+
+async function loadPlaylistSourcesFresh(): Promise<PlaylistSource[]> {
   const { data, error } = await supabaseAdmin
     .from('sources')
     .select('id, slug, name, playlist_url, is_public')
@@ -175,14 +183,27 @@ export async function refreshPlaylist(source: PlaylistSource): Promise<{
     { onConflict: 'source_id' },
   );
   if (error) throw new Error(error.message);
+  memo.set(`channels:${source.id}`, { channels, fetchedAt, stale: false });
 
   return { channels, channelCount: channels.length, categoryCount, fetchedAt };
 }
 
 /** Cached channel list; refreshes automatically once the cache goes stale. */
-export async function getPlaylistChannels(
+/**
+ * The cached channel list, remembered in memory for 5 minutes: the stored copy is a large row
+ * (thousands of channels), and starting any channel used to read all of it again first.
+ */
+export function getPlaylistChannels(
   source: PlaylistSource,
   force = false,
+): Promise<{ channels: M3uChannel[]; fetchedAt: string; stale: boolean }> {
+  if (force) return getPlaylistChannelsFresh(source, true);
+  return memo.get(`channels:${source.id}`, 5 * 60_000, () => getPlaylistChannelsFresh(source, false));
+}
+
+async function getPlaylistChannelsFresh(
+  source: PlaylistSource,
+  force: boolean,
 ): Promise<{ channels: M3uChannel[]; fetchedAt: string; stale: boolean }> {
   if (!force) {
     const { data } = await supabaseAdmin

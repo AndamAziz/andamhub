@@ -3176,6 +3176,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var rows=[].slice.call(host.querySelectorAll('.chanrow')); if(!rows.length) return;
     var cur=host.querySelector('.chanrow.on'), i=cur?rows.indexOf(cur):-1;
     if(i<0&&s.last) rows.forEach(function(r,k){ if(r.getAttribute('data-name')===s.last.title) i=k });
+    // At the last drawn row, draw the next batch instead of wrapping to the first channel.
+    var list=host.querySelector('.lvlist');
+    if(dir>0&&i===rows.length-1&&list&&list.__paintMore&&list.__paintMore()) rows=[].slice.call(host.querySelectorAll('.chanrow'));
     var n=rows[(i+dir+rows.length)%rows.length];
     var sc=document.scrollingElement, y=sc?sc.scrollTop:0;
     rows.forEach(function(r){r.classList.remove('on')}); n.classList.add('on'); n.click();
@@ -3983,15 +3986,50 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
 
   /* Paint long lists in animation-frame slices so tapping/scrolling stays live. */
+  /* Long lists (thousands of channels / films) are drawn as the viewer scrolls: the first rows
+     at once, the next batch when the end comes near. Drawing every row up front kept the page
+     busy for seconds and made live TV start and section switches slow. */
   function paintChunks(host,list,html,done){
-    host.innerHTML=''; var i=0, step=40;
-    (function next(){
-      if(host.dataset['paint']!==String(list.__id)) return;
+    host.innerHTML=''; var i=0, BATCH=120, sentinel=null, io=null;
+    if(host.__io){ try{ host.__io.disconnect() }catch(_){} host.__io=null }
+    function current(){ return host.dataset['paint']===String(list.__id) }
+    function add(n){
       var frag=document.createDocumentFragment(), wrap=document.createElement('div');
-      wrap.innerHTML=list.slice(i,i+step).map(html).join('');
+      wrap.innerHTML=list.slice(i,i+n).map(html).join('');
       while(wrap.firstChild) frag.appendChild(wrap.firstChild);
-      host.appendChild(frag); i+=step;
-      if(i<list.length) requestAnimationFrame(next); else if(done) done();
+      if(sentinel&&sentinel.parentNode===host) host.insertBefore(frag,sentinel); else host.appendChild(frag);
+      i+=n;
+    }
+    function finish(){
+      if(io){ try{ io.disconnect() }catch(_){} io=null; host.__io=null }
+      if(sentinel&&sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+      host.__paintMore=null; if(done) done();
+    }
+    function more(){
+      if(!current()||i>=list.length) return false;
+      add(BATCH); if(i>=list.length) finish();
+      return true;
+    }
+    host.__paintMore=more;
+    // First screenful in small steps (as before), so the list shows at once.
+    (function first(){
+      if(!current()) return;
+      add(40);
+      if(i>=list.length) return finish();
+      if(i<BATCH) return requestAnimationFrame(first);
+      if(!('IntersectionObserver' in window)){ while(more()){} return }
+      sentinel=document.createElement('div'); sentinel.setAttribute('aria-hidden','true');
+      sentinel.style.cssText='width:100%;height:1px;grid-column:1/-1';
+      host.appendChild(sentinel);
+      io=new IntersectionObserver(function(es){
+        if(!current()){ try{ io.disconnect() }catch(_){} return }
+        if(es.some(function(e){ return e.isIntersecting })) requestAnimationFrame(function(){
+          more();
+          // Still in view (tall screen): keep going until it is not.
+          if(io&&sentinel){ io.unobserve(sentinel); io.observe(sentinel) }
+        });
+      },{rootMargin:'1200px 0px'});
+      host.__io=io; io.observe(sentinel);
     })();
   }
   var paintSeq=0;
