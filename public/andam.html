@@ -3599,7 +3599,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         v.removeEventListener('timeupdate',videoCheck); s.videoHandler=null;
         var frames=typeof v.webkitDecodedFrameCount==='number'?v.webkitDecodedFrameCount:
           (v.getVideoPlaybackQuality?v.getVideoPlaybackQuality().totalVideoFrames:-1);
-        if(v.videoWidth===0||frames===0){ console.warn('[player] no picture decoded — trying the playlist route'); nextKnown=known==='ts'?'hls':''; lvPlay(kind,altTok,title,sub,true,null,tc) }
+        if(v.videoWidth===0||frames===0){ console.warn('[player] no picture decoded — trying the playlist route'); nextKnown=known==='ts'?'hls':known==='hls'?'ts':''; lvPlay(kind,altTok,title,sub,true,null,tc) }
       };
       s.videoHandler=videoCheck;
       s.video.addEventListener('timeupdate',videoCheck);
@@ -3684,7 +3684,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     function retryable(msg){
       if(!alive()||ok) return;
       clearTimeout(timer);
-      if(alt){ var a=alt; alt=null; setTimeout(function(){ if(alive()){ nextKnown=known==='ts'?'hls':''; lvPlay(kind,a,title,sub,true,null,tc) } },0); return }
+      if(alt){ var a=alt; alt=null; setTimeout(function(){ if(alive()){ nextKnown=known==='ts'?'hls':known==='hls'?'ts':''; lvPlay(kind,a,title,sub,true,null,tc) } },0); return }
       if(!tc){ healN=Math.max(healN,4); restart(true); return }
       fail(s,msg);
     }
@@ -3900,9 +3900,11 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
     s.now.textContent=title||'Andam'; s.sub.textContent='Preparing…';
     var q={action:'play',source:ltv.prov,type:type,id:id,ext:ext||''};
+    var lk=type==='live'?liveKindOf(id):'';
+    if(lk==='hls') q.kind='hls'; // the server then hands the playlist link first
     if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?liveKindOf(id):''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?lk:''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 
