@@ -1860,6 +1860,22 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
   var cat={kind:'movies',page:1,totalPages:1,q:'',items:[],busy:false,req:0};
 
+  /* Text as people read it: HTML entities some providers leave in ("&amp;", "&#39;") decoded. */
+  function unent(v){
+    var s=String(v==null?'':v); if(s.indexOf('&')<0) return s;
+    for(var i=0;i<2;i++) s=s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|amp|lt|gt|quot|apos|nbsp);/gi,function(m,e){
+      var k=e.toLowerCase(); if(k==='amp')return '&'; if(k==='lt')return '<'; if(k==='gt')return '>';
+      if(k==='quot')return '"'; if(k==='apos')return "'"; if(k==='nbsp')return ' ';
+      var c=k.charAt(1)==='x'?parseInt(k.slice(2),16):parseInt(k.slice(1),10);
+      return c>0&&c<=0x10FFFF?String.fromCodePoint(c):m });
+    return s;
+  }
+  /* A list name without the "{tmdb-75404}" / "tmdb:75404" id some playlists add for matching. */
+  function dispName(v){
+    var s=unent(v).replace(/[[{(]?\s*\btmdb(?:[-_ ]?id)?\s*[:=-]\s*["']?(?:(?:tv|movie|series)\s*[\/:]\s*)?\d{1,9}["']?\s*[\]})]?/i,' ')
+      .replace(/\s{2,}/g,' ').trim().replace(/[\s_|-]+$/,'');
+    return s||String(v==null?'':v);
+  }
   function esc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] }); }
 
@@ -2402,7 +2418,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         }
         if(d.genres&&d.genres.length)
           h+='<div class="dgen">'+d.genres.map(function(g){return '<span>'+esc(g)+'</span>'}).join('')+'</div>';
-        if(d.overview) h+='<p class="dover">'+esc(d.overview)+'</p>';
+        if(d.overview) h+='<p class="dover">'+esc(unent(d.overview))+'</p>';
         if(d.seasons&&d.seasons.length){
           h+='<div class="dsec"><h3>SEASONS</h3><div class="dseasons">'+
             d.seasons.map(function(s){
@@ -4004,8 +4020,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function vodCard(it,kind){
     return '<button class="pcard" type="button" data-'+kind+'="'+esc(it.id)+'" data-ext="'+esc(it.ext||'')+'" '+
       'data-title="'+esc(it.name)+'" data-poster="'+esc(it.poster||'')+'" data-year="'+esc(it.year||'')+'" data-genre="'+esc(it.genre||'')+'">'+
-      (it.poster?'<img loading="lazy" src="'+esc(it.poster)+'" alt="'+esc(it.name)+' poster" />':'')+
-      '<span class="pi"><span class="pt">'+esc(it.name)+'</span><span class="pm">'+
+      (it.poster?'<img loading="lazy" src="'+esc(it.poster)+'" alt="'+esc(dispName(it.name))+' poster" />':'')+
+      '<span class="pi"><span class="pt">'+esc(dispName(it.name))+'</span><span class="pm">'+
       '<span>'+esc(it.year||'—')+'</span>'+(it.rating?'<b>★ '+esc(it.rating)+'</b>':'')+
       '</span></span></button>';
   }
@@ -4453,7 +4469,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
   function detailBody(d){
     d=d||{}; var h='';
-    if(d.overview) h+='<p class="dpplot" dir="auto" tabindex="0">'+esc(d.overview)+'</p>';
+    if(d.overview) h+='<p class="dpplot" dir="auto" tabindex="0">'+esc(unent(d.overview))+'</p>';
     var crew=[];
     if(d.creator) crew.push(['Created by',d.creator]);
     if(d.director) crew.push(['Director',d.director]);
@@ -4526,7 +4542,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
                 '<span class="epthumb">'+(still?'<img loading="lazy" src="'+esc(still)+'" alt="">':'')+'<i>E'+ep.episode+'</i></span>'+
                 '<span class="eptext"><span class="en">S'+s.season+'E'+ep.episode+'</span>'+
                 '<span class="nm" dir="auto">'+esc(name)+'</span>'+
-                ((e.overview||ep.plot)?'<span class="sm" dir="auto">'+esc(e.overview||ep.plot)+'</span>':'')+'</span></button>';
+                ((e.overview||ep.plot)?'<span class="sm" dir="auto">'+esc(unent(e.overview||ep.plot))+'</span>':'')+'</span></button>';
             }).join('');
           }
           rows({});

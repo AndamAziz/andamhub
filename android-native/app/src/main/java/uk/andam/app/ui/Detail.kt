@@ -98,7 +98,7 @@ fun MovieDetail(source: String, vod: VodItem, onBack: () -> Unit) {
     var details by remember(vod.id) { mutableStateOf<MediaDetails?>(null) }
     var subs by remember(vod.id) { mutableStateOf<OnlineSubs?>(null) }
     LaunchedEffect(vod.id) {
-        details = runCatching { Api.details(source, "movie", vod.id, name = vod.name, year = vod.year) }.getOrNull()
+        details = runCatching { Api.details(source, "movie", vod.id, name = vod.lookup, year = vod.year) }.getOrNull()
         val tmdb = details?.tmdbId ?: 0
         if (tmdb > 0) subs = runCatching { Api.subtitles(tmdb, "movie") }.getOrNull()
     }
