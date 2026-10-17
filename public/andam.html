@@ -3425,7 +3425,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function deskPref(on){ try{ localStorage.setItem('andam.deskPlayer',on?'1':'0') }catch(_){} }
   function deskReplayHere(s){
     deskBypass=true;
-    try{ if(s.last) lvPlay(s.kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,s.last.alt) }finally{ deskBypass=false }
+    try{ if(s.last){ nextExt=s.last.ext||''; lvPlay(s.kind,s.last.token,s.last.title,s.last.sub,s.last.isHls,s.last.alt) } }finally{ deskBypass=false }
   }
   function deskCard(s,on){
     var c=s.stage.querySelector('.deskcard');
@@ -3514,7 +3514,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   function lvPlay(kind,token,title,sub,isHls,alt,tc){
     var ext=String(nextExt||'').toLowerCase(); nextExt='';
     if(!tc&&!deskBypass&&deskApi()){
-      if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)) return }
+      if(deskOn()){ if(deskPlay(kind,token,title,sub,isHls,alt)){ var ds=surf(kind); if(ds.last) ds.last.ext=ext; return } }
     }
     if(!tc&&!isHls&&kind!=='iptv'&&!/live/i.test(sub||'')&&NO_NATIVE.test(ext)) tc=true;
     var s=surf(kind),
