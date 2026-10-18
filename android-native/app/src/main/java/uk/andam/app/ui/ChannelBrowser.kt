@@ -18,7 +18,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import uk.andam.app.net.Category
@@ -59,8 +67,23 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
             if (categories.isNotEmpty()) CategoryBar(categories, cat, onSelect = { cat = it })
             Spacer(Modifier.height(6.dp))
         }
+        val grouped = cat.isEmpty() && q.isBlank() && categories.isNotEmpty()
+        val sections = remember(list, categories) { groupByCategory(categories, list.size) { list[it].group } }
         if (shown.isEmpty()) {
             ErrorBox(if (list.isEmpty()) "No channels yet." else "No channels match.")
+        } else if (grouped && sections.size > 1) {
+            // All categories: one row per provider category, in the provider's order.
+            CategorySections(
+                sections,
+                cardWidth = if (tv) 132 else 112,
+                cardHeight = 128,
+                onSeeAll = { cat = it.id },
+            ) { i ->
+                ChannelTile(list[i].title, list[i].logo, if (tv) 132 else 112) {
+                    // The player gets the full list, so its panel can switch categories too.
+                    PlayQueue.open(context, list, i, categories)
+                }
+            }
         } else {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(shown, key = { list[it].id + "#" + it }) { i ->
@@ -74,6 +97,29 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
             }
         }
     }
+    }
+}
+
+/** A channel as a tile (logo above its name), for the category rows. */
+@Composable
+fun ChannelTile(name: String, logo: String, widthDp: Int, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(widthDp.dp)
+            .height(128.dp)
+            .tvFocus(androidx.compose.foundation.shape.RoundedCornerShape(16.dp), 1.07f)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            .background(C.Surface)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Logo(logo, name, 64)
+        Text(
+            name, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 2, minLines = 2, lineHeight = 15.sp, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 

@@ -655,6 +655,35 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 
 
 .lvlist{display:flex;flex-direction:column;gap:8px}
+/* All categories: one section per provider category, each a horizontal row */
+.catsecs{display:flex;flex-direction:column;padding:0 0 18px}
+.catsec{min-width:0}
+.cshead{display:flex;align-items:center;gap:8px;padding:16px 4px 8px}
+.cshead::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--ember);flex:none}
+.cshead h3{margin:0;font:700 15px/1.25 Inter,sans-serif;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cshead .cn{flex:none;font:700 11px/1 Inter,sans-serif;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:4px 8px;font-variant-numeric:tabular-nums}
+.cshead .csnav{margin-left:auto;display:none;gap:4px;flex:none}
+.cshead .csnav button{width:28px;height:28px;border-radius:50%;border:1px solid var(--hair);background:var(--surface);color:var(--text);font:600 16px/1 Inter,sans-serif;cursor:pointer}
+.cshead .csnav button:hover{background:var(--surface-2)}
+@media (hover:hover) and (pointer:fine){.cshead .csnav{display:inline-flex}.cshead .csnav+.csall{margin-left:4px}}
+.cshead .csall{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:2px;border:0;background:transparent;color:var(--muted);font:600 12.5px/1 Inter,sans-serif;padding:7px 8px 7px 10px;border-radius:999px;cursor:pointer}
+.cshead .csall:hover,.cshead .csall:focus-visible{color:var(--text);background:rgba(255,255,255,.07)}
+.csrow{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:4px 4px 10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.csrow>*{flex:none;scroll-snap-align:start}
+.chtile{width:104px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border-radius:14px;background:var(--surface);border:1px solid var(--hair);color:var(--text);cursor:pointer;transition:transform .15s ease,background .15s ease,border-color .15s ease}
+.chtile:hover,.chtile:focus-visible{transform:translateY(-3px);background:var(--surface-2)}
+.chtile.on{border-color:var(--ember);background:var(--ember-dim)}
+.chtile .lg{width:56px;height:56px;flex:none;object-fit:contain;border-radius:10px;background:var(--surface-2)}
+.chtile .lg.mono{display:inline-flex;align-items:center;justify-content:center;font:700 20px/1 Inter,sans-serif;color:var(--muted)}
+.chtile .nm{width:100%;font:600 12px/1.25 Inter,sans-serif;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.csrow .pcard{width:132px}
+.csmore{width:104px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:14px;background:var(--surface);border:1px dashed rgba(255,255,255,.16);color:var(--text);font:600 12.5px/1.2 Inter,sans-serif;cursor:pointer}
+.csmore i{width:36px;height:36px;border-radius:50%;background:var(--ember-dim);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:18px}
+.csmore small{color:var(--faint);font-size:11px}
+.csmore.poster{width:132px;height:198px}
+.csmore:hover,.csmore:focus-visible{background:var(--surface-2)}
+html.tvmode .chtile:focus-visible,html.tvmode .csmore:focus-visible,html.tvmode .csall:focus-visible{outline:3px solid #fff;outline-offset:2px;transform:scale(1.06)}
+@media (min-width:1600px){.chtile,.csmore{width:124px;height:136px}.chtile .lg{width:68px;height:68px}.csrow .pcard,.csmore.poster{width:156px}.csmore.poster{height:234px}}
 .chanrow{display:flex;align-items:center;gap:14px;width:100%;min-height:66px;padding:8px 14px;
   border:1px solid var(--hair);border-left:3px solid transparent;border-radius:14px;
   background:rgba(255,255,255,.03);color:#f1f1f4;cursor:pointer;text-align:left;
@@ -3173,8 +3202,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
   function stepChannel(s,dir){
     var host=document.getElementById(s.kind==='iptv'?'ipBody':'ltvBody');
-    var rows=[].slice.call(host.querySelectorAll('.chanrow')); if(!rows.length) return;
-    var cur=host.querySelector('.chanrow.on'), i=cur?rows.indexOf(cur):-1;
+    var rows=[].slice.call(host.querySelectorAll('.chanrow,.chtile')); if(!rows.length) return;
+    var cur=host.querySelector('.chanrow.on,.chtile.on'), i=cur?rows.indexOf(cur):-1;
     if(i<0&&s.last) rows.forEach(function(r,k){ if(r.getAttribute('data-name')===s.last.title) i=k });
     // At the last drawn row, draw the next batch instead of wrapping to the first channel.
     var list=host.querySelector('.lvlist');
@@ -3310,7 +3339,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
   function nowLogoOf(kind){
     var host=document.getElementById(kind==='iptv'?'ipBody':'ltvBody');
-    var img=host&&host.querySelector('.chanrow.on img.lg');
+    var img=host&&host.querySelector('.chanrow.on img.lg,.chtile.on img.lg');
     return img?img.getAttribute('src'):'';
   }
 
@@ -4028,8 +4057,8 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   /* Long lists (thousands of channels / films) are drawn as the viewer scrolls: the first rows
      at once, the next batch when the end comes near. Drawing every row up front kept the page
      busy for seconds and made live TV start and section switches slow. */
-  function paintChunks(host,list,html,done){
-    host.innerHTML=''; var i=0, BATCH=120, sentinel=null, io=null;
+  function paintChunks(host,list,html,done,opt){
+    host.innerHTML=''; var i=0, BATCH=(opt&&opt.batch)||120, STEP=(opt&&opt.step)||40, sentinel=null, io=null;
     if(host.__io){ try{ host.__io.disconnect() }catch(_){} host.__io=null }
     function current(){ return host.dataset['paint']===String(list.__id) }
     function add(n){
@@ -4053,7 +4082,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     // First screenful in small steps (as before), so the list shows at once.
     (function first(){
       if(!current()) return;
-      add(40);
+      add(STEP);
       if(i>=list.length) return finish();
       if(i<BATCH) return requestAnimationFrame(first);
       if(!('IntersectionObserver' in window)){ while(more()){} return }
@@ -4073,6 +4102,43 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
   var paintSeq=0;
 
+  /* ---- All categories as sections (provider order); a category's own page lists everything ---- */
+  var SEC_MAX=30;
+  function groupSections(items,cats,keyOf){
+    var map={},order=[];
+    items.forEach(function(it){ var k=String(keyOf(it)||''); if(!map[k]){ map[k]=[]; order.push(k) } map[k].push(it) });
+    var out=[];
+    (cats||[]).forEach(function(c){ var k=String(c.id); if(map[k]){ out.push({id:k,name:c.name,items:map[k]}); delete map[k] } });
+    var rest=[]; order.forEach(function(k){ if(map[k]) rest=rest.concat(map[k]) });
+    if(rest.length) out.push({id:'',name:'Other',items:rest});
+    return out;
+  }
+  function sectionHtml(sec,card,poster){
+    var open=sec.id!=='', shown=open?sec.items.slice(0,SEC_MAX):sec.items;
+    return '<section class="catsec"><div class="cshead"><h3 dir="auto">'+esc(sec.name)+'</h3><span class="cn">'+sec.items.length+'</span>'+
+      '<span class="csnav"><button type="button" data-csdir="-1" aria-label="Scroll left">‹</button><button type="button" data-csdir="1" aria-label="Scroll right">›</button></span>'+
+      (open?'<button class="csall" type="button" data-seeall="'+esc(sec.id)+'">See all <span aria-hidden="true">›</span></button>':'')+
+      '</div><div class="csrow">'+shown.map(card).join('')+
+      (open&&sec.items.length>shown.length?'<button class="csmore'+(poster?' poster':'')+'" type="button" data-seeall="'+esc(sec.id)+'"><i aria-hidden="true">›</i>See all<small>'+sec.items.length+'</small></button>':'')+
+      '</div></section>';
+  }
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('[data-csdir]'); if(!b) return;
+    var row=b.closest('.catsec'); row=row&&row.querySelector('.csrow'); if(!row) return;
+    var dir=Number(b.getAttribute('data-csdir'))*(getComputedStyle(row).direction==='rtl'?-1:1);
+    row.scrollBy({left:dir*Math.max(200,row.clientWidth*0.85),behavior:'smooth'});
+  });
+  function paintSections(host,secs,card,poster){
+    secs.__id=++paintSeq; host.dataset['paint']=String(secs.__id);
+    paintChunks(host,secs,function(sec){ return sectionHtml(sec,card,poster) },null,{step:3,batch:6});
+  }
+  function chTile(c,attr,playing){
+    var on=playing&&playing.title===c.name?' on':'';
+    return '<button class="chtile'+on+'" type="button" '+attr+' data-name="'+esc(c.name)+'" title="'+esc(c.name)+'">'+
+      (c.logo?'<img class="lg" loading="lazy" src="'+esc(c.logo)+'" alt="" onerror="this.style.visibility=\'hidden\'" />':'<span class="lg mono">'+esc(String(c.name||'?').trim().charAt(0))+'</span>')+
+      '<span class="nm" dir="auto">'+esc(c.name)+'</span></button>';
+  }
+
   function renderDirect(items){
     ensureMpegts(); // ready before the first channel is clicked
     var list=filtered(items,'name');
@@ -4081,6 +4147,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(!list.length){ ltvBody.innerHTML=''; ltvSet('No channels here.'); return }
     ltvSet('');
     var playing=surf('live').last;
+    var secs=(!ltv.cat&&!ltv.q)?groupSections(list,ltv.cats,function(c){ return c.categoryId }):[];
+    if(secs.length>1){
+      ltvBody.innerHTML='<div class="catsecs" id="ltvSecs"></div>';
+      paintSections(document.getElementById('ltvSecs'),secs,function(c){ return chTile(c,'data-id="'+esc(c.id)+'"',playing) },false);
+      return;
+    }
     ltvBody.innerHTML='<div class="lvlist" id="ltvList"></div>';
     var host=document.getElementById('ltvList');
     list.__id=++paintSeq; host.dataset['paint']=String(list.__id);
@@ -4109,6 +4181,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     var list=filtered(items,'name');
     if(!list.length){ ltvBody.innerHTML=''; ltvSet('Nothing here yet.'); return }
     ltvSet('');
+    var secs=(!ltv.cat&&!ltv.q)?groupSections(list,ltv.cats,function(i){ return i.categoryId }):[];
+    if(secs.length>1){
+      ltvBody.innerHTML='<div class="catsecs" id="ltvSecs"></div>';
+      paintSections(document.getElementById('ltvSecs'),secs,function(i){ return vodCard(i,kind) },true);
+      return;
+    }
     ltvBody.innerHTML='<div class="vodgrid" id="ltvGrid"></div>';
     var host=document.getElementById('ltvGrid');
     list.__id=++paintSeq; host.dataset['paint']=String(list.__id);
@@ -4144,10 +4222,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
     ltvBody.innerHTML=skelRows(8); ltvSet('');
     var type=ltv.tab==='direct'?'live':(ltv.tab==='movies'?'vod':'series');
-    api({action:'categories',type:type,source:ltv.prov})
+    /* Categories first (both requests run together): "All" is drawn as one section per category. */
+    var catsP=api({action:'categories',type:type,source:ltv.prov})
       .then(function(d){ if(my===ltv.req) renderCats(d.categories||[]) })
       .catch(function(){});
     api(Object.assign({action:type,source:ltv.prov},ltv.cat?{category_id:ltv.cat}:{}))
+      .then(function(d){ return catsP.then(function(){ return d }) })
       .then(function(d){
         if(my!==ltv.req) return;
         var items=d.items||[];
@@ -4202,9 +4282,11 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   });
 
   ltvBody.addEventListener('click',function(e){
-    var ch=e.target.closest('.chanrow');
+    var sa=e.target.closest('[data-seeall]');
+    if(sa){ ltv.cat=sa.getAttribute('data-seeall')||''; renderCats(ltv.cats||[]); loadTab(); try{ ltvBody.scrollTop=0; var sc=ltvBody.closest('.lvscroll'); if(sc) sc.scrollTop=0 }catch(_){} return }
+    var ch=e.target.closest('.chanrow,.chtile');
     if(ch){
-      [].forEach.call(ltvBody.querySelectorAll('.chanrow.on'),function(x){x.classList.remove('on')});
+      [].forEach.call(ltvBody.querySelectorAll('.chanrow.on,.chtile.on'),function(x){x.classList.remove('on')});
       ch.classList.add('on');
       playById('live',ch.getAttribute('data-id'),'',ch.getAttribute('data-name'),'● LIVE · '+(ltvSub.textContent.split(' ·')[0]),true);
       return;
@@ -4722,6 +4804,12 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(!list.length){ ipBody.innerHTML=''; ipSet('No channels match that search.'); return }
     ipSet('');
     var playing=surf('iptv').last;
+    var secs=(!ip.group&&!q)?groupSections(list,(ip.groups||[]).map(function(g){ return {id:g.name,name:g.name} }),function(c){ return c.group }):[];
+    if(secs.length>1){
+      ipBody.innerHTML='<div class="catsecs" id="ipSecs"></div>';
+      paintSections(document.getElementById('ipSecs'),secs,function(c){ return chTile(c,'data-ipch="'+esc(c.id)+'"',playing) },false);
+      return;
+    }
     ipBody.innerHTML='<div class="lvlist" id="ipList"></div>';
     var host=document.getElementById('ipList');
     list.__id=++paintSeq; host.dataset['paint']=String(list.__id);
@@ -4782,8 +4870,10 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     ipq=setTimeout(function(){ ip.q=v; renderIpChannels(); },200);
   });
   ipBody.addEventListener('click',function(e){
+    var sa=e.target.closest('[data-seeall]');
+    if(sa){ ip.group=sa.getAttribute('data-seeall')||''; renderIpGroups(); renderIpChannels(); try{ var sc=ipBody.closest('.lvscroll'); if(sc) sc.scrollTop=0 }catch(_){} return }
     var ch=e.target.closest('[data-ipch]'); if(!ch) return;
-    [].forEach.call(ipBody.querySelectorAll('.chanrow.on'),function(x){x.classList.remove('on')});
+    [].forEach.call(ipBody.querySelectorAll('.chanrow.on,.chtile.on'),function(x){x.classList.remove('on')});
     ch.classList.add('on');
     var name=ch.getAttribute('data-name'), s=surf('iptv');
     s.idle.classList.add('hide'); clearFail(s); busy(s,true);
