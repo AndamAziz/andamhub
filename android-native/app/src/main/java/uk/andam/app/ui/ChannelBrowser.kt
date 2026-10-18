@@ -53,13 +53,11 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
 
     val tv = LocalTv.current
     androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
-    if (tv && categories.isNotEmpty()) {
-        TvCategoryPane(categories, cat, onSelect = { cat = it })
-        Spacer(Modifier.width(16.dp))
-    }
     Column(Modifier.weight(1f).fillMaxHeight()) {
         if (tv) {
+            // Same as phones: categories from the dropdown, never a side pane or a row.
             TvSearchButton(q, { q = it }, "Search channels", Modifier.padding(bottom = 10.dp))
+            if (categories.isNotEmpty()) CategoryBar(categories, cat, onSelect = { cat = it })
             CountLine("${shown.size} channels")
             Spacer(Modifier.height(6.dp))
         } else {
@@ -71,8 +69,8 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
         val sections = remember(list, categories) { groupByCategory(categories, list.size) { list[it].group } }
         if (shown.isEmpty()) {
             ErrorBox(if (list.isEmpty()) "No channels yet." else "No channels match.")
-        } else if (grouped && sections.size > 1 && !tv) {
-            // Phones: each category as a short list, like the channel list itself.
+        } else if (grouped && sections.size > 1) {
+            // All categories: each category as a short list (like the channel list itself).
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 sections.forEach { sec ->
                     val canOpen = sec.category.id.isNotEmpty()
@@ -90,19 +88,6 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
                 }
                 item { Spacer(Modifier.height(16.dp)) }
             }
-        } else if (grouped && sections.size > 1) {
-            // All categories: one row per provider category, in the provider's order.
-            CategorySections(
-                sections,
-                cardWidth = if (tv) 132 else 112,
-                cardHeight = 128,
-                onSeeAll = { cat = it.id },
-            ) { i ->
-                ChannelTile(list[i].title, list[i].logo, if (tv) 132 else 112) {
-                    // The player gets the full list, so its panel can switch categories too.
-                    PlayQueue.open(context, list, i, categories)
-                }
-            }
         } else {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(shown, key = { list[it].id + "#" + it }) { i ->
@@ -116,29 +101,6 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
             }
         }
     }
-    }
-}
-
-/** A channel as a tile (logo above its name), for the category rows. */
-@Composable
-fun ChannelTile(name: String, logo: String, widthDp: Int, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(widthDp.dp)
-            .height(128.dp)
-            .tvFocus(androidx.compose.foundation.shape.RoundedCornerShape(16.dp), 1.07f)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .background(C.Surface)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Logo(logo, name, 64)
-        Text(
-            name, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            maxLines = 2, minLines = 2, lineHeight = 15.sp, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
-        )
     }
 }
 

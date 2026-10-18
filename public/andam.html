@@ -655,55 +655,34 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 
 
 .lvlist{display:flex;flex-direction:column;gap:8px}
-/* All categories: one section per provider category, each a horizontal row */
+/* All categories: one section per provider category (vertical list / poster grid, like the other pages) */
 .catsecs{display:flex;flex-direction:column;padding:0 0 18px}
 .catsec{min-width:0}
 .cshead{display:flex;align-items:center;gap:8px;padding:16px 4px 8px}
 .cshead::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--ember);flex:none}
 .cshead h3{margin:0;font:700 15px/1.25 Inter,sans-serif;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cshead .cn{flex:none;font:700 11px/1 Inter,sans-serif;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:4px 8px;font-variant-numeric:tabular-nums}
-.cshead .csnav{margin-left:auto;display:none;gap:4px;flex:none}
-.cshead .csnav button{width:28px;height:28px;border-radius:50%;border:1px solid var(--hair);background:var(--surface);color:var(--text);font:600 16px/1 Inter,sans-serif;cursor:pointer}
-.cshead .csnav button:hover{background:var(--surface-2)}
-@media (hover:hover) and (pointer:fine){.cshead .csnav{display:inline-flex}.cshead .csnav+.csall{margin-left:4px}}
 .cshead .csall{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:2px;border:0;background:transparent;color:var(--muted);font:600 12.5px/1 Inter,sans-serif;padding:7px 8px 7px 10px;border-radius:999px;cursor:pointer}
 .cshead .csall:hover,.cshead .csall:focus-visible{color:var(--text);background:rgba(255,255,255,.07)}
-.csrow{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:4px 4px 10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
-.csrow>*{flex:none;scroll-snap-align:start}
-.chtile{width:104px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border-radius:14px;background:var(--surface);border:1px solid var(--hair);color:var(--text);cursor:pointer;transition:transform .15s ease,background .15s ease,border-color .15s ease}
-.chtile:hover,.chtile:focus-visible{transform:translateY(-3px);background:var(--surface-2)}
-.chtile.on{border-color:var(--ember);background:var(--ember-dim)}
-.chtile .lg{width:56px;height:56px;flex:none;object-fit:contain;border-radius:10px;background:var(--surface-2)}
-.chtile .lg.mono{display:inline-flex;align-items:center;justify-content:center;font:700 20px/1 Inter,sans-serif;color:var(--muted)}
-.chtile .nm{width:100%;font:600 12px/1.25 Inter,sans-serif;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.csrow .pcard{width:132px}
-.csmore{width:104px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:14px;background:var(--surface);border:1px dashed rgba(255,255,255,.16);color:var(--text);font:600 12.5px/1.2 Inter,sans-serif;cursor:pointer}
-.csmore i{width:36px;height:36px;border-radius:50%;background:var(--ember-dim);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:18px}
+.csrow{display:flex;flex-direction:column;gap:6px;padding:0 0 4px}
+.csrow.posters{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:14px 12px}
+.chtile{width:100%;height:60px;display:flex;align-items:center;gap:12px;padding:0 12px;border-radius:12px;background:transparent;border:1px solid transparent;border-left:3px solid transparent;color:var(--text);cursor:pointer;text-align:left;transition:background .15s ease}
+.chtile:hover,.chtile:focus-visible{background:rgba(255,255,255,.06)}
+.chtile.on{border-left-color:var(--ember);background:var(--ember-dim)}
+.chtile .lg{width:40px;height:40px;flex:none;object-fit:contain;border-radius:8px;background:var(--surface-2)}
+.chtile .lg.mono{display:inline-flex;align-items:center;justify-content:center;font:700 15px/1 Inter,sans-serif;color:var(--muted)}
+.chtile .nm{flex:1;min-width:0;font:500 14px/1.2 Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.csrow:not(.posters) .chtile:nth-of-type(n+9){display:none}
+.csrow.posters .pcard:nth-of-type(n+13){display:none}
+.csmore{display:none}
+.csmore.m{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;border-radius:12px;border:1px solid var(--hair);background:var(--surface);color:var(--text);font:600 13px/1 Inter,sans-serif;cursor:pointer}
+.csmore.m:hover,.csmore.m:focus-visible{background:var(--surface-2)}
+.csmore i{order:2;width:24px;height:24px;border-radius:50%;background:var(--ember-dim);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:14px}
 .csmore small{color:var(--faint);font-size:11px}
-.csmore.poster{width:132px;height:198px}
-.csmore:hover,.csmore:focus-visible{background:var(--surface-2)}
-.csmore{display:none}.csmore.d{display:flex}
-/* Phones: sections are a vertical list (channels) / poster grid (films, series), like the other pages */
-@media (max-width:767px){
-  html:not(.tvmode) .csrow{flex-direction:column;gap:6px;overflow:visible;scroll-snap-type:none;padding:0 0 4px}
-  html:not(.tvmode) .csrow.posters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
-  html:not(.tvmode) .cshead .csnav{display:none}
-  html:not(.tvmode) .chtile{width:100%;height:60px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;border-radius:12px;background:transparent;border:1px solid transparent;border-left:3px solid transparent;transform:none}
-  html:not(.tvmode) .chtile:hover{transform:none;background:rgba(255,255,255,.06)}
-  html:not(.tvmode) .chtile.on{border-left-color:var(--ember);background:var(--ember-dim)}
-  html:not(.tvmode) .chtile .lg{width:40px;height:40px;border-radius:8px}
-  html:not(.tvmode) .chtile .lg.mono{font-size:15px}
-  html:not(.tvmode) .chtile .nm{flex:1;min-width:0;text-align:left;font:500 14px/1.2 Inter,sans-serif;-webkit-line-clamp:1}
-  html:not(.tvmode) .csrow:not(.posters) .chtile:nth-of-type(n+9){display:none}
-  html:not(.tvmode) .csrow.posters .pcard{width:auto}
-  html:not(.tvmode) .csrow.posters .pcard:nth-of-type(n+13){display:none}
-  html:not(.tvmode) .csmore{display:none}
-  html:not(.tvmode) .csmore.m{display:flex;width:100%;height:46px;flex-direction:row;gap:8px;border-radius:12px;border:1px solid var(--hair);background:var(--surface)}
-  html:not(.tvmode) .csmore.m i{width:24px;height:24px;font-size:14px;order:2}
-  html:not(.tvmode) .csrow.posters .csmore.m{grid-column:1/-1}
-}
-html.tvmode .chtile:focus-visible,html.tvmode .csmore:focus-visible,html.tvmode .csall:focus-visible{outline:3px solid #fff;outline-offset:2px;transform:scale(1.06)}
-@media (min-width:1600px){.chtile,.csmore{width:124px;height:136px}.chtile .lg{width:68px;height:68px}.csrow .pcard,.csmore.poster{width:156px}.csmore.poster{height:234px}}
+.csrow.posters .csmore.m{grid-column:1/-1}
+@media (max-width:767px){.csrow.posters{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}}
+@media (min-width:1600px){.chtile{height:72px}.chtile .nm{font-size:17px}.chtile .lg{width:52px;height:52px}}
+html.tvmode .chtile:focus-visible,html.tvmode .csmore:focus-visible,html.tvmode .csall:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .chanrow{display:flex;align-items:center;gap:14px;width:100%;min-height:66px;padding:8px 14px;
   border:1px solid var(--hair);border-left:3px solid transparent;border-radius:14px;
   background:rgba(255,255,255,.03);color:#f1f1f4;cursor:pointer;text-align:left;
@@ -1334,10 +1313,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 .catsel-opt{display:block;width:100%;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:13.5px;font-weight:600;text-align:left;cursor:pointer}
 .catsel-opt:hover{background:rgba(255,255,255,.06);color:var(--text)}
 .catsel-opt.on{background:var(--ember-dim);color:#fff}
-@media (min-width:720px){
-  .ltv .lvchips{display:none!important}
-  .catsel.has{display:block}
-}
+/* Categories are always picked from the dropdown (no horizontal chip row), on every width */
+.ltv .lvchips{display:none!important}
+.catsel.has{display:block}
 
 /* v2.10 — scorpion emblem as the brand mark */
 .brand .mark{background:#0A0B0F url(/icon-192.png) center/cover no-repeat !important;color:transparent !important;font-size:0 !important;box-shadow:0 0 0 1px rgba(255,59,78,.35),0 4px 14px rgba(255,59,78,.25) !important}
@@ -4123,7 +4101,6 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   var paintSeq=0;
 
   /* ---- All categories as sections (provider order); a category's own page lists everything ---- */
-  var SEC_MAX=30;
   function groupSections(items,cats,keyOf){
     var map={},order=[];
     items.forEach(function(it){ var k=String(keyOf(it)||''); if(!map[k]){ map[k]=[]; order.push(k) } map[k].push(it) });
@@ -4133,24 +4110,17 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(rest.length) out.push({id:'',name:'Other',items:rest});
     return out;
   }
-  /* Phones show fewer per section (as a list / grid, like the rest of the app). */
+  /* Per section: a short list / grid (like the rest of the app), then "See all". */
   var SEC_PHONE_CH=8, SEC_PHONE_POSTER=12;
   function sectionHtml(sec,card,poster){
-    var open=sec.id!=='', shown=open?sec.items.slice(0,SEC_MAX):sec.items, n=sec.items.length;
-    var more=(open&&n>SEC_MAX?' d':'')+(open&&n>(poster?SEC_PHONE_POSTER:SEC_PHONE_CH)?' m':'');
+    var lim=poster?SEC_PHONE_POSTER:SEC_PHONE_CH, open=sec.id!=='', shown=open?sec.items.slice(0,lim):sec.items, n=sec.items.length;
+    var more=open&&n>lim?' m':'';
     return '<section class="catsec"><div class="cshead"><h3 dir="auto">'+esc(sec.name)+'</h3><span class="cn">'+sec.items.length+'</span>'+
-      '<span class="csnav"><button type="button" data-csdir="-1" aria-label="Scroll left">‹</button><button type="button" data-csdir="1" aria-label="Scroll right">›</button></span>'+
       (open?'<button class="csall" type="button" data-seeall="'+esc(sec.id)+'">See all <span aria-hidden="true">›</span></button>':'')+
       '</div><div class="csrow'+(poster?' posters':'')+'">'+shown.map(card).join('')+
       (more?'<button class="csmore'+(poster?' poster':'')+more+'" type="button" data-seeall="'+esc(sec.id)+'"><i aria-hidden="true">›</i>See all<small>'+n+'</small></button>':'')+
       '</div></section>';
   }
-  document.addEventListener('click',function(e){
-    var b=e.target.closest&&e.target.closest('[data-csdir]'); if(!b) return;
-    var row=b.closest('.catsec'); row=row&&row.querySelector('.csrow'); if(!row) return;
-    var dir=Number(b.getAttribute('data-csdir'))*(getComputedStyle(row).direction==='rtl'?-1:1);
-    row.scrollBy({left:dir*Math.max(200,row.clientWidth*0.85),behavior:'smooth'});
-  });
   function paintSections(host,secs,card,poster){
     secs.__id=++paintSeq; host.dataset['paint']=String(secs.__id);
     paintChunks(host,secs,function(sec){ return sectionHtml(sec,card,poster) },null,{step:3,batch:6});

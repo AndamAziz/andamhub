@@ -4,20 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -35,8 +28,8 @@ import uk.andam.app.net.Category
 
 /**
  * "All categories" as the provider arranges it: one section per category, in the provider's
- * order, each a horizontal row with its name, its size and "See all" (which opens that category).
- * Used by Live TV, IPTV, Movies and Series on phones, tablets and TV.
+ * order — a header (name, size, "See all"), a short list / poster grid and a "See all" button.
+ * Used by Live TV, IPTV, Movies and Series on phones, tablets and TV (no horizontal rows).
  */
 class CategorySection(val category: Category, val indices: List<Int>)
 
@@ -50,9 +43,6 @@ fun groupByCategory(categories: List<Category>, count: Int, categoryOf: (Int) ->
     if (rest.isNotEmpty()) out.add(CategorySection(Category("", "Other"), rest))
     return out
 }
-
-/** Items shown per row before the "See all" card; the category itself shows everything. */
-const val SECTION_ROW_MAX = 30
 
 @Composable
 fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?, start: Int = 16, end: Int = 8) {
@@ -87,63 +77,7 @@ fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?, start: Int
     }
 }
 
-/** The last card of a row: opens the whole category. */
-@Composable
-fun SeeAllCard(count: Int, width: Int, height: Int, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .width(width.dp)
-            .height(height.dp)
-            .tvFocus(RoundedCornerShape(14.dp), 1.06f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(C.Surface)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(50)).background(C.EmberDim), contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = C.Text)
-            }
-            Text("See all", color = C.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-            Text("$count", color = C.Faint, fontSize = 11.sp)
-        }
-    }
-}
-
-/**
- * The sections as a vertical list of horizontal rows. [card] draws item `index` (an index into
- * the caller's full list); [cardWidth] / [cardHeight] size the "See all" card to match.
- */
-@Composable
-fun CategorySections(
-    sections: List<CategorySection>,
-    header: (@Composable () -> Unit)? = null,
-    cardWidth: Int,
-    cardHeight: Int,
-    onSeeAll: (Category) -> Unit,
-    card: @Composable (index: Int) -> Unit,
-) {
-    LazyColumn(state = rememberLazyListState(), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        if (header != null) item(key = "header") { header() }
-        items(sections, key = { "sec:" + it.category.id + ":" + it.category.name }) { sec ->
-            val canOpen = sec.category.id.isNotEmpty()
-            SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ onSeeAll(sec.category) }) else null)
-            val shown = if (canOpen) sec.indices.take(SECTION_ROW_MAX) else sec.indices
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                items(shown, key = { it }) { i -> card(i) }
-                if (canOpen && sec.indices.size > shown.size) {
-                    item(key = "all") { SeeAllCard(sec.indices.size, cardWidth, cardHeight) { onSeeAll(sec.category) } }
-                }
-            }
-        }
-    }
-}
-
-/** Phones: per section, how many items show before "See all" (a list / grid like the other pages). */
+/** Per section, how many items show before "See all" (a list / grid like the other pages). */
 const val SECTION_PHONE_CHANNELS = 8
 const val SECTION_PHONE_POSTERS = 12
 
