@@ -208,6 +208,34 @@ private fun PosterGrid(
                 val sections = remember(s.value, cats) { groupByCategory(cats, s.value.size) { s.value[it].cat } }
                 val w = if (tv) 132 else 112
                 if (shown.isEmpty()) ErrorBox("Nothing here yet.")
+                else if (cat.isEmpty() && q.isBlank() && sections.size > 1 && !tv) {
+                    // Phones: each category as a short poster grid, like the grid itself.
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(96.dp),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${s.value.size} titles · ${sections.size} categories") }
+                        sections.forEach { sec ->
+                            val canOpen = sec.category.id.isNotEmpty()
+                            item(key = "h:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
+                                SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ cat = sec.category.id }) else null, start = 4, end = 0)
+                            }
+                            val cells = if (canOpen) sec.indices.take(SECTION_PHONE_POSTERS) else sec.indices
+                            items(cells.size, key = { "p:" + sec.category.id + ":" + cells[it] }) { k ->
+                                val p = s.value[cells[k]]
+                                PosterCard(p.title, p.image, p.sub, p.rating) { onOpen(sec.indices.map { s.value[it] }, k) }
+                            }
+                            if (canOpen && sec.indices.size > cells.size) {
+                                item(key = "m:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
+                                    SeeAllRow(sec.indices.size, horizontal = 0) { cat = sec.category.id }
+                                }
+                            }
+                        }
+                    }
+                }
                 else if (cat.isEmpty() && q.isBlank() && sections.size > 1) {
                     // All categories: one row per provider category, in the provider's order.
                     CategorySections(

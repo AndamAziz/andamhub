@@ -682,6 +682,26 @@ body.player-fullscreen>.lvstage.fspseudo{visibility:visible!important;pointer-ev
 .csmore small{color:var(--faint);font-size:11px}
 .csmore.poster{width:132px;height:198px}
 .csmore:hover,.csmore:focus-visible{background:var(--surface-2)}
+.csmore{display:none}.csmore.d{display:flex}
+/* Phones: sections are a vertical list (channels) / poster grid (films, series), like the other pages */
+@media (max-width:767px){
+  html:not(.tvmode) .csrow{flex-direction:column;gap:6px;overflow:visible;scroll-snap-type:none;padding:0 0 4px}
+  html:not(.tvmode) .csrow.posters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
+  html:not(.tvmode) .cshead .csnav{display:none}
+  html:not(.tvmode) .chtile{width:100%;height:60px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;border-radius:12px;background:transparent;border:1px solid transparent;border-left:3px solid transparent;transform:none}
+  html:not(.tvmode) .chtile:hover{transform:none;background:rgba(255,255,255,.06)}
+  html:not(.tvmode) .chtile.on{border-left-color:var(--ember);background:var(--ember-dim)}
+  html:not(.tvmode) .chtile .lg{width:40px;height:40px;border-radius:8px}
+  html:not(.tvmode) .chtile .lg.mono{font-size:15px}
+  html:not(.tvmode) .chtile .nm{flex:1;min-width:0;text-align:left;font:500 14px/1.2 Inter,sans-serif;-webkit-line-clamp:1}
+  html:not(.tvmode) .csrow:not(.posters) .chtile:nth-of-type(n+9){display:none}
+  html:not(.tvmode) .csrow.posters .pcard{width:auto}
+  html:not(.tvmode) .csrow.posters .pcard:nth-of-type(n+13){display:none}
+  html:not(.tvmode) .csmore{display:none}
+  html:not(.tvmode) .csmore.m{display:flex;width:100%;height:46px;flex-direction:row;gap:8px;border-radius:12px;border:1px solid var(--hair);background:var(--surface)}
+  html:not(.tvmode) .csmore.m i{width:24px;height:24px;font-size:14px;order:2}
+  html:not(.tvmode) .csrow.posters .csmore.m{grid-column:1/-1}
+}
 html.tvmode .chtile:focus-visible,html.tvmode .csmore:focus-visible,html.tvmode .csall:focus-visible{outline:3px solid #fff;outline-offset:2px;transform:scale(1.06)}
 @media (min-width:1600px){.chtile,.csmore{width:124px;height:136px}.chtile .lg{width:68px;height:68px}.csrow .pcard,.csmore.poster{width:156px}.csmore.poster{height:234px}}
 .chanrow{display:flex;align-items:center;gap:14px;width:100%;min-height:66px;padding:8px 14px;
@@ -4113,13 +4133,16 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(rest.length) out.push({id:'',name:'Other',items:rest});
     return out;
   }
+  /* Phones show fewer per section (as a list / grid, like the rest of the app). */
+  var SEC_PHONE_CH=8, SEC_PHONE_POSTER=12;
   function sectionHtml(sec,card,poster){
-    var open=sec.id!=='', shown=open?sec.items.slice(0,SEC_MAX):sec.items;
+    var open=sec.id!=='', shown=open?sec.items.slice(0,SEC_MAX):sec.items, n=sec.items.length;
+    var more=(open&&n>SEC_MAX?' d':'')+(open&&n>(poster?SEC_PHONE_POSTER:SEC_PHONE_CH)?' m':'');
     return '<section class="catsec"><div class="cshead"><h3 dir="auto">'+esc(sec.name)+'</h3><span class="cn">'+sec.items.length+'</span>'+
       '<span class="csnav"><button type="button" data-csdir="-1" aria-label="Scroll left">‹</button><button type="button" data-csdir="1" aria-label="Scroll right">›</button></span>'+
       (open?'<button class="csall" type="button" data-seeall="'+esc(sec.id)+'">See all <span aria-hidden="true">›</span></button>':'')+
-      '</div><div class="csrow">'+shown.map(card).join('')+
-      (open&&sec.items.length>shown.length?'<button class="csmore'+(poster?' poster':'')+'" type="button" data-seeall="'+esc(sec.id)+'"><i aria-hidden="true">›</i>See all<small>'+sec.items.length+'</small></button>':'')+
+      '</div><div class="csrow'+(poster?' posters':'')+'">'+shown.map(card).join('')+
+      (more?'<button class="csmore'+(poster?' poster':'')+more+'" type="button" data-seeall="'+esc(sec.id)+'"><i aria-hidden="true">›</i>See all<small>'+n+'</small></button>':'')+
       '</div></section>';
   }
   document.addEventListener('click',function(e){

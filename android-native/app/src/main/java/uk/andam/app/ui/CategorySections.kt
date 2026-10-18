@@ -55,9 +55,9 @@ fun groupByCategory(categories: List<Category>, count: Int, categoryOf: (Int) ->
 const val SECTION_ROW_MAX = 30
 
 @Composable
-fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?) {
+fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?, start: Int = 16, end: Int = 8) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 18.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = start.dp, end = end.dp, top = 18.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(4.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(C.Ember))
@@ -139,6 +139,33 @@ fun CategorySections(
                     item(key = "all") { SeeAllCard(sec.indices.size, cardWidth, cardHeight) { onSeeAll(sec.category) } }
                 }
             }
+        }
+    }
+}
+
+/** Phones: per section, how many items show before "See all" (a list / grid like the other pages). */
+const val SECTION_PHONE_CHANNELS = 8
+const val SECTION_PHONE_POSTERS = 12
+
+/** Full-width "See all" button closing a section on phones. */
+@Composable
+fun SeeAllRow(count: Int, horizontal: Int = 12, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontal.dp, vertical = 6.dp)
+            .tvFocus(RoundedCornerShape(12.dp), 1.02f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(C.Surface)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("See all", color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text("$count", color = C.Faint, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+        Box(Modifier.padding(start = 8.dp).size(24.dp).clip(RoundedCornerShape(50)).background(C.EmberDim), contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = C.Text, modifier = Modifier.size(18.dp))
         }
     }
 }
