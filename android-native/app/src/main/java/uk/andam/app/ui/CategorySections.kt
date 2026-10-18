@@ -4,13 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -21,15 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import uk.andam.app.net.Category
 
 /**
  * "All categories" as the provider arranges it: one section per category, in the provider's
- * order — a header (name, size, "See all"), a short list / poster grid and a "See all" button.
- * Used by Live TV, IPTV, Movies and Series on phones, tablets and TV (no horizontal rows).
+ * order. Each section is a header (name, size, "See all") and ONE full row of the grid — 3 on
+ * phones, more on tablets and TV — so every section lines up the same. "See all" opens the
+ * category with everything in it. No horizontal scrolling anywhere.
+ * Used by Live TV, IPTV, Movies and Series on phones, tablets and TV.
  */
 class CategorySection(val category: Category, val indices: List<Int>)
 
@@ -44,26 +54,35 @@ fun groupByCategory(categories: List<Category>, count: Int, categoryOf: (Int) ->
     return out
 }
 
+/** Grid columns for the section rows: 3 on phones, more on tablets / TV. */
+fun sectionColumns(width: Dp, tv: Boolean): Int = when {
+    width < 600.dp -> 3
+    tv -> ((width.value - 32f) / 150f).toInt().coerceIn(4, 8)
+    else -> ((width.value - 32f) / 130f).toInt().coerceIn(4, 7)
+}
+
 @Composable
-fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?, start: Int = 16, end: Int = 8) {
+fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?) {
     Row(
-        Modifier.fillMaxWidth().padding(start = start.dp, end = end.dp, top = 18.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(4.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(C.Ember))
-        Text(
-            title, color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 10.dp).weight(1f, fill = false),
-        )
-        Text(
-            "$count", color = C.Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(C.Surface2).padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-        Spacer(Modifier.weight(1f))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(4.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(C.Ember))
+            Text(
+                title, color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 10.dp).weight(1f, fill = false),
+            )
+            Text(
+                "$count", color = C.Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(C.Surface2).padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
         if (onSeeAll != null) {
             Row(
                 Modifier
+                    .padding(start = 8.dp)
                     .tvFocus(RoundedCornerShape(50), 1.04f)
                     .clip(RoundedCornerShape(50))
                     .clickable(onClick = onSeeAll)
@@ -77,29 +96,60 @@ fun SectionHeader(title: String, count: Int, onSeeAll: (() -> Unit)?, start: Int
     }
 }
 
-/** Per section, how many items show before "See all" (a list / grid like the other pages). */
-const val SECTION_PHONE_CHANNELS = 8
-const val SECTION_PHONE_POSTERS = 12
-
-/** Full-width "See all" button closing a section on phones. */
+/** A channel as a card (logo above its name), sized by its grid cell. */
 @Composable
-fun SeeAllRow(count: Int, horizontal: Int = 12, onClick: () -> Unit) {
-    Row(
+fun ChannelTile(name: String, logo: String, onClick: () -> Unit) {
+    val tv = LocalTv.current
+    Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = horizontal.dp, vertical = 6.dp)
-            .tvFocus(RoundedCornerShape(12.dp), 1.02f)
-            .clip(RoundedCornerShape(12.dp))
+            .height(if (tv) 132.dp else 116.dp)
+            .tvFocus(RoundedCornerShape(14.dp), 1.06f)
+            .clip(RoundedCornerShape(14.dp))
             .background(C.Surface)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Text("See all", color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text("$count", color = C.Faint, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-        Box(Modifier.padding(start = 8.dp).size(24.dp).clip(RoundedCornerShape(50)).background(C.EmberDim), contentAlignment = Alignment.Center) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = C.Text, modifier = Modifier.size(18.dp))
+        Logo(logo, name, if (tv) 64 else 52)
+        Text(
+            name, color = C.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 2, lineHeight = 15.sp, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/**
+ * The sections as one grid: per section a full-width header and one row of [cell]s
+ * (`cell(section, k)` draws the k-th item of that section).
+ */
+@Composable
+fun SectionGrid(
+    sections: List<CategorySection>,
+    onSeeAll: (Category) -> Unit,
+    cell: @Composable (CategorySection, Int) -> Unit,
+) {
+    val tv = LocalTv.current
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cols = sectionColumns(maxWidth, tv)
+        val gap = if (tv) 16.dp else 10.dp
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(cols),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            sections.forEach { sec ->
+                val canOpen = sec.category.id.isNotEmpty()
+                item(key = "h:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ onSeeAll(sec.category) }) else null)
+                }
+                val n = if (canOpen) minOf(cols, sec.indices.size) else sec.indices.size
+                items(n, key = { "i:" + sec.category.id + ":" + sec.indices[it] }) { k -> cell(sec, k) }
+            }
         }
     }
 }
