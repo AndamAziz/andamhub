@@ -143,7 +143,7 @@ fun MoviesScreen() {
     PosterGrid(
         key = "vod:$source",
         loadCats = { Api.categories(source, "vod") },
-        loadItems = { cat -> Api.vod(source, cat).map { Poster(it.id, it.name, it.poster, listOf(it.year, it.genre.substringBefore(',')).filter { s -> s.isNotBlank() }.joinToString(" · "), it.rating, it) } },
+        loadItems = { cat -> Api.vod(source, cat).map { Poster(it.id, it.name, it.poster, listOf(it.year, it.genre.substringBefore(',')).filter { s -> s.isNotBlank() }.joinToString(" · "), it.rating, it, it.categoryId) } },
         onOpen = { list, index -> open = list[index].payload as VodItem },
     )
 }
@@ -161,12 +161,12 @@ fun SeriesScreen() {
     PosterGrid(
         key = "series:$source",
         loadCats = { Api.categories(source, "series") },
-        loadItems = { cat -> Api.series(source, cat).map { Poster(it.id, it.name, it.poster, listOf(it.year, it.genre.substringBefore(',')).filter { s -> s.isNotBlank() }.joinToString(" · "), it.rating, it) } },
+        loadItems = { cat -> Api.series(source, cat).map { Poster(it.id, it.name, it.poster, listOf(it.year, it.genre.substringBefore(',')).filter { s -> s.isNotBlank() }.joinToString(" · "), it.rating, it, it.categoryId) } },
         onOpen = { list, index -> open = list[index].payload as SeriesItem },
     )
 }
 
-class Poster(val id: String, val title: String, val image: String, val sub: String, val rating: String, val payload: Any)
+class Poster(val id: String, val title: String, val image: String, val sub: String, val rating: String, val payload: Any, val cat: String = "")
 
 @Composable
 private fun PosterGrid(
@@ -205,7 +205,25 @@ private fun PosterGrid(
             is Load.Err -> ErrorBox(s.message) { Api.clearCache(); reload++ }
             is Load.Ok -> {
                 val shown = remember(s.value, q) { s.value.filter { q.isBlank() || it.title.contains(q, ignoreCase = true) } }
-                if (shown.isEmpty()) ErrorBox("Nothing here yet.") else
+                val sections = remember(s.value, cats) { groupByCategory(cats, s.value.size) { s.value[it].cat } }
+                val w = if (tv) 132 else 112
+                if (shown.isEmpty()) ErrorBox("Nothing here yet.")
+                else if (cat.isEmpty() && q.isBlank() && sections.size > 1) {
+                    // All categories: one row per provider category, in the provider's order.
+                    CategorySections(
+                        sections,
+                        header = { CountLine("${s.value.size} titles · ${sections.size} categories") },
+                        cardWidth = w,
+                        cardHeight = w * 3 / 2,
+                        onSeeAll = { cat = it.id },
+                    ) { i ->
+                        val p = s.value[i]
+                        PosterCard(p.title, p.image, p.sub, p.rating, Modifier.width(w.dp)) {
+                            val row = sections.first { sec -> i in sec.indices }.indices
+                            onOpen(row.map { s.value[it] }, row.indexOf(i))
+                        }
+                    }
+                } else
                     LazyVerticalGrid(
                         // 3 posters per row on phones, more on tablets/TV — like pro streaming apps.
                         columns = GridCells.Adaptive(if (tv) 122.dp else 96.dp),
