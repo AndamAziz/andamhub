@@ -190,13 +190,12 @@ private fun PosterGrid(
 
     val tv = LocalTv.current
     Row(Modifier.fillMaxSize()) {
-    if (tv && cats.isNotEmpty()) {
-        TvCategoryPane(cats, cat, onSelect = { cat = it })
-        Spacer(Modifier.width(16.dp))
-    }
     Column(Modifier.weight(1f).fillMaxSize()) {
-        if (tv) TvSearchButton(q, { q = it }, "Search titles", Modifier.padding(bottom = 6.dp))
-        else {
+        if (tv) {
+            // Same as phones: categories from the dropdown, never a side pane or a row.
+            TvSearchButton(q, { q = it }, "Search titles", Modifier.padding(bottom = 6.dp))
+            if (cats.isNotEmpty()) CategoryBar(cats, cat, onSelect = { cat = it })
+        } else {
             SearchField(q, { q = it }, "Search titles", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (cats.isNotEmpty()) CategoryBar(cats, cat, onSelect = { cat = it })
         }
@@ -206,21 +205,32 @@ private fun PosterGrid(
             is Load.Ok -> {
                 val shown = remember(s.value, q) { s.value.filter { q.isBlank() || it.title.contains(q, ignoreCase = true) } }
                 val sections = remember(s.value, cats) { groupByCategory(cats, s.value.size) { s.value[it].cat } }
-                val w = if (tv) 132 else 112
                 if (shown.isEmpty()) ErrorBox("Nothing here yet.")
                 else if (cat.isEmpty() && q.isBlank() && sections.size > 1) {
-                    // All categories: one row per provider category, in the provider's order.
-                    CategorySections(
-                        sections,
-                        header = { CountLine("${s.value.size} titles · ${sections.size} categories") },
-                        cardWidth = w,
-                        cardHeight = w * 3 / 2,
-                        onSeeAll = { cat = it.id },
-                    ) { i ->
-                        val p = s.value[i]
-                        PosterCard(p.title, p.image, p.sub, p.rating, Modifier.width(w.dp)) {
-                            val row = sections.first { sec -> i in sec.indices }.indices
-                            onOpen(row.map { s.value[it] }, row.indexOf(i))
+                    // All categories: each category as a short poster grid (like the grid itself).
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(if (tv) 122.dp else 96.dp),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${s.value.size} titles · ${sections.size} categories") }
+                        sections.forEach { sec ->
+                            val canOpen = sec.category.id.isNotEmpty()
+                            item(key = "h:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
+                                SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ cat = sec.category.id }) else null, start = 4, end = 0)
+                            }
+                            val cells = if (canOpen) sec.indices.take(SECTION_PHONE_POSTERS) else sec.indices
+                            items(cells.size, key = { "p:" + sec.category.id + ":" + cells[it] }) { k ->
+                                val p = s.value[cells[k]]
+                                PosterCard(p.title, p.image, p.sub, p.rating) { onOpen(sec.indices.map { s.value[it] }, k) }
+                            }
+                            if (canOpen && sec.indices.size > cells.size) {
+                                item(key = "m:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
+                                    SeeAllRow(sec.indices.size, horizontal = 0) { cat = sec.category.id }
+                                }
+                            }
                         }
                     }
                 } else
