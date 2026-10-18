@@ -183,6 +183,8 @@ private fun PosterGrid(
     var state by remember(key) { mutableStateOf<Load<List<Poster>>>(Load.Busy) }
 
     LaunchedEffect(key) { cats = runCatching { loadCats() }.getOrDefault(emptyList()) }
+    // Back from a category opened with "See all" returns to all categories.
+    BackHandler(enabled = cat.isNotEmpty()) { cat = "" }
     LaunchedEffect(key, cat, reload) {
         state = Load.Busy
         state = try { Load.Ok(loadItems(cat)) } catch (e: Exception) { Load.Err(e.message ?: "Could not load.") }
@@ -207,31 +209,10 @@ private fun PosterGrid(
                 val sections = remember(s.value, cats) { groupByCategory(cats, s.value.size) { s.value[it].cat } }
                 if (shown.isEmpty()) ErrorBox("Nothing here yet.")
                 else if (cat.isEmpty() && q.isBlank() && sections.size > 1) {
-                    // All categories: each category as a short poster grid (like the grid itself).
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(if (tv) 122.dp else 96.dp),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${s.value.size} titles · ${sections.size} categories") }
-                        sections.forEach { sec ->
-                            val canOpen = sec.category.id.isNotEmpty()
-                            item(key = "h:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ cat = sec.category.id }) else null, start = 4, end = 0)
-                            }
-                            val cells = if (canOpen) sec.indices.take(SECTION_PHONE_POSTERS) else sec.indices
-                            items(cells.size, key = { "p:" + sec.category.id + ":" + cells[it] }) { k ->
-                                val p = s.value[cells[k]]
-                                PosterCard(p.title, p.image, p.sub, p.rating) { onOpen(sec.indices.map { s.value[it] }, k) }
-                            }
-                            if (canOpen && sec.indices.size > cells.size) {
-                                item(key = "m:" + sec.category.id + ":" + sec.category.name, span = { GridItemSpan(maxLineSpan) }) {
-                                    SeeAllRow(sec.indices.size, horizontal = 0) { cat = sec.category.id }
-                                }
-                            }
-                        }
+                    // All categories: per category a header and one row of posters.
+                    SectionGrid(sections, onSeeAll = { cat = it.id }) { sec, k ->
+                        val p = s.value[sec.indices[k]]
+                        PosterCard(p.title, p.image, p.sub, p.rating) { onOpen(sec.indices.map { s.value[it] }, k) }
                     }
                 } else
                     LazyVerticalGrid(

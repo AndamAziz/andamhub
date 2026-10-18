@@ -50,6 +50,8 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
         }
     }
     LaunchedEffect(cat, q) { listState.scrollToItem(0) }
+    // Back from a category opened with "See all" returns to all categories.
+    androidx.activity.compose.BackHandler(enabled = cat.isNotEmpty()) { cat = "" }
 
     val tv = LocalTv.current
     androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
@@ -70,23 +72,11 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
         if (shown.isEmpty()) {
             ErrorBox(if (list.isEmpty()) "No channels yet." else "No channels match.")
         } else if (grouped && sections.size > 1) {
-            // All categories: each category as a short list (like the channel list itself).
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                sections.forEach { sec ->
-                    val canOpen = sec.category.id.isNotEmpty()
-                    item(key = "h:" + sec.category.id + ":" + sec.category.name) {
-                        SectionHeader(sec.category.name, sec.indices.size, if (canOpen) ({ cat = sec.category.id }) else null)
-                    }
-                    val rows = if (canOpen) sec.indices.take(SECTION_PHONE_CHANNELS) else sec.indices
-                    items(rows, key = { "c:" + sec.category.id + ":" + it }) { i ->
-                        val ch = list[i]
-                        ChannelRow(nums.getOrElse(i) { i + 1 }, ch.title, ch.logo) { PlayQueue.open(context, list, i, categories) }
-                    }
-                    if (canOpen && sec.indices.size > rows.size) {
-                        item(key = "m:" + sec.category.id + ":" + sec.category.name) { SeeAllRow(sec.indices.size) { cat = sec.category.id } }
-                    }
-                }
-                item { Spacer(Modifier.height(16.dp)) }
+            // All categories: per category a header and one row of channel cards.
+            SectionGrid(sections, onSeeAll = { cat = it.id }) { sec, k ->
+                val i = sec.indices[k]
+                // The player gets the full list, so its panel can switch categories too.
+                ChannelTile(list[i].title, list[i].logo) { PlayQueue.open(context, list, i, categories) }
             }
         } else {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
