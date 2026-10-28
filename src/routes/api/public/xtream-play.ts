@@ -231,6 +231,9 @@ async function fetchDirectSegment(
   }
 }
 
+/** Internal marker (never sent to the viewer): the provider refused byte ranges for this file. */
+const NO_RANGES = 'x-andam-no-ranges';
+
 async function fetchUpstream(
   upstream: string,
   request: Request,
@@ -303,7 +306,12 @@ async function fetchUpstream(
         } catch {
           /* nothing to drain */
         }
-        return again;
+        // Marked so the reply does not claim byte ranges: this provider refuses them, and a
+        // player told it may seek (mpv / FFmpeg) then asks for a range, gets the whole file
+        // back and stops with "Unexpected offset".
+        const marked = new Headers(again.headers);
+        marked.set(NO_RANGES, '1');
+        return new Response(again.body, { status: again.status, statusText: again.statusText, headers: marked });
       }
       try {
         await again.body?.cancel();
@@ -557,7 +565,8 @@ export const Route = createFileRoute('/api/public/xtream-play')({
           return new Response(body, { status: 200, headers });
         }
 
-        headers.set('Accept-Ranges', 'bytes');
+        if (!res.headers.get(NO_RANGES)) headers.set('Accept-Ranges', 'bytes');
+        else headers.delete('Accept-Ranges');
         // The file size: players need it to seek in films / episodes (MPEG-TS, AVI and MKV
         // without an index cannot be sought in — nor their length worked out — without it).
         // Only for media passed through untouched; manifests above are rewritten.
