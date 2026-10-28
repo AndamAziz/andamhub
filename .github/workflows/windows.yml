@@ -50,6 +50,47 @@ jobs:
           node scripts/get-player.js
           ls -la mpv || true
 
+      # Plays real streams with the bundled player and OUR config (portable_config), so a
+      # broken mpv.conf / FFmpeg change is caught here instead of on viewers' PCs.
+      # Required: an MP4 file (played and sought), HLS through the Andam relay (extension-less
+      # parts) and a public HLS playlist. Live MPEG-TS via the relay is reported only (third-party).
+      - name: Smoke-test Andam Player (mp4, m3u8, relay)
+        if: hashFiles('windows-app/mpv/AndamPlayer.exe') != ''
+        shell: bash
+        run: |
+          # Collect every result first (no exit on the first failing command).
+          set +e +o pipefail
+          P=./mpv/AndamPlayer.exe
+          "$P" --version > ver.txt 2>&1; head -1 ver.txt
+          play() { # name required url [extra mpv options]
+            local name="$1" req="$2" url="$3"; shift 3
+            # CI runners have no GPU: software decoding; stop after 120 decoded frames.
+            timeout 90 "$P" --idle=no --force-window=no --vo=null --ao=null --hwdec=no --frames=120 \
+              --network-timeout=25 --msg-level=all=warn,cplayer=info "$@" "$url" > log.txt 2>&1
+            local rc=$?
+            if [ $rc -eq 0 ] && ! grep -qiE "Failed to open|failed to recognize|not in allowed|Unexpected offset|Errors when loading file" log.txt; then
+              echo "OK   $name"; return 0
+            fi
+            echo "FAIL $name (exit $rc)"; tail -40 log.txt
+            if [ "$req" = "yes" ]; then FAILED=1; else echo "::warning::$name did not play (third-party stream)"; fi
+          }
+          FAILED=0
+          # Our settings must be the ones in use (mpv reads portable_config next to the exe).
+          timeout 60 "$P" -v --idle=no --force-window=no --vo=null --ao=null --hwdec=no --frames=1 \
+            "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4" > cfg.txt 2>&1
+          if grep -i "portable_config" cfg.txt | grep -qi "mpv.conf"; then
+            echo "OK   portable_config/mpv.conf is loaded"
+          else
+            echo "FAIL portable_config/mpv.conf was not loaded"; head -60 cfg.txt; FAILED=1
+          fi
+          tok() { curl -sS "https://ip.andam.uk/api/public/iptv?action=play&source=andam&id=$1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(JSON.parse(s).token||'')}catch(e){}})"; }
+          play "MP4 file" yes "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4"
+          play "MP4 file, sought to 0:05" yes "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4" --start=5 --frames=60
+          play "HLS via the Andam relay" yes "https://ip.andam.uk/api/public/xtream-play?t=$(tok 1)"
+          play "Public HLS playlist" yes "https://hlspackager.akamaized.net/live/DB/AVA_TV/HLS/AVA_TV.m3u8"
+          play "Live MPEG-TS via the relay" no "https://ip.andam.uk/api/public/xtream-play?t=$(tok 51)" --stream-lavf-o-append=seekable=0
+          exit $FAILED
+
       - name: Build installer (Andam-Setup.exe)
         shell: bash
         env:

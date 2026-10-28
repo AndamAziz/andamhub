@@ -243,10 +243,22 @@ function connect(tries = 0) {
     if (sock === c) sock = null;
   });
 }
+// HTTP options per stream (mirrors stream-lavf-o in mpv.conf). Live TV is opened without a Range
+// header (seekable=0), like the Android app: some panels refuse a ranged live request. Films and
+// episodes let FFmpeg find out from the reply whether they can be sought.
+const LAVF_BASE = {
+  reconnect: '1',
+  reconnect_streamed: '1',
+  reconnect_on_network_error: '1',
+  reconnect_on_http_error: '5xx',
+  reconnect_delay_max: '5',
+  multiple_requests: '1',
+};
 // Loads a stream. Live channels and episodes get marker entries around them so the player's
 // own ⏮ ⏭ buttons work (see mpv/portable_config/scripts/andam.lua).
-function load(url, title, nav, subs) {
+function load(url, title, nav, subs, live) {
   pendingSubs = subs && subs.length ? { url, subs } : null;
+  send(['set_property', 'stream-lavf-o', live ? { ...LAVF_BASE, seekable: '0' } : LAVF_BASE]);
   send(['set_property', 'force-media-title', title]);
   send(['loadfile', url, 'replace']);
   if (nav) {
@@ -257,7 +269,7 @@ function load(url, title, nav, subs) {
   send(['set_property', 'pause', false]);
 }
 
-function startPlayer(url, title, nav, subs) {
+function startPlayer(url, title, nav, subs, live) {
   sockBuf = '';
   pending = [];
   mpv = spawn(MPV_EXE, [`--input-ipc-server=${PIPE}`, '--idle=yes', `--force-media-title=${title}`], {
@@ -275,7 +287,7 @@ function startPlayer(url, title, nav, subs) {
     mpv = null;
     notify({ type: 'closed' });
   });
-  load(url, title, nav, subs);
+  load(url, title, nav, subs, live);
   setTimeout(() => connect(), 150);
 }
 
@@ -299,8 +311,9 @@ ipcMain.handle('player:play', (_e, o) => {
     }));
   try {
     const nav = Boolean(o && o.nav);
-    if (mpv) load(url, title, nav, subs);
-    else startPlayer(url, title, nav, subs);
+    const live = Boolean(o && o.live);
+    if (mpv) load(url, title, nav, subs, live);
+    else startPlayer(url, title, nav, subs, live);
     return { ok: true };
   } catch {
     return { ok: false };

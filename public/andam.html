@@ -3935,7 +3935,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(lk==='hls') q.kind='hls'; // the server then hands the playlist link first
     if(deskApi()) q.device='1'; // Windows app: may also get a device-route link (providers that refuse the relay)
     api(q)
-      .then(function(d){ deskNextDirect={link:d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?lk:''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
+      .then(function(d){ deskNextDirect={link:(lk==='hls'&&d.directHls)||d.direct||null,src:ltv.prov}; nextExt=ext||''; nextKnown=(type==='live'&&d.fallback)?lk:''; lvPlay(k,d.play,title,sub,isHls,d.fallback||null) })
       .catch(function(){ fail(s,'Could not start this stream') });
   }
 
