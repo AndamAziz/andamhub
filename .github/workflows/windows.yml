@@ -58,8 +58,10 @@ jobs:
         if: hashFiles('windows-app/mpv/AndamPlayer.exe') != ''
         shell: bash
         run: |
+          # Collect every result first (no exit on the first failing command).
+          set +e +o pipefail
           P=./mpv/AndamPlayer.exe
-          "$P" --version | head -1
+          "$P" --version > ver.txt 2>&1; head -1 ver.txt
           play() { # name required url [extra mpv options]
             local name="$1" req="$2" url="$3"; shift 3
             timeout 90 "$P" --idle=no --force-window=no --vo=null --ao=null --length=6 \
@@ -73,11 +75,12 @@ jobs:
           }
           FAILED=0
           # Our settings must be the ones in use (mpv reads portable_config next to the exe).
-          if "$P" -v --idle=no --force-window=no --vo=null --ao=null --frames=1 \
-               "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" 2>&1 | grep -i "portable_config" | grep -qi "mpv.conf"; then
+          timeout 60 "$P" -v --idle=no --force-window=no --vo=null --ao=null --frames=1 \
+            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" > cfg.txt 2>&1
+          if grep -i "portable_config" cfg.txt | grep -qi "mpv.conf"; then
             echo "OK   portable_config/mpv.conf is loaded"
           else
-            echo "FAIL portable_config/mpv.conf was not loaded"; FAILED=1
+            echo "FAIL portable_config/mpv.conf was not loaded"; head -60 cfg.txt; FAILED=1
           fi
           tok() { curl -sS "https://ip.andam.uk/api/public/iptv?action=play&source=andam&id=$1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(JSON.parse(s).token||'')}catch(e){}})"; }
           play "MP4 file" yes "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
