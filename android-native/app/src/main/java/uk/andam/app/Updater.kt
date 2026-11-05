@@ -17,19 +17,17 @@ import java.io.File
 object Updater {
     data class Release(val build: Int, val name: String, val apkUrl: String, val sizeBytes: Long, val notes: String)
 
+    /** Asked first: the Andam server keeps GitHub's answer (GitHub's own API allows only 60
+     *  calls an hour per address, so viewers on shared VPN / mobile addresses got 403). */
+    private val ANDAM = "${Config.BASE_URL}/api/public/download?app=android&info=1"
     private const val LATEST = "https://api.github.com/repos/AndamAziz/andamhub/releases/latest"
 
     val currentBuild: Int get() = BuildConfig.VERSION_CODE - 1000
 
     /** The newest release, or null when this app is already up to date. Throws on network errors. */
     suspend fun check(): Release? = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(LATEST)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", Config.USER_AGENT)
-            .build()
-        Api.http.newCall(req).execute().use { res ->
-            if (!res.isSuccessful) throw IllegalStateException("Update server answered ${res.code}")
-            val j = JSONObject(res.body?.string().orEmpty())
+        val j = runCatching { fetch(ANDAM) }.getOrNull() ?: fetch(LATEST)
+        run {
             val build = Regex("(\\d+)").find(j.optString("tag_name"))?.value?.toIntOrNull() ?: return@withContext null
             val assets = j.optJSONArray("assets")
             var url = ""
@@ -43,6 +41,19 @@ object Updater {
             }
             if (url.isBlank() || build <= currentBuild) null
             else Release(build, j.optString("name"), url, size, j.optString("body"))
+        }
+    }
+
+    private fun fetch(url: String): JSONObject {
+        val req = Request.Builder().url(url)
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", Config.USER_AGENT)
+            .build()
+        Api.http.newCall(req).execute().use { res ->
+            if (!res.isSuccessful) throw IllegalStateException("Update server answered ${res.code}")
+            val j = JSONObject(res.body?.string().orEmpty())
+            if (!j.has("tag_name")) throw IllegalStateException("Update server sent no release")
+            return j
         }
     }
 
