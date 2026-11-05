@@ -1410,6 +1410,24 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 }
 </style>
 
+<script>
+/* Logos / posters that do not load from their own host (dead page, 403 hotlink block, Wikimedia
+   429, an image page, plain http on this https site) are asked for once more through the Andam
+   image service; only if that fails too does the page's own placeholder take over. */
+(function(){
+  document.addEventListener('error',function(e){
+    var img=e.target;
+    if(!img||img.tagName!=='IMG'||img.getAttribute('data-px')) return;
+    var src=img.currentSrc||img.src||'';
+    if(!/^https?:\/\//i.test(src)||src.indexOf('/api/public/img?')>=0) return;
+    try{ if(new URL(src).host===location.host) return }catch(_){ return }
+    img.setAttribute('data-px','1');
+    e.stopImmediatePropagation(); /* the img's own onerror (placeholder) waits for the second try */
+    if(img.srcset) img.removeAttribute('srcset');
+    img.src='/api/public/img?u='+encodeURIComponent(src);
+  },true);
+})();
+</script>
 </head>
 <body>
 
