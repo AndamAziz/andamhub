@@ -27,6 +27,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as ApiPublicAccessRouteImport } from './routes/api/public/access'
 import { Route as ApiPublicAdminRouteImport } from './routes/api/public/admin'
 import { Route as ApiPublicDownloadRouteImport } from './routes/api/public/download'
+import { Route as ApiPublicImgRouteImport } from './routes/api/public/img'
 import { Route as ApiPublicIptvRouteImport } from './routes/api/public/iptv'
 import { Route as ApiPublicSubtitlesRouteImport } from './routes/api/public/subtitles'
 import { Route as ApiPublicTmdbDiscoverRouteImport } from './routes/api/public/tmdb-discover'
@@ -128,6 +129,11 @@ const ApiPublicDownloadRoute = ApiPublicDownloadRouteImport.update({
   path: '/api/public/download',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicImgRoute = ApiPublicImgRouteImport.update({
+  id: '/api/public/img',
+  path: '/api/public/img',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicIptvRoute = ApiPublicIptvRouteImport.update({
   id: '/api/public/iptv',
   path: '/api/public/iptv',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/img': typeof ApiPublicImgRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/img': typeof ApiPublicImgRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/api/public/access': typeof ApiPublicAccessRoute
   '/api/public/admin': typeof ApiPublicAdminRoute
   '/api/public/download': typeof ApiPublicDownloadRoute
+  '/api/public/img': typeof ApiPublicImgRoute
   '/api/public/iptv': typeof ApiPublicIptvRoute
   '/api/public/subtitles': typeof ApiPublicSubtitlesRoute
   '/api/public/tmdb-discover': typeof ApiPublicTmdbDiscoverRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/api/public/access'
     | '/api/public/admin'
     | '/api/public/download'
+    | '/api/public/img'
     | '/api/public/iptv'
     | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/api/public/access'
     | '/api/public/admin'
     | '/api/public/download'
+    | '/api/public/img'
     | '/api/public/iptv'
     | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/api/public/access'
     | '/api/public/admin'
     | '/api/public/download'
+    | '/api/public/img'
     | '/api/public/iptv'
     | '/api/public/subtitles'
     | '/api/public/tmdb-discover'
@@ -322,6 +334,7 @@ export interface RootRouteChildren {
   ApiPublicAccessRoute: typeof ApiPublicAccessRoute
   ApiPublicAdminRoute: typeof ApiPublicAdminRoute
   ApiPublicDownloadRoute: typeof ApiPublicDownloadRoute
+  ApiPublicImgRoute: typeof ApiPublicImgRoute
   ApiPublicIptvRoute: typeof ApiPublicIptvRoute
   ApiPublicSubtitlesRoute: typeof ApiPublicSubtitlesRoute
   ApiPublicTmdbDiscoverRoute: typeof ApiPublicTmdbDiscoverRoute
@@ -458,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/img': {
+      id: '/api/public/img'
+      path: '/api/public/img'
+      fullPath: '/api/public/img'
+      preLoaderRoute: typeof ApiPublicImgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/iptv': {
       id: '/api/public/iptv'
       path: '/api/public/iptv'
@@ -553,6 +573,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAccessRoute: ApiPublicAccessRoute,
   ApiPublicAdminRoute: ApiPublicAdminRoute,
   ApiPublicDownloadRoute: ApiPublicDownloadRoute,
+  ApiPublicImgRoute: ApiPublicImgRoute,
   ApiPublicIptvRoute: ApiPublicIptvRoute,
   ApiPublicSubtitlesRoute: ApiPublicSubtitlesRoute,
   ApiPublicTmdbDiscoverRoute: ApiPublicTmdbDiscoverRoute,
