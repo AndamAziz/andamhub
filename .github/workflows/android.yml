@@ -126,6 +126,22 @@ jobs:
             -Pandroid.injected.signing.key.alias="${{ steps.sign.outputs.key_alias }}" \
             -Pandroid.injected.signing.key.password="${{ steps.sign.outputs.key_pass }}"
 
+      - name: Verify distribution-specific merged manifests
+        run: |
+          PLAY_MANIFEST="$(find app/build/intermediates/merged_manifest -path '*playRelease*' -name AndroidManifest.xml -print -quit)"
+          GITHUB_MANIFEST="$(find app/build/intermediates/merged_manifest -path '*githubRelease*' -name AndroidManifest.xml -print -quit)"
+          test -n "$PLAY_MANIFEST" || { echo "::error::Play merged manifest not found"; exit 1; }
+          test -n "$GITHUB_MANIFEST" || { echo "::error::GitHub merged manifest not found"; exit 1; }
+          if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' "$PLAY_MANIFEST"; then
+            echo "::error::REQUEST_INSTALL_PACKAGES must not be present in the Google Play manifest"
+            exit 1
+          fi
+          grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' "$GITHUB_MANIFEST" || {
+            echo "::error::GitHub APK manifest must retain REQUEST_INSTALL_PACKAGES"
+            exit 1
+          }
+          echo "Verified: Play build excludes REQUEST_INSTALL_PACKAGES; GitHub build retains it."
+
       - name: Prepare release downloads
         if: github.event_name != 'pull_request'
         run: |
