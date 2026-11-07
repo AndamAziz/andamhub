@@ -118,7 +118,7 @@ jobs:
 
       - name: Build signed APK + AAB (native app)
         run: |
-          gradle --no-daemon assembleRelease bundleRelease \
+          gradle --no-daemon assemblePlayRelease bundlePlayRelease assembleGithubRelease bundleGithubRelease \
             -PandamVersionCode=$((1000 + ${{ github.run_number }})) \
             -PandamVersionName="2.0.${{ github.run_number }}" \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
@@ -130,13 +130,21 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p release-files
-          cp app/build/outputs/apk/release/app-release.apk \
+          cp app/build/outputs/apk/github/release/app-github-release.apk \
             release-files/Andam-${{ github.run_number }}.apk
-          cp app/build/outputs/bundle/release/app-release.aab \
+          cp app/build/outputs/bundle/githubRelease/app-github-release.aab \
             release-files/Andam-${{ github.run_number }}.aab
           if [ "${{ steps.sign.outputs.generated }}" = "true" ]; then
             cp "$RUNNER_TEMP/release.jks" release-files/Andam-signing-key.jks
           fi
+
+      - name: Upload Google Play AAB for Play Console
+        uses: actions/upload-artifact@v4
+        with:
+          name: Andam-Play-${{ github.run_number }}
+          path: android-native/app/build/outputs/bundle/playRelease/app-play-release.aab
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Publish APK and AAB in Releases
         if: github.event_name != 'pull_request'
