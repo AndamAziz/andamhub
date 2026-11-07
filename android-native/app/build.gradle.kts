@@ -8,13 +8,14 @@ val media3 = "1.5.0"
 
 android {
     namespace = "uk.andam.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         // Same id as the old WebView app, so the new build installs as an update.
         applicationId = "uk.andam.app"
         minSdk = 26
-        targetSdk = 35
+        // Google Play requires API 36 (Android 16) for new releases.
+        targetSdk = 36
         versionCode = (project.findProperty("andamVersionCode") as String?)?.toIntOrNull() ?: 100
         versionName = (project.findProperty("andamVersionName") as String?) ?: "2.0.0"
     }

@@ -45,6 +45,8 @@ jobs:
           done
           if [ -n "$SDKMANAGER" ]; then
             yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+            # The app targets API 36 (Google Play requirement).
+            "$SDKMANAGER" "platforms;android-36" > /dev/null 2>&1 || echo "::warning::could not pre-install platforms;android-36 (Gradle will try)"
           else
             echo "sdkmanager not found, skipping license accept"
           fi
