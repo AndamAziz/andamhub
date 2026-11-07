@@ -50,6 +50,18 @@ object UpdateState {
 
 @Composable
 fun UpdateSettings() {
+    if (BuildConfig.FLAVOR == "play") {
+        SettingsGroup("App") {
+            SettingsRow(
+                Icons.Filled.SystemUpdate, Teal,
+                title = "App updates",
+                subtitle = "Updates are securely delivered and installed by Google Play.",
+                trailing = { SettingsPill("Google Play", Teal) },
+                chevron = false,
+            )
+        }
+        return
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
