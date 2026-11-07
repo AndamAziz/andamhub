@@ -131,7 +131,9 @@ private fun Main(onSignIn: () -> Unit) {
     }
     // Quiet update check once per launch; a banner appears when a newer build exists.
     LaunchedEffect(Unit) {
-        runCatching { uk.andam.app.Updater.check() }.getOrNull()?.let { UpdateState.available = it }
+        if (BuildConfig.FLAVOR == "github") {
+            runCatching { uk.andam.app.Updater.check() }.getOrNull()?.let { UpdateState.available = it }
+        }
     }
     BackHandler(enabled = account || tab != 0) { if (account) account = false else tab = 0 }
 

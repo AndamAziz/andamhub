@@ -20,6 +20,18 @@ android {
         versionName = (project.findProperty("andamVersionName") as String?) ?: "2.0.0"
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLAY_STORE_BUILD", "true")
+        }
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -48,6 +60,8 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    // Google Play managed in-app updates (used only by the play product flavor).
+    implementation("com.google.android.play:app-update:2.1.0")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
