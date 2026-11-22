@@ -62,6 +62,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     // Google Play managed in-app updates (used only by the play product flavor).
     implementation("com.google.android.play:app-update:2.1.0")
+    // app-update brings androidx.fragment 1.0.0 transitively; Play Console flags it as outdated.
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
