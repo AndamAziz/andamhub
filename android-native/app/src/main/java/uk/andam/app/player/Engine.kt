@@ -56,6 +56,8 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         val headers: Map<String, String> = emptyMap(),
         /** Straight from the channel's own host (IPTV), not through the Andam server. */
         val direct: Boolean = false,
+        /** The container was already switched once (plain file <-> HLS) after a parsing error. */
+        val switched: Boolean = false,
     )
 
     // ---- observable UI state ----
@@ -402,7 +404,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                         // Referer-protected channel: the phone asks for it directly with the
                         // playlist's headers first (like VLC); the relay routes stay as fallbacks.
                         if (p.directUrl != null) {
-                            list.add(Attempt(p.directUrl, hls = p.directUrl.contains(".m3u8", true), fix = false, headers = p.headers, direct = true))
+                            list.add(Attempt(p.directUrl, hls = looksLikeHls(p.directUrl), fix = false, headers = p.headers, direct = true))
                         }
                         listOf(p.token)
                     }
@@ -421,7 +423,7 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
                 if (mine != session) return@launch
                 // Ask the provider like a normal player app would (some panels refuse unknown agents).
                 val direct = providerDirect?.let {
-                    Attempt(it, hls = it.contains(".m3u8", true), fix = false, direct = true,
+                    Attempt(it, hls = looksLikeHls(it), fix = false, direct = true,
                         headers = mapOf("User-Agent" to PLAYER_AGENT))
                 }
                 // Providers that refuse the relay (the server only sends `direct` for those) play
@@ -577,7 +579,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
         playingSince = 0
         audioChecked = false
         videoChecked = false
-        requestHeaders = a.headers
+        // ".txt" HLS servers answer "security error" (200 text/html) to requests without an
+        // Accept header; VLC sends "*/*". Only these routes get it, other links are unchanged.
+        requestHeaders = if (isTxt(a.url) && a.headers.keys.none { it.equals("Accept", true) })
+            a.headers + ("Accept" to "*/*") else a.headers
         val builder = MediaItem.Builder().setUri(a.url)
             // Title + logo for the lock screen, notification and Bluetooth displays.
             .setMediaMetadata(
@@ -676,9 +681,10 @@ class Engine(private val context: Context, private val scope: CoroutineScope) {
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> {
-                if (!current.hls) {
+                if (!current.switched && (!current.hls || isTxt(current.url))) {
                     // The "file" was really a playlist (common for M3U channels): replay it as HLS.
-                    attempts = attempts.toMutableList().also { it[attemptIndex] = current.copy(hls = true) }
+                    // A ".txt" link tried as HLS that was not a playlist: replay it once as a file.
+                    attempts = attempts.toMutableList().also { it[attemptIndex] = current.copy(hls = !current.hls, switched = true) }
                     start(attemptIndex)
                 } else nextAttempt()
             }
@@ -770,6 +776,16 @@ object DirectRoute {
 
 
 private const val PLAYER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+
+/** Address path ends in ".txt" (query and fragment ignored). */
+internal fun isTxt(url: String): Boolean =
+    url.substringBefore('#').substringBefore('?').endsWith(".txt", ignoreCase = true)
+
+/**
+ * HLS guessed from the address. ".txt" links are HLS master playlists served as text/plain
+ * (e.g. .../cdn/hls/<id>/master.txt), so they are tried as HLS first, like VLC does.
+ */
+internal fun looksLikeHls(url: String): Boolean = url.contains(".m3u8", true) || isTxt(url)
 
 /** Follows a provider link's redirects (without downloading the file) and returns the final URL. */
 private suspend fun resolveRedirects(url: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
