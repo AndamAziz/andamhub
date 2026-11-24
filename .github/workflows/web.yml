@@ -1,0 +1,65 @@
+name: Deploy website (Cloudflare Worker)
+
+# Builds the TanStack Start site (ip.andam.uk) and deploys it to the owner's own Cloudflare
+# account as the Worker "andam-web". Public Supabase values come from .env; every secret
+# (SUPABASE_SERVICE_ROLE_KEY, STREAM_TOKEN_SECRET, TMDB_API_KEY, …) lives in the Worker's
+# own "Variables and Secrets" in Cloudflare and is kept across deploys.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "package.json"
+      - "bun.lock"
+      - "vite.config.ts"
+      - ".env"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "package.json"
+      - "bun.lock"
+      - "vite.config.ts"
+      - ".env"
+      - ".github/workflows/web.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Build
+        run: bun run build
+      - name: Check the build uses the current Supabase project
+        run: |
+          set -euo pipefail
+          ref="$(grep -oP '^VITE_SUPABASE_PROJECT_ID="\K[^"]+' .env)"
+          grep -rqs "$ref" .output/public || { echo "::error::client bundle does not reference $ref"; exit 1; }
+          echo "Built against Supabase project $ref"
+      - name: Deploy to Cloudflare Workers
+        if: github.event_name != 'pull_request'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set in the repository secrets; built but not deployed."
+            exit 0
+          fi
+          npx -y wrangler@4.45.0 deploy --config .output/server/wrangler.json --name andam-web
