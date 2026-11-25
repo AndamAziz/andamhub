@@ -4,7 +4,6 @@ import { Apple, Chrome, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
 
 import { syncMyAccount } from '@/lib/account.functions';
 import { Button } from '@/components/ui/button';
@@ -56,10 +55,12 @@ function AuthPage() {
   }, [navigate]);
 
   useEffect(() => {
+    // Back from Google: the session arrives in the URL fragment, so count it as a new login.
+    const fromOAuth = window.location.hash.includes('access_token=');
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
       try {
-        await finishSignIn(false, data.session.access_token);
+        await finishSignIn(fromOAuth, data.session.access_token);
       } catch (err) {
         // Stale session: stay on the sign-in form instead of crashing.
         console.warn('[auth] account sync failed', err);
@@ -93,15 +94,17 @@ function AuthPage() {
         await startNativeOAuth(provider);
         return;
       }
-      const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: window.location.origin,
+      // Supabase Auth sends the browser to Google and back to /auth with the session in the
+      // URL fragment; the effect above picks it up and finishes the sign-in.
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/auth` },
       });
-      if (result.error) {
-        setError(result.error.message ?? `${provider} sign-in failed`);
+      if (oauthError) {
+        setError(oauthError.message ?? `${provider} sign-in failed`);
         return;
       }
-      if (result.redirected) return;
-      await finishSignIn(true);
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : `${provider} sign-in failed`);
     } finally {
