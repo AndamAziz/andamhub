@@ -16,11 +16,15 @@ export function geminiModels(): string[] {
 }
 
 /** One short completion. Returns null when Gemini is not configured, busy everywhere or too slow. */
-export async function geminiText(system: string, user: string, timeoutMs = 7000): Promise<string | null> {
+export async function geminiText(
+  system: string,
+  user: string,
+  opts: { timeoutMs?: number; models?: string[] } = {},
+): Promise<string | null> {
   const key = env('GEMINI_API_KEY');
   if (!key) return null;
-  const deadline = Date.now() + timeoutMs;
-  for (const model of geminiModels()) {
+  const deadline = Date.now() + (opts.timeoutMs ?? 7000);
+  for (const model of opts.models ?? geminiModels()) {
     const left = deadline - Date.now();
     if (left < 500) break;
     try {
@@ -44,7 +48,8 @@ export async function geminiText(system: string, user: string, timeoutMs = 7000)
       const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
       return (j.choices?.[0]?.message?.content ?? '').trim() || null;
     } catch {
-      return null;
+      // timed out or network trouble: try the next model while time is left
+      continue;
     }
   }
   return null;

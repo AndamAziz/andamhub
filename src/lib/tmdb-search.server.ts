@@ -141,11 +141,64 @@ async function personTitles(get: Fetcher, type: MediaType, person: { id: number;
     .slice(0, 60);
 }
 
+/** Letter-pair similarity of two names, 0..1 (Dice coefficient on folded text). */
+function similarity(a: string, b: string): number {
+  const pairs = (s: string) => {
+    const t = ` ${fold(s).replace(/^the /, '')} `;
+    const out: string[] = [];
+    for (let i = 0; i < t.length - 1; i++) out.push(t.slice(i, i + 2));
+    return out;
+  };
+  const x = pairs(a);
+  const y = pairs(b);
+  if (!x.length || !y.length) return 0;
+  const bag = new Map<string, number>();
+  for (const p of x) bag.set(p, (bag.get(p) ?? 0) + 1);
+  let hit = 0;
+  for (const p of y) {
+    const n = bag.get(p) ?? 0;
+    if (n > 0) {
+      hit++;
+      bag.set(p, n - 1);
+    }
+  }
+  return (2 * hit) / (x.length + y.length);
+}
+
+/**
+ * A quick spelling fix without AI: search again with the query's longest word (and its first
+ * letters), then keep the titles that read like what was typed ("gam of thrones" → Game of Thrones).
+ */
+async function nearTitle(get: Fetcher, type: MediaType, text: string, year?: string): Promise<string | null> {
+  const words = fold(text).split(' ').filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
+  const longest = words[0];
+  if (!longest) return null;
+  const tries = [...new Set([longest, longest.length >= 6 ? longest.slice(0, 4) : ''].filter(Boolean))];
+  for (const t of tries) {
+    const found = await titleSearch(get, type, t, 1, year);
+    const best = found.results
+      .map((r) => ({ title: titleOf(r), score: Math.max(similarity(titleOf(r), text), similarity(origTitleOf(r), text)) }))
+      .sort((a, b) => b.score - a.score)[0];
+    if (best && best.score >= 0.55) return best.title;
+  }
+  return null;
+}
+
 /** Gemini's guess at what was meant, remembered per query so a retyped query costs nothing. */
 const fixes = new Map<string, string | null>();
-async function correctQuery(q: string, type: MediaType): Promise<string | null> {
+async function correctQuery(get: Fetcher, q: string, type: MediaType, year?: string): Promise<string | null> {
   const k = `${type}:${fold(q)}`;
   if (fixes.has(k)) return fixes.get(k) ?? null;
+  const remember = (v: string | null) => {
+    fixes.set(k, v);
+    if (fixes.size > 500) fixes.delete(fixes.keys().next().value as string);
+    return v;
+  };
+  // Latin letters with a typo: often one word is right, which TMDB alone can match.
+  if (/[a-z]/i.test(q)) {
+    const near = await nearTitle(get, type, q, year);
+    if (near && fold(near) !== fold(q)) return remember(near);
+  }
   const out = await geminiText(
     'You fix search queries for a movie and TV catalogue (TMDB). The query may be misspelled, ' +
       'transliterated, or written in Kurdish (Sorani or Kurmanji), Arabic, Persian or Turkish. ' +
@@ -154,12 +207,13 @@ async function correctQuery(q: string, type: MediaType): Promise<string | null> 
       ', or the English name of the actor or director meant. No quotes, no year, no notes. ' +
       'If you cannot tell, reply NONE.',
     q,
+    // the small models answer fastest for a one-line guess
+    { timeoutMs: 9000, models: ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'] },
   );
-  const fixed = out && !/^none\b/i.test(out) ? (out.replace(/^["'“”]+|["'“”.]+$/g, '').split('\n')[0] ?? '').trim().slice(0, 120) : null;
-  const useful = fixed && fixed.length > 1 && fold(fixed) !== fold(q) ? fixed : null;
-  fixes.set(k, useful);
-  if (fixes.size > 500) fixes.delete(fixes.keys().next().value as string);
-  return useful;
+  // No answer at all (busy / slow): do not remember, so the next try asks again.
+  if (out == null) return null;
+  const fixed = !/^none\b/i.test(out) ? (out.replace(/^["'“”]+|["'“”.]+$/g, '').split('\n')[0] ?? '').trim().slice(0, 120) : null;
+  return remember(fixed && fixed.length > 1 && fold(fixed) !== fold(q) ? fixed : null);
 }
 
 async function firstPage(get: Fetcher, type: MediaType, text: string, year?: string) {
@@ -203,7 +257,7 @@ export async function smartSearch(
   ]);
   if (main.results.length || !opts.fix) return { ...main, year, other: otherCount };
 
-  const fixed = await correctQuery(text, type);
+  const fixed = await correctQuery(get, text, type, year);
   if (!fixed) return { ...main, year, other: otherCount };
   const [again, otherAgain] = await Promise.all([
     firstPage(get, type, fixed, year),
