@@ -10,19 +10,17 @@
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-let keyPromise: Promise<CryptoKey> | null = null;
+// Keep the finished key, never a shared promise: a Worker request cannot wait on a promise
+// another request created (handle_cross_request_promise_resolution).
+let key: CryptoKey | null = null;
 
-function getKey(): Promise<CryptoKey> {
-  if (!keyPromise) {
-    const secret = process.env['STREAM_TOKEN_SECRET'];
-    if (!secret) throw new Error('STREAM_TOKEN_SECRET is not configured');
-    keyPromise = crypto.subtle
-      .digest('SHA-256', enc.encode(secret))
-      .then((raw) =>
-        crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']),
-      );
-  }
-  return keyPromise;
+async function getKey(): Promise<CryptoKey> {
+  if (key) return key;
+  const secret = process.env['STREAM_TOKEN_SECRET'];
+  if (!secret) throw new Error('STREAM_TOKEN_SECRET is not configured');
+  const raw = await crypto.subtle.digest('SHA-256', enc.encode(secret));
+  key = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  return key;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
