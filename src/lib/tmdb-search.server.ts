@@ -166,14 +166,19 @@ function similarity(a: string, b: string): number {
 }
 
 /**
- * A quick spelling fix without AI: search again with the query's longest word (and its first
- * letters), then keep the titles that read like what was typed ("gam of thrones" → Game of Thrones).
+ * A quick spelling fix without AI: search again with the query's longest word (and shorter
+ * beginnings of it), then keep the titles that read like what was typed ("gam of thrones" → Game of Thrones).
  */
 async function nearTitle(get: Fetcher, type: MediaType, text: string, year?: string): Promise<string | null> {
   const words = fold(text).split(' ').filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
   const longest = words[0];
   if (!longest) return null;
-  const tries = [...new Set([longest, longest.length >= 6 ? longest.slice(0, 4) : ''].filter(Boolean))];
+  // TMDB matches word beginnings, so a typo near the end is found by cutting the word short
+  // ("intersteller" → "interstell" → Interstellar).
+  const cut = (n: number) => (n >= 4 && n < longest.length ? longest.slice(0, n) : '');
+  const tries = [
+    ...new Set([longest, cut(longest.length - 2), cut(Math.ceil(longest.length * 0.6)), cut(4)].filter(Boolean)),
+  ];
   for (const t of tries) {
     const found = await titleSearch(get, type, t, 1, year);
     const best = found.results
@@ -208,7 +213,7 @@ export async function correctQuery(get: Fetcher, q: string, type: MediaType, yea
       'If you cannot tell, reply NONE.',
     q,
     // the small models answer fastest for a one-line guess
-    { timeoutMs: 9000, models: ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'] },
+    { timeoutMs: 12000, models: ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'] },
   );
   // No answer at all (busy / slow): do not remember, so the next try asks again.
   if (out == null) return null;
