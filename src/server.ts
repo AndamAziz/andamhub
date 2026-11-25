@@ -7,15 +7,15 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
-let serverEntryPromise: Promise<ServerEntry> | undefined;
+// Keep the loaded module, never a shared promise: a Worker request cannot wait on a promise
+// another request created (handle_cross_request_promise_resolution).
+let serverEntry: ServerEntry | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
-  if (!serverEntryPromise) {
-    serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => (m.default ?? m) as ServerEntry,
-    );
-  }
-  return serverEntryPromise;
+  if (serverEntry) return serverEntry;
+  const m = await import("@tanstack/react-start/server-entry");
+  serverEntry = (m.default ?? m) as ServerEntry;
+  return serverEntry;
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body
