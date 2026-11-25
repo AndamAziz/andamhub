@@ -5,7 +5,7 @@ const TMDB = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
 
 const paramsSchema = z.object({
-  kind: z.enum(["movies", "series", "details", "season"]).default("movies"),
+  kind: z.enum(["movies", "series", "details", "season", "fix"]).default("movies"),
   page: z.coerce.number().int().min(1).max(500).default(1),
   q: z.string().trim().max(120).optional(),
   sort: z.string().trim().max(40).optional(),
@@ -87,13 +87,27 @@ async function handle(request: Request) {
           : "movies";
   // Metadata lookups (details/season) are also used to enrich Live TV titles,
   // so any unlocked section is enough for those.
-  const lookup = kind === "details" || kind === "season";
+  const lookup = kind === "details" || kind === "season" || kind === "fix";
   const ok = lookup
     ? canOpen(access, "movies") || canOpen(access, "series") || canOpen(access, "live")
     : canOpen(access, wants);
   if (!ok) return lockedResponse(wants);
 
   try {
+    // The apps search the provider's own film / series lists on the device; when nothing matches
+    // they ask here what was meant (typos, Kurdish / Arabic / Persian spelling).
+    if (kind === "fix") {
+      if (!q) return Response.json({ error: "q required" }, { status: 400 });
+      const { correctQuery, splitYear } = await import("@/lib/tmdb-search.server");
+      const type = url.searchParams.get("type") === "tv" ? "tv" : "movie";
+      const { text, year } = splitYear(q);
+      const corrected = await correctQuery((path, search) => authFetch(path, key, search), text, type, year);
+      return Response.json(
+        { corrected: corrected ? (year ? `${corrected} ${year}` : corrected) : null },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+
     if (kind === "details") {
       if (!id) return Response.json({ error: "id required" }, { status: 400 });
       const type = url.searchParams.get("type") === "tv" ? "tv" : "movie";

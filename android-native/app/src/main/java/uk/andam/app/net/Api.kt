@@ -159,6 +159,15 @@ object Api {
     internal fun displayName(raw: String): String =
         unescape(raw).replace(TMDB_TAG, " ").replace(Regex("\\s{2,}"), " ").trim().trimEnd('_', '-', '|', ' ').ifBlank { raw }
 
+    /**
+     * The title a search with no matches probably meant (typos, Kurdish / Arabic / Persian
+     * spelling), from the server's spelling fixer; null when it has no better guess.
+     */
+    suspend fun fixQuery(q: String, type: String): String? = runCatching {
+        val j = get("/api/public/tmdb-discover", mapOf("kind" to "fix", "q" to q, "type" to type))
+        if (j.isNull("corrected")) null else j.optString("corrected").takeIf { it.isNotBlank() }
+    }.getOrNull()
+
     // ---------------- access ----------------
 
     suspend fun access(): Access {

@@ -186,7 +186,7 @@ async function nearTitle(get: Fetcher, type: MediaType, text: string, year?: str
 
 /** Gemini's guess at what was meant, remembered per query so a retyped query costs nothing. */
 const fixes = new Map<string, string | null>();
-async function correctQuery(get: Fetcher, q: string, type: MediaType, year?: string): Promise<string | null> {
+export async function correctQuery(get: Fetcher, q: string, type: MediaType, year?: string): Promise<string | null> {
   const k = `${type}:${fold(q)}`;
   if (fixes.has(k)) return fixes.get(k) ?? null;
   const remember = (v: string | null) => {

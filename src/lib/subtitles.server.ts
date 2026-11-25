@@ -248,39 +248,61 @@ const SYSTEM =
   'Keep the line breaks inside a cue. Do not add notes.';
 
 
+/**
+ * Gemini (or Lovable AI) translates one batch of cues. Each model gets a time limit; a busy,
+ * rate-limited, missing or slow model hands over to the next one, and an answer that is not a
+ * usable list of lines also counts as a failure — so a bad answer is never stored as "Kurdish".
+ * Thinking is switched off: it only makes a line-by-line translation slower.
+ */
 async function translateWithAi(lines: string[]): Promise<string[]> {
   const lovable = env('LOVABLE_API_KEY');
   const gemini = env('GEMINI_API_KEY');
-  const endpoint = lovable
-    ? 'https://ai.gateway.lovable.dev/v1/chat/completions'
-    : GEMINI_ENDPOINT;
-  const models = lovable
-    ? ['google/gemini-2.5-flash']
-    : geminiModels();
-  let res: Response | undefined;
+  const endpoint = lovable ? 'https://ai.gateway.lovable.dev/v1/chat/completions' : GEMINI_ENDPOINT;
+  const models = lovable ? ['google/gemini-2.5-flash'] : subtitleModels();
+  let last = 'AI translation unavailable';
   for (const model of models) {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${lovable || gemini}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        messages: [
-          { role: 'system', content: SYSTEM + ' Return ONLY a JSON array of strings.' },
-          { role: 'user', content: JSON.stringify(lines) },
-        ],
-      }),
-    });
-    if (res.ok || ![404, 429, 500, 503].includes(res.status)) break;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${lovable || gemini}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          ...(lovable || model.includes('lite') ? {} : { reasoning_effort: 'none' }),
+          messages: [
+            { role: 'system', content: SYSTEM + ' Return ONLY a JSON array of strings.' },
+            { role: 'user', content: JSON.stringify(lines) },
+          ],
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (!res.ok) {
+        last = `AI translation ${res.status}`;
+        if ([400, 404, 429, 500, 502, 503, 504].includes(res.status)) continue;
+        break;
+      }
+      const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const content = j.choices?.[0]?.message?.content ?? '';
+      const start = content.indexOf('[');
+      const end = content.lastIndexOf(']');
+      const out = start >= 0 && end > start ? (JSON.parse(content.slice(start, end + 1)) as unknown[]) : [];
+      const good = out.filter((x) => typeof x === 'string' && x.trim()).length;
+      // Most lines must come back translated; otherwise try the next model.
+      if (good < Math.ceil(lines.length * 0.8)) {
+        last = 'AI translation came back incomplete';
+        continue;
+      }
+      return lines.map((orig, i) => (typeof out[i] === 'string' && (out[i] as string).trim() ? (out[i] as string) : orig));
+    } catch (e) {
+      last = e instanceof Error && e.name === 'TimeoutError' ? 'AI translation timed out' : 'AI translation failed';
+    }
   }
-  if (!res) throw new Error('AI translation unavailable');
-  if (!res.ok) throw new Error(`AI translation ${res.status}`);
-  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = j.choices?.[0]?.message?.content ?? '';
-  const start = content.indexOf('[');
-  const end = content.lastIndexOf(']');
-  const out = start >= 0 && end > start ? (JSON.parse(content.slice(start, end + 1)) as unknown[]) : [];
-  return lines.map((orig, i) => (typeof out[i] === 'string' && (out[i] as string).trim() ? (out[i] as string) : orig));
+  throw new Error(last);
+}
+
+/** Gemini models for subtitles: the main model first, then the lite one (its own quota, answers fast). */
+function subtitleModels(): string[] {
+  return [...new Set([...geminiModels().slice(0, 1), 'gemini-flash-lite-latest', ...geminiModels(), 'gemini-3.1-flash-lite'])];
 }
 
 let anthropic: Anthropic | null = null;
