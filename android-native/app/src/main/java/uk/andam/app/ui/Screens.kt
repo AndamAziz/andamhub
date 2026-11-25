@@ -166,6 +166,8 @@ fun SeriesScreen() {
     )
 }
 
+private val YEAR_IN = Regex("(?:19|20)\\d{2}")
+
 class Poster(val id: String, val title: String, val image: String, val sub: String, val rating: String, val payload: Any, val cat: String = "")
 
 @Composable
@@ -183,6 +185,15 @@ private fun PosterGrid(
     var state by remember(key) { mutableStateOf<Load<List<Poster>>>(Load.Busy) }
 
     LaunchedEffect(key) { cats = runCatching { loadCats() }.getOrDefault(emptyList()) }
+    val loaded = (state as? Load.Ok<List<Poster>>)?.value.orEmpty()
+    val mediaType = if (key.startsWith("series")) "tv" else "movie"
+    val search = rememberSmartSearch(
+        loaded, loaded.size, q,
+        title = { loaded[it].title },
+        year = { YEAR_IN.find(loaded[it].sub)?.value.orEmpty() },
+        extra = { loaded[it].sub },
+        fix = { Api.fixQuery(it, mediaType) },
+    )
     // Back from a category opened with "See all" returns to all categories.
     BackHandler(enabled = cat.isNotEmpty()) { cat = "" }
     LaunchedEffect(key, cat, reload) {
@@ -205,9 +216,16 @@ private fun PosterGrid(
             is Load.Busy -> Busy()
             is Load.Err -> ErrorBox(s.message) { Api.clearCache(); reload++ }
             is Load.Ok -> {
-                val shown = remember(s.value, q) { s.value.filter { q.isBlank() || it.title.contains(q, ignoreCase = true) } }
+                // Smart search: best matches first, typos and Kurdish / Arabic spelling forgiven.
+                val shown = remember(s.value, search) {
+                    if (s.value !== loaded) s.value else search.indices?.map { s.value[it] } ?: s.value
+                }
                 val sections = remember(s.value, cats) { groupByCategory(cats, s.value.size) { s.value[it].cat } }
-                if (shown.isEmpty()) ErrorBox("Nothing here yet.")
+                if (shown.isEmpty()) {
+                    if (q.isBlank()) ErrorBox("Nothing here yet.")
+                    else if (search.busy) ErrorBox("Looking for similar titles…")
+                    else ErrorBox("No titles match \"${q.trim()}\". Try another spelling or a year.")
+                }
                 else if (cat.isEmpty() && q.isBlank() && sections.size > 1) {
                     // All categories: per category a header and one row of posters.
                     SectionGrid(sections, onSeeAll = { cat = it.id }) { sec, k ->
@@ -223,7 +241,9 @@ private fun PosterGrid(
                         verticalArrangement = Arrangement.spacedBy(if (tv) 20.dp else 14.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        item(span = { GridItemSpan(maxLineSpan) }) { CountLine("${shown.size} titles") }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            CountLine(search.corrected?.let { "Showing results for \"$it\" · ${shown.size} titles" } ?: "${shown.size} titles")
+                        }
                         items(shown.size, key = { shown[it].id + "#" + it }) { i ->
                             val p = shown[i]
                             PosterCard(p.title, p.image, p.sub, p.rating) { onOpen(shown, i) }

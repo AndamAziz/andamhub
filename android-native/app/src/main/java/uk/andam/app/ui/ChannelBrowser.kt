@@ -44,10 +44,10 @@ fun ChannelBrowser(key: String, categories: List<Category>, list: List<PlayItem>
     var q by rememberSaveable(key) { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    val shown = remember(list, cat, q) {
-        list.indices.filter { i ->
-            (cat.isEmpty() || list[i].group == cat) && (q.isBlank() || list[i].title.contains(q, ignoreCase = true))
-        }
+    // Smart search: best matches first; Kurdish / Arabic letter forms, word order and typos forgiven.
+    val search = rememberSmartSearch(list, list.size, q, title = { list[it].title }, extra = { list[it].group })
+    val shown = remember(list, cat, search) {
+        (search.indices ?: list.indices.toList()).filter { i -> cat.isEmpty() || list[i].group == cat }
     }
     LaunchedEffect(cat, q) { listState.scrollToItem(0) }
     // Back from a category opened with "See all" returns to all categories.
