@@ -15,6 +15,7 @@
  * Every downloaded or generated file is kept in the private storage bucket "subtitles", so a
  * subtitle is fetched from OpenSubtitles (or translated) only once.
  */
+import { GEMINI_ENDPOINT, geminiModels } from '@/lib/gemini.server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 
@@ -246,22 +247,16 @@ const SYSTEM =
   'spoken Sorani translation of the matching cue. Keep it short like real subtitles. Keep names of people and places. ' +
   'Keep the line breaks inside a cue. Do not add notes.';
 
-/**
- * Gemini models to try in order. Google retires model names (gemini-2.5-flash now answers 404 for new
- * keys) and its busiest models answer 503 at peak times, so a busy or missing model falls through to
- * the next one. GEMINI_MODEL, when set, is tried first.
- */
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
 
 async function translateWithAi(lines: string[]): Promise<string[]> {
   const lovable = env('LOVABLE_API_KEY');
   const gemini = env('GEMINI_API_KEY');
   const endpoint = lovable
     ? 'https://ai.gateway.lovable.dev/v1/chat/completions'
-    : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    : GEMINI_ENDPOINT;
   const models = lovable
     ? ['google/gemini-2.5-flash']
-    : [...new Set([env('GEMINI_MODEL'), ...GEMINI_MODELS].filter(Boolean))];
+    : geminiModels();
   let res: Response | undefined;
   for (const model of models) {
     res = await fetch(endpoint, {

@@ -12,6 +12,7 @@ const paramsSchema = z.object({
   genre: z.string().regex(/^\d{1,6}$/).optional(),
   id: z.string().regex(/^\d{1,10}$/).optional(),
   season: z.coerce.number().int().min(0).max(200).optional(),
+  fix: z.enum(["0", "1"]).optional(),
 });
 
 function authFetch(path: string, key: string, search: Record<string, string>) {
@@ -71,7 +72,7 @@ async function handle(request: Request) {
   const url = new URL(request.url);
   const parsed = paramsSchema.safeParse(Object.fromEntries(url.searchParams));
   if (!parsed.success) return Response.json({ error: "Invalid parameters" }, { status: 400 });
-  const { kind, page, q, sort, genre, id, season } = parsed.data;
+  const { kind, page, q, sort, genre, id, season, fix } = parsed.data;
 
   // Movies / Shows are activation-gated: a locked viewer gets no catalog data.
   const { canOpen, lockedResponse, resolveAccessCached: resolveAccess } = await import("@/lib/access.server");
@@ -142,13 +143,27 @@ async function handle(request: Request) {
     }
 
     const type = kind === "movies" ? "movie" : "tv";
-    const res = q
-      ? await authFetch(`/search/${type}`, key, {
-          query: q,
-          page: String(page),
-          include_adult: "false",
-        })
-      : sort === "trending"
+    if (q) {
+      const { smartSearch } = await import("@/lib/tmdb-search.server");
+      const found = await smartSearch((path, search) => authFetch(path, key, search), type, q, page, {
+        fix: fix === "1",
+      });
+      return Response.json(
+        {
+          kind,
+          page,
+          totalPages: found.totalPages,
+          items: found.results.map((r) => mapItem(r, kind)).filter((i) => i.poster),
+          corrected: found.corrected ?? null,
+          person: found.person ?? null,
+          year: found.year ?? null,
+          other: found.other ?? null,
+        },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+    const res =
+      sort === "trending"
         ? await authFetch(`/trending/${type}/week`, key, { page: String(page) })
         : await authFetch(`/discover/${type}`, key, {
             page: String(page),
