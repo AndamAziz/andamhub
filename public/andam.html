@@ -232,32 +232,118 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
 .dseasons button:hover{border-color:var(--ember)}
 .dseasons button span:last-child{font-family:'IBM Plex Mono';font-size:11px;color:var(--muted)}
 
-/* VIDAPI PLAYER */
+/* MOVIE / SHOW PLAYER
+   Laptop & desktop: one card, video on the left, seasons + episodes on the right (shows).
+   Tablet: video on top, episodes below.  Phone: a full-screen page with the video pinned
+   at the top and the episode list scrolling under it; turned sideways the video fills the
+   screen.  iPhone notches and home bars are kept clear with the safe-area insets. */
 .vp{position:fixed;inset:0;z-index:95;background:rgba(3,4,6,.94);backdrop-filter:blur(10px);display:none;
-  padding:22px;place-items:center}
+  padding:24px;place-items:center}
 .vp.open{display:grid}
-.vpwrap{width:min(1180px,100%);background:var(--surface);border:1px solid var(--hair);border-radius:14px;overflow:hidden;
-  box-shadow:0 40px 120px rgba(0,0,0,.7)}
-.vphead{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--hair)}
-.vphead .t{font-size:14.5px;font-weight:600}
-.vphead .s{font-family:'IBM Plex Mono';font-size:11px;color:var(--muted);margin-top:3px}
-.vphead .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
-.vphead select{background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;color:var(--text);
-  font-size:12px;padding:7px 9px}
-.vpclose,.vpfs{width:32px;height:32px;min-width:32px;border-radius:9px;border:1px solid var(--hair);background:rgba(8,9,12,.7);
-  color:var(--text);font-size:15px;display:grid;place-items:center;cursor:pointer}
-.vpfs:hover{border-color:var(--ember);color:var(--ember)}
-.vpstage{position:relative;aspect-ratio:16/9;background:#000}
+.vp .vpwrap{width:min(1320px,100%);max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);
+  background:var(--surface);border:1px solid var(--hair);border-radius:18px;overflow:hidden;
+  box-shadow:0 40px 120px rgba(0,0,0,.7);display:flex;flex-direction:column}
+.vphead{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 18px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+.vpttl{min-width:0;flex:1}
+.vphead .t{font-size:16px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vphead .s{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vpclose,.vpfs{width:40px;height:40px;min-width:40px;border-radius:50%;border:1px solid var(--hair);background:rgba(8,9,12,.7);
+  color:var(--text);font-size:16px;display:grid;place-items:center;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.vpfs:hover,.vpclose:hover,.vpfs:focus-visible,.vpclose:focus-visible{border-color:var(--ember);color:var(--ember)}
+.vpclose svg,.vpfs svg{width:18px;height:18px}
+.vpmain{display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:0;flex:1 1 auto}
+.vp.movie .vpmain{grid-template-columns:minmax(0,1fr)}
+.vpleft{min-width:0;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+.vpstage{position:relative;aspect-ratio:16/9;background:#000;flex:0 0 auto;max-height:calc(100dvh - 230px);width:100%}
 .vpstage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.vpstage:fullscreen,.vpstage:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh}
+.vpstage:fullscreen,.vpstage:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh;max-height:none}
 /* iOS/Safari fallback: iframes cannot enter native fullscreen, so pin the
    stage over the viewport instead. */
-.vpstage.fsfake{position:fixed;inset:0;z-index:200;aspect-ratio:auto;width:100vw;height:100vh}
+.vpstage.fsfake{position:fixed;inset:0;z-index:200;aspect-ratio:auto;width:100vw;height:100vh;height:100dvh;max-height:none}
 .vpguard{position:absolute;inset:0;pointer-events:none}
-@media (max-width:640px){.vpclose,.vpfs{width:44px;height:44px;min-width:44px}}
+.vpbar{display:flex;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}
+.vpbar:empty{display:none}
+.vpnav{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;
+  border:1px solid var(--hair);background:var(--surface-2);color:var(--text);font-size:13.5px;font-weight:600;cursor:pointer}
+.vpnav:hover,.vpnav:focus-visible{border-color:var(--ember)}
+.vpnav.next{margin-left:auto;background:var(--ember);border-color:var(--ember);color:#fff}
+.vpnav.next:hover,.vpnav.next:focus-visible{filter:brightness(1.1)}
+.vpnav[disabled]{opacity:.35;pointer-events:none}
+.vpinfo{padding:14px 18px 18px;color:var(--muted);font-size:13.5px;line-height:1.55}
+.vpinfo:empty{display:none}
+.vpinfo .m{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.vpinfo .m b{color:var(--gold);font-weight:600}
+.vpinfo p{color:rgba(255,255,255,.75);max-width:760px}
+.vpside{border-left:1px solid var(--hair);display:flex;flex-direction:column;min-height:0;background:var(--void)}
+.vp.movie .vpside{display:none}
+.vpseasons{display:flex;gap:8px;overflow-x:auto;padding:12px 14px;border-bottom:1px solid var(--hair);flex:0 0 auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.vpseasons::-webkit-scrollbar{display:none}
+.vpseason{flex:0 0 auto;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--hair);background:transparent;
+  color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.vpseason:hover,.vpseason:focus-visible{color:var(--text);border-color:var(--hair-2,rgba(255,255,255,.2))}
+.vpseason.on{background:var(--text);border-color:var(--text);color:var(--void)}
+.vpeps{position:relative;overflow-y:auto;padding:8px;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
+.vpep{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;width:100%;text-align:left;padding:8px;border-radius:12px;
+  border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;align-items:start}
+.vpep+.vpep{margin-top:2px}
+.vpep:hover,.vpep:focus-visible{background:var(--surface-2)}
+.vpep.on{background:var(--ember-dim);border-color:rgba(255,59,78,.45)}
+.vpep .th{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.vpep .th img{width:100%;height:100%;object-fit:cover;display:block}
+.vpep .th i{position:absolute;inset:0;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700;color:var(--faint)}
+.vpep.on .th::after{content:'▶ Playing';position:absolute;left:6px;bottom:6px;font-size:10px;font-weight:700;
+  padding:3px 7px;border-radius:999px;background:var(--ember);color:#fff}
+.vpep .n{font-size:13.5px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vpep .n span{color:var(--muted);font-weight:500;margin-right:4px}
+.vpep .o{margin-top:4px;font-size:12px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden}
+.vpep .d{margin-top:4px;font-size:11px;color:var(--faint)}
+.vpmsg{padding:18px 12px;color:var(--muted);font-size:13px}
+.vpnote{font-size:11.5px;color:var(--faint);padding:10px 16px;border-top:1px solid var(--hair);flex:0 0 auto}
 
-.vpnote{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--faint);padding:9px 16px;border-top:1px solid var(--hair)}
-
+/* tablet: video on top, episodes underneath */
+@media (max-width:1024px){
+  .vpmain{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .vpleft{overflow:visible}
+  .vpside{border-left:0;border-top:1px solid var(--hair);min-height:220px}
+  .vpstage{max-height:none}
+}
+/* phone: a full-screen page, video pinned at the top */
+@media (max-width:720px){
+  .vp{padding:0;background:var(--void);backdrop-filter:none}
+  .vp .vpwrap{width:100%;height:100vh;height:100dvh;max-height:none;border:0;border-radius:0;box-shadow:none;background:var(--void)}
+  .vphead{padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 8px calc(10px + env(safe-area-inset-left));
+    gap:10px;border-bottom:0}
+  .vp .vpclose,.vp .vpfs{width:44px;height:44px;min-width:44px;background:var(--surface);border-color:transparent}
+  .vpclose{order:-1}
+  .vphead .t{font-size:15.5px}
+  .vpbar{padding:10px 12px}
+  .vpnav{flex:1;justify-content:center;min-height:46px}
+  .vpnav.next{margin-left:0}
+  .vpinfo{padding:14px 16px 18px}
+  .vp:not(.movie) .vpinfo{display:none}
+  .vpside{background:var(--void)}
+  .vpseasons{padding:10px 12px}
+  .vpeps{padding:6px 8px calc(12px + env(safe-area-inset-bottom))}
+  .vpep{grid-template-columns:132px minmax(0,1fr);padding:8px 6px}
+  .vpnote{display:none}
+}
+/* phone turned sideways: the video takes the whole screen, controls float on top */
+@media (max-height:520px) and (orientation:landscape){
+  .vp{padding:0;background:#000;backdrop-filter:none}
+  .vp .vpwrap{width:100%;height:100vh;height:100dvh;max-height:none;border:0;border-radius:0;box-shadow:none;background:#000;position:relative}
+  .vphead{position:absolute;top:0;left:0;right:0;z-index:3;border:0;background:linear-gradient(rgba(0,0,0,.65),transparent);
+    padding:calc(6px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 18px calc(12px + env(safe-area-inset-left));
+    pointer-events:none}
+  .vphead>*{pointer-events:auto}
+  .vpttl{pointer-events:none}
+  .vpclose{order:-1}
+  .vpmain{display:block;height:100%}
+  .vpleft{height:100%;overflow:hidden}
+  .vpstage{height:100%;max-height:none;aspect-ratio:auto}
+  .vpbar,.vpinfo,.vpside,.vpnote{display:none}
+}
 
 /* CATALOG */
 .hide{display:none !important}
@@ -1686,20 +1772,29 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 <div class="vp" id="vp" role="dialog" aria-modal="true" aria-label="Andam movie player">
   <div class="vpwrap">
     <div class="vphead">
-      <div>
+      <div class="vpttl">
         <div class="t" id="vpTitle">—</div>
         <div class="s" id="vpSub">VidAPI</div>
       </div>
-      <div class="sp" id="vpPick"></div>
-      <button class="vpfs" id="vpFs" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-      <button class="vpclose" id="vpClose" aria-label="Close player">✕</button>
+      <button class="vpfs" id="vpFs" type="button" title="Fullscreen" aria-label="Fullscreen"></button>
+      <button class="vpclose" id="vpClose" type="button" title="Close" aria-label="Close player"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <div class="vpstage" id="vpStage">
-      <iframe id="vpFrame" title="VidAPI player" allowfullscreen allow="fullscreen *; autoplay *; encrypted-media *; picture-in-picture *"
-        referrerpolicy="no-referrer"></iframe>
-      <div class="vpguard" aria-hidden="true"></div>
+    <div class="vpmain">
+      <div class="vpleft">
+        <div class="vpstage" id="vpStage">
+          <iframe id="vpFrame" title="VidAPI player" allowfullscreen allow="fullscreen *; autoplay *; encrypted-media *; picture-in-picture *"
+            referrerpolicy="no-referrer"></iframe>
+          <div class="vpguard" aria-hidden="true"></div>
+        </div>
+        <div class="vpbar" id="vpBar"></div>
+        <div class="vpinfo" id="vpInfo"></div>
+      </div>
+      <aside class="vpside" aria-label="Episodes">
+        <div class="vpseasons" id="vpPick" role="tablist" aria-label="Seasons"></div>
+        <div class="vpeps" id="vpEps"></div>
+      </aside>
     </div>
-    <div class="vpnote" id="vpNote">If an ad tab opens, close it and return here — playback continues. Press Esc to close.</div>
+    <div class="vpnote" id="vpNote">If an ad tab opens, close it and return here — playback continues. Press Esc to close · F for fullscreen.</div>
   </div>
 </div>
 
@@ -2644,32 +2739,125 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     return u;
   }
 
+  var vpBar=document.getElementById('vpBar'), vpInfo=document.getElementById('vpInfo'),
+      vpEps=document.getElementById('vpEps');
+  var epCache={}, vpItem=null, vpPlaying=null, vpView=0;
+
+  /* one request per season, shared by the list, the subtitle and next/previous */
+  function seasonEps(id,season){
+    var k=id+':'+season;
+    if(!epCache[k]){
+      epCache[k]=fetch('/api/public/tmdb-discover?kind=season&id='+encodeURIComponent(id)+'&season='+season,{headers:tmdbHeaders()})
+        .then(function(r){ return r.json() })
+        .then(function(d){ return (d&&d.episodes)||[] })
+        .catch(function(){ delete epCache[k]; return [] });
+    }
+    return epCache[k];
+  }
+  function seasonNums(item){ return (item.seasons||[]).map(function(x){ return +x.season }).filter(function(n){ return n>=0 }) }
+  function epCount(item,s){
+    var x=(item.seasons||[]).filter(function(z){ return +z.season===s })[0];
+    return x?(+x.episodes||0):0;
+  }
+  /* the episode before/after (s,e), crossing into the next or previous season */
+  function neighbour(item,s,e,dir){
+    var list=seasonNums(item), i=list.indexOf(s), n=epCount(item,s);
+    if(dir>0){
+      if(!n||e<n) return {s:s,e:e+1};
+      var ns=list[i+1]; return ns!=null?{s:ns,e:1}:null;
+    }
+    if(e>1) return {s:s,e:e-1};
+    var ps=i>0?list[i-1]:null; return ps!=null?{s:ps,e:epCount(item,ps)||1}:null;
+  }
+
+  function renderBar(item,s,e){
+    if(item.type!=='tv'){ vpBar.innerHTML=''; return }
+    var prev=neighbour(item,s,e,-1), next=neighbour(item,s,e,1);
+    vpBar.innerHTML=
+      '<button type="button" class="vpnav prev" data-dir="-1"'+(prev?'':' disabled')+'>‹ Previous</button>'+
+      '<button type="button" class="vpnav next" data-dir="1"'+(next?'':' disabled')+'>Next episode ›</button>';
+  }
+  vpBar.addEventListener('click',function(ev){
+    var b=ev.target.closest('.vpnav'); if(!b||!vpItem||!vpPlaying) return;
+    var to=neighbour(vpItem,vpPlaying.s,vpPlaying.e,+b.getAttribute('data-dir'));
+    if(to) openVid(vpItem,to.s,to.e,0);
+  });
+
+  function renderInfo(item){
+    if(item.type==='tv'){ vpInfo.innerHTML=''; return }
+    var m=[];
+    if(item.year) m.push(esc(item.year));
+    if(item.rating&&+item.rating>0) m.push('<b>★ '+esc(item.rating)+'</b>');
+    if(item.runtime) m.push(esc(item.runtime)+' min');
+    if(item.genres&&item.genres.length) m.push(esc([].concat(item.genres).slice(0,3).join(' · ')));
+    vpInfo.innerHTML=(m.length?'<div class="m">'+m.join(' &nbsp;·&nbsp; ')+'</div>':'')+
+      (item.overview?'<p>'+esc(unent(item.overview))+'</p>':'');
+  }
+
+  function renderSeasons(item){
+    var list=seasonNums(item);
+    vpPick.innerHTML=list.length>1?list.map(function(n){
+      var x=(item.seasons||[]).filter(function(z){ return +z.season===n })[0]||{};
+      return '<button type="button" role="tab" class="vpseason'+(n===vpView?' on':'')+'" data-season="'+n+'" aria-selected="'+(n===vpView)+'">'+
+        esc(n===0?(x.name||'Specials'):('Season '+n))+'</button>';
+    }).join(''):'';
+    var on=vpPick.querySelector('.vpseason.on');
+    if(on) vpPick.scrollLeft=Math.max(0,on.offsetLeft-vpPick.offsetLeft-12);
+  }
+  vpPick.addEventListener('click',function(ev){
+    var b=ev.target.closest('.vpseason'); if(!b||!vpItem) return;
+    vpView=+b.getAttribute('data-season'); renderSeasons(vpItem); renderEpisodes(vpItem);
+  });
+
+  function renderEpisodes(item){
+    var id=item.tmdbId, view=vpView;
+    vpEps.innerHTML='<div class="vpmsg">Loading episodes…</div>';
+    seasonEps(id,view).then(function(eps){
+      if(vpItem!==item||vpView!==view) return;
+      if(!eps.length){ vpEps.innerHTML='<div class="vpmsg">No episode list for this season.</div>'; return }
+      vpEps.innerHTML=eps.map(function(x){
+        var on=vpPlaying&&vpPlaying.s===view&&vpPlaying.e===x.episode;
+        return '<button type="button" class="vpep'+(on?' on':'')+'" data-s="'+view+'" data-e="'+x.episode+'"'+(on?' aria-current="true"':'')+'>'+
+          '<span class="th">'+(x.still?'<img src="'+esc(x.still)+'" alt="" loading="lazy" />':'<i>E'+x.episode+'</i>')+'</span>'+
+          '<span><span class="n"><span>'+x.episode+'.</span>'+esc(x.name||('Episode '+x.episode))+'</span>'+
+          (x.overview?'<span class="o">'+esc(unent(x.overview))+'</span>':'')+
+          (x.air?'<span class="d">'+esc(x.air)+'</span>':'')+'</span></button>';
+      }).join('');
+      var cur=vpEps.querySelector('.vpep.on');
+      if(cur) vpEps.scrollTop=Math.max(0,cur.offsetTop-8);
+    });
+  }
+  vpEps.addEventListener('click',function(ev){
+    var b=ev.target.closest('.vpep'); if(!b||!vpItem) return;
+    openVid(vpItem,+b.getAttribute('data-s'),+b.getAttribute('data-e'),0);
+  });
+
   function openVid(item,season,episode,startAt){
     var need=item&&item.type==='tv'?'series':'movies';
     if(!allowed(need)){ openLock(need); return }
-    var s=season||1, e=episode||1;
+    var s=season||1, e=episode||1, tv=item.type==='tv';
     var saved=getProg(item.tmdbId,item.type);
-    if(startAt==null&&saved&&(item.type!=='tv'||((saved.season||1)===s&&(saved.episode||1)===e))) startAt=saved.position||0;
+    if(startAt==null&&saved&&(!tv||((saved.season||1)===s&&(saved.episode||1)===e))) startAt=saved.position||0;
     startAt=startAt||0;
-    vp.classList.add('open'); document.body.style.overflow='hidden';
+    vp.classList.add('open'); vp.classList.toggle('movie',!tv); document.body.style.overflow='hidden';
     vpTitle.textContent=item.title||'Andam';
-    vpSub.textContent=(item.type==='tv'?('VidAPI · S'+s+' E'+e):'VidAPI · Movie')+
-      (startAt>10?(' · resuming at '+fmtTime(startAt)):'');
+    var resume=startAt>10?(' · resuming at '+fmtTime(startAt)):'';
+    vpSub.textContent=(tv?('Season '+s+' · Episode '+e):[item.year,item.runtime?item.runtime+' min':'','Movie'].filter(Boolean).join(' · '))+resume;
     vpFrame.src=vidUrl(item,s,e,startAt);
     startTracking(item,s,e,startAt);
     setProg(item.tmdbId,item.type,{title:item.title,poster:item.poster,season:s,episode:e,
       position:Math.round(startAt),duration:item.runtime?item.runtime*60:0});
-    vpPick.innerHTML='';
-    if(item.type==='tv'&&item.seasons&&item.seasons.length){
-      var ss=document.createElement('select'); ss.setAttribute('aria-label','Season');
-      ss.innerHTML=item.seasons.map(function(x){
-        return '<option value="'+x.season+'"'+(x.season===s?' selected':'')+'>S'+x.season+'</option>' }).join('');
-      var es=document.createElement('select'); es.setAttribute('aria-label','Episode');
-      vpPick.appendChild(ss); vpPick.appendChild(es);
-      loadEpisodes(item.tmdbId,s,es,e);
-      ss.addEventListener('change',function(){ loadEpisodes(item.tmdbId,+ss.value,es,1) });
-      es.addEventListener('change',function(){ stopTracking(); openVid(item,+ss.value,+es.value,0) });
-    }
+    var sameShow=vpItem===item;
+    vpItem=item; vpPlaying={s:s,e:e};
+    renderBar(item,s,e); renderInfo(item);
+    if(!tv){ vpPick.innerHTML=''; vpEps.innerHTML=''; return }
+    if(!sameShow||vpView!==s){ vpView=s; renderSeasons(item) }
+    renderEpisodes(item);
+    seasonEps(item.tmdbId,s).then(function(eps){
+      if(vpItem!==item||!vpPlaying||vpPlaying.s!==s||vpPlaying.e!==e) return;
+      var x=eps.filter(function(z){ return z.episode===e })[0];
+      if(x&&x.name) vpSub.textContent='S'+s+' · E'+e+' · '+x.name+resume;
+    });
   }
 
   /* ---------- FULLSCREEN ----------
@@ -2699,7 +2887,9 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
   }
   function syncFsBtn(){
     var on=fsActive();
-    vpFsBtn.textContent=on?'⤡':'⛶';
+    vpFsBtn.innerHTML=on
+      ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>'
+      :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
     vpFsBtn.setAttribute('aria-label',on?'Exit fullscreen':'Fullscreen');
     vpFsBtn.title=vpFsBtn.getAttribute('aria-label');
   }
@@ -2708,6 +2898,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(fsActive()) exitFs(); else enterFs();
     setTimeout(syncFsBtn,60);
   });
+  syncFsBtn();
   document.addEventListener('fullscreenchange',syncFsBtn);
   document.addEventListener('webkitfullscreenchange',syncFsBtn);
 
@@ -2716,6 +2907,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     if(fsActive()) exitFs();
     syncFsBtn();
     vp.classList.remove('open'); vpFrame.src='about:blank'; document.body.style.overflow='';
+    vpItem=null; vpPlaying=null;
   }
   document.getElementById('vpClose').addEventListener('click',closeVid);
   vp.addEventListener('click',function(e){ if(e.target===vp) closeVid() });
