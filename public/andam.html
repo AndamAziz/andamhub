@@ -366,6 +366,12 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0}
 .pcard .pm{margin-top:5px;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono';font-size:10.5px;color:var(--muted)}
 .pcard .pm b{color:var(--gold);font-weight:500}
 .catmsg{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--muted);padding:30px 0}
+.cathint{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:-6px 0 18px;font-size:13px;color:var(--muted)}
+.cathint b{color:var(--text);font-weight:600}
+.cathint .chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--hair);background:var(--surface);color:var(--muted);font-size:12.5px}
+.cathint button.chip{cursor:pointer;color:var(--text)}
+.cathint button.chip:hover,.cathint button.chip:focus-visible{border-color:var(--ember);color:var(--ember)}
 .more{display:flex;justify-content:center;padding:30px 0 0}
 .skel{border-radius:12px;border:1px solid var(--hair);background:var(--surface);aspect-ratio:2/3.35;
   animation:sk 1.3s ease-in-out infinite alternate}
@@ -1662,10 +1668,11 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
     <h1 id="catTitle">Movies</h1>
     <span class="cnt mono" id="catCount"></span>
     <form id="catForm" role="search">
-      <input id="catSearch" type="search" placeholder="Search titles" aria-label="Search titles" />
+      <input id="catSearch" type="search" placeholder="Search titles, actors, years…" aria-label="Search titles, actors or years" autocomplete="off" enterkeyhint="search" />
       <button class="btn glass" type="submit">Search</button>
     </form>
   </div>
+  <div class="cathint hide" id="catHint" aria-live="polite"></div>
   <div class="grid" id="catGrid"></div>
   <div class="catmsg hide" id="catMsg"></div>
   <div class="more"><button class="btn glass hide" id="catMore">Load more</button></div>
@@ -2044,12 +2051,33 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
 
 
-  function fetchCatalog(reset){
-    if(cat.busy) return;
+  var catHint=document.getElementById('catHint');
+  function setCatHint(d){
+    var parts=[], label=cat.kind==='movies'?'movies':'shows', otherKind=cat.kind==='movies'?'series':'movies';
+    if(d&&d.corrected) parts.push('<span>Showing results for <b>'+esc(d.corrected)+'</b></span>');
+    if(d&&d.person) parts.push('<span class="chip">'+(d.person.job==='actor'?'With ':'By ')+esc(d.person.name)+'</span>');
+    if(d&&d.year) parts.push('<span class="chip">'+esc(d.year)+'</span>');
+    if(d&&d.other>0) parts.push('<button type="button" class="chip" id="catOther">'+d.other+' in '+(otherKind==='movies'?'Movies':'Shows')+' ›</button>');
+    catHint.innerHTML=parts.join('');
+    catHint.classList.toggle('hide',!parts.length);
+    var o=document.getElementById('catOther');
+    if(o) o.addEventListener('click',function(){
+      var q=catSearch.value.trim();
+      if(!allowed(otherKind)){ openLock(otherKind); return }
+      cat.kind=otherKind; catTitle.textContent=otherKind==='movies'?'Movies':'Shows';
+      catSearch.value=q; cat.q=q; cat.qUsed=''; fetchCatalog(true);
+    });
+  }
+
+  /* reset=true starts a new list (and may overtake one still loading); opts.fix lets the
+     server ask Gemini what a query with no matches meant (typos, Kurdish / Arabic spelling). */
+  function fetchCatalog(reset,opts){
+    opts=opts||{};
+    if(cat.busy&&!reset) return;
     cat.busy=true; catMore.classList.add('hide'); setCatMsg('');
-    if(reset){ cat.page=1; cat.items=[]; catGrid.innerHTML=skeletons(12); catCount.textContent=''; }
-    var my=++cat.req;
-    var qs='kind='+cat.kind+'&page='+cat.page+(cat.q?'&q='+encodeURIComponent(cat.q):'');
+    if(reset){ cat.page=1; cat.items=[]; cat.qUsed=''; catGrid.innerHTML=skeletons(12); catCount.textContent=''; setCatHint(null) }
+    var my=++cat.req, q=cat.qUsed||cat.q;
+    var qs='kind='+cat.kind+'&page='+cat.page+(q?'&q='+encodeURIComponent(q):'')+(opts.fix?'&fix=1':'');
     fetch('/api/public/tmdb-discover?'+qs,{headers:tmdbHeaders()})
       .then(function(r){
         /* server said locked: fall back to the gate, never to stale content */
@@ -2060,12 +2088,20 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
       .then(function(d){
         if(my!==cat.req) return;
         cat.totalPages=Number(d.totalPages||1);
+        if(reset&&d.corrected) cat.qUsed=d.corrected;
         var items=Array.isArray(d.items)?d.items:[];
         cat.items=cat.items.concat(items);
-        if(reset) catGrid.innerHTML='';
+        if(reset){ catGrid.innerHTML=''; if(cat.q) setCatHint(d) }
         catGrid.insertAdjacentHTML('beforeend',items.map(posterCard).join(''));
         catCount.textContent=cat.items.length+' titles'+(cat.q?' · "'+cat.q+'"':'');
-        if(!cat.items.length) setCatMsg(cat.q?'No titles found for "'+cat.q+'".':'Nothing to show right now.');
+        if(!cat.items.length){
+          if(cat.q&&!opts.fix){
+            /* nothing matched as typed: ask once more with the spelling fixer */
+            setCatMsg('Looking for similar titles…'); cat.busy=false;
+            fetchCatalog(true,{fix:true}); return;
+          }
+          setCatMsg(cat.q?'No titles found for "'+cat.q+'". Try another spelling, an actor or a year.':'Nothing to show right now.');
+        }
         catMore.classList.toggle('hide', cat.page>=cat.totalPages || !items.length);
       })
       .catch(function(){
@@ -2073,7 +2109,7 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
         if(reset) catGrid.innerHTML='';
         setCatMsg('Could not load the catalog. Try again in a moment.');
       })
-      .then(function(){ cat.busy=false });
+      .then(function(){ if(my===cat.req) cat.busy=false });
   }
 
   var ltvEl=document.getElementById('ltv'), iptvEl=document.getElementById('iptv');
@@ -2207,7 +2243,21 @@ html.tvmode .lvstage:focus-within .lvcontrols{opacity:1}
 
 
   catMore.addEventListener('click',function(){ if(cat.page<cat.totalPages){ cat.page++; fetchCatalog(false); } });
-  catForm.addEventListener('submit',function(e){ e.preventDefault(); cat.q=catSearch.value.trim(); fetchCatalog(true); });
+  /* results follow the typing (after a short pause); Enter searches at once */
+  var catTimer=null;
+  function runSearch(){
+    clearTimeout(catTimer);
+    var q=catSearch.value.trim();
+    if(q===cat.q&&cat.items.length) return;
+    cat.q=q; fetchCatalog(true);
+  }
+  catForm.addEventListener('submit',function(e){ e.preventDefault(); catSearch.blur(); cat.q=null; runSearch(); });
+  catSearch.addEventListener('input',function(){
+    clearTimeout(catTimer);
+    var q=catSearch.value.trim();
+    if(q&&q.length<2) return;
+    catTimer=setTimeout(runSearch,q?420:0);
+  });
 
   /* "Get the app": hide the Windows button inside the Windows app, and both inside the Android app. */
   (function(){
